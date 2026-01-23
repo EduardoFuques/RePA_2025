@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import os
 
 from src.logger import logger
 from src.middlewarelogg import log_requests
@@ -15,22 +17,26 @@ from src.routes.work_routes import work_router
 
 from src.seed import seed_data
 
+load_dotenv()
+
 # Inicializar la base de datos
 init_db()
 
 app = FastAPI()
 app.title = "Backend RePA - 2025"
-app.version = "0.1.0"
+app.version = "0.2.0"
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
 
 logger.info("FastAPI iniciado correctamente...")
 
-origin = ['*'] # URL permitidas para consumir la API
+# CORS - Cargar orígenes desde variable de entorno
+cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
+origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origin,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

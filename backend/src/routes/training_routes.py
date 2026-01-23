@@ -116,7 +116,7 @@ async def get_list_training(current_user: dict= Depends(get_current_user), db: S
         )
     
     trainings = db.query(Training).filter(Training.user_id == current_user["id"]).all()
-    if not training:
+    if not trainings:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Cursos no encontrado"

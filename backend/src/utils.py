@@ -42,7 +42,7 @@ async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)
     """
 
     payload = decode_access_token(token)
-    print(f"Utils - get_current_user - payload: {payload}")  # Debug
+    logger.debug(f"get_current_user - payload: {payload}")
     
     user_data = {
         "id": payload.get("sub"),
@@ -50,7 +50,7 @@ async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)
         "roles": payload.get("roles"),
         "type": payload.get("type")
     }
-    print(f"Utils - get_current_user - user_data: {user_data}")  # Debug
+    logger.debug(f"get_current_user - user_data: {user_data}")
     return user_data
 
 def validar_password(password: str):
@@ -88,17 +88,17 @@ def has_user_role(current_user: dict, required_roles: list[str]) -> bool:
     Returns:
         bool: True si tiene al menos un rol requerido, False en caso contrario
     """
-    print(f"Utils - has_user_role - current_user: {current_user}")  # Debug
+    logger.debug(f"has_user_role - current_user: {current_user}")
     
     # Extraer los nombres de los roles del usuario en minúsculas
     user_roles = {role["rol"].lower() for role in current_user.get("roles", [])}
-    print(f"Utils - has_user_role - user_roles: {user_roles}")  # Debug
+    logger.debug(f"has_user_role - user_roles: {user_roles}")
     # Convertir los roles requeridos a minúsculas para comparación insensible a mayúsculas/minúsculas
     required_roles_lower = {role.lower() for role in required_roles}
-    print(f"Utils - has_user_role - required_roles_lower: {required_roles_lower}")  # Debug
+    logger.debug(f"has_user_role - required_roles_lower: {required_roles_lower}")
     
     hsa_role = user_roles.isdisjoint(required_roles_lower)
-    print(f"Utils - has_user_role - hsa_role: {hsa_role}")  # Debug
+    logger.debug(f"has_user_role - hsa_role: {hsa_role}")
     
     # Verificar si hay intersección entre los roles del usuario y los roles requeridos
     return not user_roles.isdisjoint(required_roles_lower)

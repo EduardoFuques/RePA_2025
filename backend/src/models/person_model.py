@@ -1,13 +1,13 @@
 # models/person_model.py
 from sqlalchemy import Column, String, Integer, Date, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
-from src.db.database import Base
+from src.database import Base
 
 class Person(Base):
     __tablename__ = "persons"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_email = Column(String, ForeignKey("users.email"), unique=True, nullable=False)  # Relación 1 a 1
+    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)  # Relación 1 a 1
     nombre = Column(String, nullable=False)
     apellido = Column(String, nullable=False)
     dni_cuit_cuil = Column(String, unique=True, nullable=False)
@@ -35,4 +35,4 @@ class Person(Base):
     dir_pais = Column(String, nullable=True)
 
     # Relación con el usuario
-    user = relationship("User", back_populates="person")
+    user = relationship("User", back_populates="person", foreign_keys=[user_id])

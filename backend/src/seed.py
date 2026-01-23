@@ -16,12 +16,12 @@ def seed_data():
             ]
             db.add_all(roles)
             db.commit()
-            print("Seed de roles completado.")
+            # Seed de roles completado
         else:
-            print("Los roles ya existen, saltando el seed.")
+            pass  # Los roles ya existen
     except IntegrityError as e:
         db.rollback()
-        print("Error insertando seed:", e)
+        # Error insertando seed - se ignora si ya existen
     finally:
         db.close()
 
