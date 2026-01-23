@@ -14,6 +14,10 @@ from src.routes.admin_routes import admin_router
 from src.routes.training_routes import training_router
 from src.routes.admin_training_rutes import admin_training
 from src.routes.work_routes import work_router
+from src.routes.persona_fisica_routes import persona_fisica_router
+from src.routes.persona_juridica_routes import persona_juridica_router
+from src.routes.asociacion_routes import asociacion_router
+from src.routes.obra_audiovisual_routes import obra_audiovisual_router
 
 from src.seed import seed_data
 
@@ -24,7 +28,7 @@ init_db()
 
 app = FastAPI()
 app.title = "Backend RePA - 2025"
-app.version = "0.2.0"
+app.version = "0.4.0"
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
 
 logger.info("FastAPI iniciado correctamente...")
@@ -52,6 +56,12 @@ def on_startup():
 app.include_router(user_router, prefix="/users", tags=["Users"])
 app.include_router(training_router, prefix="/training", tags=["Training"])
 app.include_router(work_router, prefix="/work", tags=["Work"])
+
+# Rutas de formularios RePA
+app.include_router(persona_fisica_router, prefix="/persona-fisica", tags=["Persona Física"])
+app.include_router(persona_juridica_router, prefix="/persona-juridica", tags=["Persona Jurídica"])
+app.include_router(asociacion_router, prefix="/asociacion", tags=["Asociación/Colectivo"])
+app.include_router(obra_audiovisual_router, prefix="/obras", tags=["Obras Audiovisuales (AGAM)"])
 
 # Rutas de Administración
 app.include_router(admin_router, prefix="/admin_user", tags=["Administrator User"])

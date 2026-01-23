@@ -7,6 +7,26 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.4.0] - 2026-01-23
+
+### Added
+- **Schemas Pydantic** para validación de datos:
+  - `persona_fisica_schemas.py` - Create, Update, Out para PF y subperfiles
+  - `persona_juridica_schemas.py` - Create, Update, Out para PJ e integrantes
+  - `asociacion_schemas.py` - Create, Update, Out para AS e integrantes
+  - `obra_audiovisual_schemas.py` - Create, Update, Out para AGAM y equipo técnico
+- **Rutas CRUD** para formularios RePA:
+  - `/persona-fisica` - CRUD completo + endpoints para cada subperfil
+  - `/persona-juridica` - CRUD completo + gestión de integrantes
+  - `/asociacion` - CRUD completo + gestión de integrantes
+  - `/obras` - CRUD completo + gestión de equipo técnico
+- Rutas registradas en `main.py` con tags para documentación Swagger
+
+### Changed
+- Versión de la API actualizada a 0.4.0
+
+---
+
 ## [0.3.0] - 2026-01-23
 
 ### Added
