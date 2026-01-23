@@ -41,3 +41,9 @@ class User(Base):
     roles = relationship("Role", secondary="user_roles", backref="users")
     trainings = relationship("Training", back_populates="user")  # Relación 1:N con Training
     trabajos = relationship('Work', back_populates='user') # Relación 1:N con Trabajo
+    
+    # Relaciones con formularios RePA
+    persona_fisica = relationship("PersonaFisica", back_populates="user", uselist=False)  # 1:1
+    persona_juridica = relationship("PersonaJuridica", back_populates="user", uselist=False)  # 1:1
+    asociacion = relationship("Asociacion", back_populates="user", uselist=False)  # 1:1
+    obras_audiovisuales = relationship("ObraAudiovisual", back_populates="user")  # 1:N

@@ -7,6 +7,29 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.3.0] - 2026-01-23
+
+### Added
+- **Modelo PersonaFisica** (`persona_fisica_model.py`) - Reemplaza Person con estructura completa:
+  - Datos personales, educación, identidades, situación laboral, interés institucional
+  - Subperfiles: Productor, Director, Guionista, Documentalista, Realizador Integral, Técnico/Artístico, Capacitador, Investigador
+- **Modelo PersonaJuridica** (`persona_juridica_model.py`):
+  - Datos institucionales, domicilio, representación legal, actividades, documentación
+  - Tabla de integrantes vinculados
+- **Modelo Asociacion** (`asociacion_model.py`):
+  - Datos básicos, representación, ámbitos de actuación, documentación
+  - Tabla de integrantes vinculados
+- **Modelo ObraAudiovisual** (`obra_audiovisual_model.py`) para AGAM:
+  - Identificación, datos técnicos, datos relacionales, derechos
+  - Tabla de equipo técnico
+- Archivo `models/__init__.py` para registro centralizado de modelos
+- Relaciones en User: persona_fisica, persona_juridica, asociacion, obras_audiovisuales
+
+### Removed
+- Archivo `person_model.py` (reemplazado por `persona_fisica_model.py`)
+
+---
+
 ## [0.2.0] - 2026-01-23
 
 ### Added
