@@ -2,8 +2,6 @@
 # Importar todos los modelos para que SQLAlchemy los registre
 
 from src.models.user_models import User, Role, UserRole, TokenRecovery
-from src.models.training_models import Training
-from src.models.work_models import Work, RolWork, TareaWork
 
 # Modelos de formularios RePA
 from src.models.persona_fisica_model import (
@@ -31,11 +29,6 @@ __all__ = [
     "Role", 
     "UserRole",
     "TokenRecovery",
-    # Training & Work
-    "Training",
-    "Work",
-    "RolWork",
-    "TareaWork",
     # Persona Física
     "PersonaFisica",
     "SubperfilProductor",
