@@ -66,6 +66,10 @@ class ObraAudiovisual(Base):
     
     # Relación con el usuario
     user = relationship("User", back_populates="obras_audiovisuales")
+    
+    # Relaciones con Exhibiciones y Cinemateca
+    exhibiciones = relationship("Exhibicion", back_populates="obra")
+    registros_cinemateca = relationship("Cinemateca", back_populates="obra")
 
 
 class EquipoTecnicoObra(Base):

@@ -9,3 +9,8 @@ python-jose[cryptography] # Librería para JWT
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.0 # Librería para encriptar contraseñas
 python-dotenv # Librería para manejar variables de entorno
+
+# Testing
+pytest
+pytest-asyncio
+httpx

@@ -18,6 +18,8 @@ from src.routes.persona_fisica_routes import persona_fisica_router
 from src.routes.persona_juridica_routes import persona_juridica_router
 from src.routes.asociacion_routes import asociacion_router
 from src.routes.obra_audiovisual_routes import obra_audiovisual_router
+from src.routes.esa_routes import esa_router
+from src.routes.exhibicion_routes import exhibicion_router
 
 from src.seed import seed_data
 
@@ -28,7 +30,7 @@ init_db()
 
 app = FastAPI()
 app.title = "Backend RePA - 2025"
-app.version = "0.4.0"
+app.version = "0.5.0"
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
 
 logger.info("FastAPI iniciado correctamente...")
@@ -62,6 +64,8 @@ app.include_router(persona_fisica_router, prefix="/persona-fisica", tags=["Perso
 app.include_router(persona_juridica_router, prefix="/persona-juridica", tags=["Persona Jurídica"])
 app.include_router(asociacion_router, prefix="/asociacion", tags=["Asociación/Colectivo"])
 app.include_router(obra_audiovisual_router, prefix="/obras", tags=["Obras Audiovisuales (AGAM)"])
+app.include_router(esa_router, prefix="/esa", tags=["Estudiantes ESA"])
+app.include_router(exhibicion_router, prefix="/exhibiciones", tags=["Exhibiciones, Salas, Festivales, Cinemateca"])
 
 # Rutas de Administración
 app.include_router(admin_router, prefix="/admin_user", tags=["Administrator User"])

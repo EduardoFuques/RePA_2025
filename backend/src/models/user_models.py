@@ -47,3 +47,9 @@ class User(Base):
     persona_juridica = relationship("PersonaJuridica", back_populates="user", uselist=False)  # 1:1
     asociacion = relationship("Asociacion", back_populates="user", uselist=False)  # 1:1
     obras_audiovisuales = relationship("ObraAudiovisual", back_populates="user")  # 1:N
+    
+    # Relaciones con ESA y Exhibiciones
+    estudiante_esa = relationship("EstudianteESA", back_populates="user", uselist=False)  # 1:1
+    salas = relationship("Sala", back_populates="user")  # 1:N
+    exhibiciones = relationship("Exhibicion", back_populates="user")  # 1:N
+    festivales = relationship("Festival", back_populates="user")  # 1:N

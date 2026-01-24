@@ -7,6 +7,33 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.0] - 2026-01-24
+
+### Added
+- **Modelo EstudianteESA** (`esa_model.py`) - Registro de estudiantes del audiovisual:
+  - Datos personales, localización, formación, intereses, declaraciones
+  - Vigencia de 1 año con renovación automática
+- **Modelos de Exhibiciones** (`exhibicion_model.py`):
+  - `Sala` - Salas de exhibición con características técnicas
+  - `Exhibicion` - Registro de proyecciones con espectadores y recaudación
+  - `Festival` - Festivales de cine con categorías y apoyo IAAviM
+  - `Cinemateca` - Gestión del archivo físico de obras
+- **Schemas Pydantic** para ESA y Exhibiciones
+- **Rutas CRUD** para ESA (`/esa`) y Exhibiciones (`/exhibiciones`)
+- **Suite de Tests** con pytest:
+  - `conftest.py` - Configuración y fixtures
+  - `test_auth.py` - Tests de autenticación
+  - `test_persona_fisica.py` - Tests de Persona Física
+  - `test_esa.py` - Tests de Estudiantes ESA
+  - `test_exhibiciones.py` - Tests de Salas, Exhibiciones, Festivales
+- Dependencias de testing: pytest, pytest-asyncio, httpx
+
+### Changed
+- Versión de la API actualizada a 0.5.0
+- Relaciones agregadas en User y ObraAudiovisual
+
+---
+
 ## [0.4.0] - 2026-01-23
 
 ### Added

@@ -21,6 +21,10 @@ from src.models.persona_juridica_model import PersonaJuridica, IntegrantePJ
 from src.models.asociacion_model import Asociacion, IntegranteAsociacion
 from src.models.obra_audiovisual_model import ObraAudiovisual, EquipoTecnicoObra
 
+# Modelos ESA y Exhibiciones
+from src.models.esa_model import EstudianteESA
+from src.models.exhibicion_model import Sala, Exhibicion, Festival, Cinemateca
+
 __all__ = [
     # User & Auth
     "User",
@@ -51,4 +55,11 @@ __all__ = [
     # Obras Audiovisuales (AGAM)
     "ObraAudiovisual",
     "EquipoTecnicoObra",
+    # ESA (Estudiantes)
+    "EstudianteESA",
+    # Exhibiciones
+    "Sala",
+    "Exhibicion",
+    "Festival",
+    "Cinemateca",
 ]
