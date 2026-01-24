@@ -45,7 +45,7 @@ origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
 app = FastAPI(
     title="Backend RePA - 2025",
-    version="0.5.2",
+    version="0.5.3",
     lifespan=lifespan
 )
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)

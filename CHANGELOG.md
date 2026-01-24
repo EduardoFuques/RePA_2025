@@ -7,6 +7,22 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.3] - 2026-01-24
+
+### Added
+- **Alembic para migraciones de base de datos**:
+  - Configuración inicial con `alembic init`
+  - `env.py` configurado para usar `DATABASE_URL` desde variables de entorno
+  - Migración inicial `bc2bcbe0847e_initial_migration.py`
+  - Soporte para autogenerate de migraciones
+- Archivo `.env.example` con configuración de ejemplo
+- Puerto 5432 expuesto en `docker-compose.yml` para desarrollo local
+
+### Changed
+- Versión actualizada a 0.5.3
+
+---
+
 ## [0.5.2] - 2026-01-24
 
 ### Changed

@@ -433,19 +433,19 @@ El login genera `refresh_token` pero no hay endpoint para usarlo.
 | 12 | ~~Corregir typo `admin_training_rutes.py`~~ | v0.5.1 |
 | 13 | ~~Corregir deprecation warnings Pydantic v2~~ | v0.5.2 |
 | 14 | ~~Migrar `on_event` a `lifespan` handlers~~ | v0.5.2 |
+| 15 | ~~Implementar Alembic (migraciones)~~ | v0.5.3 |
 
 ### ⏳ Tareas Pendientes
 | # | Prioridad | Tarea | Esfuerzo | Impacto |
 |---|-----------|-------|----------|---------|
-| 1 | 🟡 Media | Implementar Alembic (migraciones) | Medio | Alto |
-| 2 | � Baja | Implementar health checks | Bajo | Medio |
-| 3 | 🟢 Baja | Configurar logging estructurado | Medio | Medio |
+| 1 | 🟢 Baja | Implementar health checks | Bajo | Medio |
+| 2 | 🟢 Baja | Configurar logging estructurado | Medio | Medio |
 
 ---
 
 *Documento generado el 23/01/2026*
-*Última actualización: 24/01/2026 10:20*
-*Versión del backend analizada: 0.5.2*
+*Última actualización: 24/01/2026 10:25*
+*Versión del backend analizada: 0.5.3*
 
 ---
 
