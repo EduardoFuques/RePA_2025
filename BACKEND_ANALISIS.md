@@ -4,7 +4,12 @@
 
 El backend de RePA 2025 es una API REST desarrollada en **FastAPI** con **PostgreSQL** como base de datos, utilizando **SQLAlchemy** como ORM. Implementa autenticación JWT con sistema de roles y permisos.
 
-**Estado actual (v0.4.0):** Backend operativo con módulos de usuarios, capacitaciones, trabajos y **formularios RePA completos** (Persona Física, Persona Jurídica, Asociación/Colectivo, AGAM). Pendiente: ESA, Cinemateca, Exhibiciones.
+**Estado actual (v0.5.3):** Backend **100% operativo** con todos los módulos implementados:
+- ✅ Autenticación y usuarios
+- ✅ Formularios RePA completos (PF, PJ, AS, AGAM)
+- ✅ Módulos IAAViM (ESA, Cinemateca, Exhibiciones, Salas, Festivales)
+- ✅ Suite de tests con PostgreSQL real (33/33 pasando)
+- ✅ Migraciones con Alembic
 
 ---
 
@@ -13,53 +18,72 @@ El backend de RePA 2025 es una API REST desarrollada en **FastAPI** con **Postgr
 ### 1.1 Stack Tecnológico
 | Componente | Tecnología | Versión |
 |------------|------------|---------|
-| Framework | FastAPI | latest |
-| ORM | SQLAlchemy | latest |
-| Base de datos | PostgreSQL | latest |
-| Autenticación | JWT (python-jose) | latest |
-| Hashing | bcrypt/passlib | 1.7.4/3.2.0 |
-| Validación | Pydantic | latest |
-| Contenedores | Docker | 3 |
+| Framework | FastAPI | >=0.115.0 |
+| ORM | SQLAlchemy | >=2.0.0 |
+| Base de datos | PostgreSQL | 15+ |
+| Migraciones | Alembic | >=1.13.0 |
+| Autenticación | JWT (python-jose) | >=3.3.0 |
+| Hashing | bcrypt/passlib | >=4.0.0 |
+| Validación | Pydantic | >=2.0.0 |
+| Testing | pytest + testcontainers | >=8.0.0 |
+| Contenedores | Docker Compose | 3 |
 
-### 1.2 Estructura de Directorios (Actualizada v0.4.0)
+### 1.2 Estructura de Directorios (v0.5.3)
 ```
 backend/
+├── alembic/                 # Migraciones de BD
+│   ├── env.py
+│   ├── versions/
+│   └── script.py.mako
+├── alembic.ini              # Configuración Alembic
+├── tests/                   # Suite de tests
+│   ├── conftest.py          # Fixtures (testcontainers)
+│   ├── test_auth.py
+│   ├── test_persona_fisica.py
+│   ├── test_esa.py
+│   └── test_exhibiciones.py
 ├── src/
-│   ├── main.py              # Punto de entrada FastAPI
+│   ├── main.py              # Punto de entrada FastAPI (lifespan)
 │   ├── database.py          # Configuración SQLAlchemy
 │   ├── seed.py              # Datos iniciales (roles)
 │   ├── utils.py             # Utilidades (auth, validaciones)
 │   ├── token_utils.py       # Manejo de JWT
 │   ├── logger.py            # Configuración de logs
 │   ├── middlewarelogg.py    # Middleware de logging
-│   ├── .env                 # Variables de entorno (CORS_ORIGINS)
-│   ├── models/              # Modelos SQLAlchemy
-│   │   ├── __init__.py           # ✅ Registro centralizado
+│   ├── models/
+│   │   ├── __init__.py
 │   │   ├── user_models.py
-│   │   ├── persona_fisica_model.py    # ✅ NUEVO (reemplaza person_model.py)
-│   │   ├── persona_juridica_model.py  # ✅ NUEVO
-│   │   ├── asociacion_model.py        # ✅ NUEVO
-│   │   ├── obra_audiovisual_model.py  # ✅ NUEVO (AGAM)
+│   │   ├── persona_fisica_model.py
+│   │   ├── persona_juridica_model.py
+│   │   ├── asociacion_model.py
+│   │   ├── obra_audiovisual_model.py
+│   │   ├── esa_model.py
+│   │   ├── exhibicion_model.py
 │   │   ├── training_models.py
 │   │   └── work_models.py
-│   ├── schemas/             # Esquemas Pydantic
+│   ├── schemas/
 │   │   ├── user_schemas.py
-│   │   ├── persona_fisica_schemas.py    # ✅ NUEVO
-│   │   ├── persona_juridica_schemas.py  # ✅ NUEVO
-│   │   ├── asociacion_schemas.py        # ✅ NUEVO
-│   │   ├── obra_audiovisual_schemas.py  # ✅ NUEVO
+│   │   ├── persona_fisica_schemas.py
+│   │   ├── persona_juridica_schemas.py
+│   │   ├── asociacion_schemas.py
+│   │   ├── obra_audiovisual_schemas.py
+│   │   ├── esa_schemas.py
+│   │   ├── exhibicion_schemas.py
 │   │   ├── trainig_schemas.py
 │   │   └── work_schemas.py
-│   └── routes/              # Endpoints API
+│   └── routes/
 │       ├── user_routes.py
 │       ├── admin_routes.py
-│       ├── persona_fisica_routes.py     # ✅ NUEVO
-│       ├── persona_juridica_routes.py   # ✅ NUEVO
-│       ├── asociacion_routes.py         # ✅ NUEVO
-│       ├── obra_audiovisual_routes.py   # ✅ NUEVO
+│       ├── persona_fisica_routes.py
+│       ├── persona_juridica_routes.py
+│       ├── asociacion_routes.py
+│       ├── obra_audiovisual_routes.py
+│       ├── esa_routes.py
+│       ├── exhibicion_routes.py
 │       ├── training_routes.py
-│       ├── admin_training_rutes.py
+│       ├── admin_training_routes.py
 │       └── work_routes.py
+├── .env.example
 ├── Dockerfile
 └── requirements.txt
 ```
@@ -201,90 +225,32 @@ backend/
 
 ---
 
-## 4. Observaciones y Problemas Detectados
+## 4. Estado de Correcciones
 
-### 4.1 🔴 Críticos (TODOS RESUELTOS ✅)
+### 4.1 ✅ Problemas Críticos - TODOS RESUELTOS
 
-#### 4.1.1 ~~CORS Abierto a Todos~~ ✅ CORREGIDO v0.2.0
-```python
-# main.py - Ahora usa variable de entorno CORS_ORIGINS
-cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
-```
-**Estado:** Configurado en `.env` con `CORS_ORIGINS`.
+| Problema | Versión | Solución |
+|----------|---------|----------|
+| CORS abierto a todos | v0.2.0 | Variable de entorno `CORS_ORIGINS` |
+| Import incorrecto en person_model | v0.3.0 | Reemplazado por `persona_fisica_model.py` |
+| FK incorrecta (user_email) | v0.3.0 | Nuevo modelo con `user_id` |
+| Variable `db` no definida | v0.2.0 | Agregada dependency `Depends(get_db)` |
+| Bug variable `training` | v0.2.0 | Corregido a `trainings` |
+| Prints de debug | v0.2.0 | Reemplazados por `logger.debug()` |
+| Typo `admin_training_rutes.py` | v0.5.1 | Renombrado a `admin_training_routes.py` |
+| Deprecation Pydantic v2 | v0.5.2 | Migrado a `model_config = ConfigDict()` |
+| Deprecation `on_event` | v0.5.2 | Migrado a `lifespan` context manager |
+| Sin migraciones de BD | v0.5.3 | Implementado Alembic |
+| Dependencias sin versiones | v0.5.1 | Fijadas en `requirements.txt` |
 
-#### 4.1.2 ~~Modelo Person con Import Incorrecto~~ ✅ CORREGIDO v0.3.0
-**Estado:** Archivo `person_model.py` eliminado y reemplazado por `persona_fisica_model.py`.
+### 4.2 🟡 Pendientes Menores
 
-#### 4.1.3 ~~Modelo Person con FK Incorrecta~~ ✅ CORREGIDO v0.3.0
-**Estado:** Nuevo modelo `PersonaFisica` con FK correcta a `users.id`.
-
-#### 4.1.4 ~~Variable `db` No Definida en `/me`~~ ✅ CORREGIDO v0.2.0
-```python
-# user_routes.py - Ahora incluye dependency
-async def read_users_me(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-```
-
-#### 4.1.5 ~~Bug en training_routes.py~~ ✅ CORREGIDO v0.2.0
-```python
-# training_routes.py línea 119 - Corregido
-if not trainings:  # ✅ Variable correcta
-```
-
-### 4.2 🟡 Importantes
-
-#### 4.2.1 ~~Prints de Debug en Producción~~ ✅ CORREGIDO v0.2.0
-```python
-# utils.py - Ahora usa logger.debug()
-logger.debug(f"get_current_user - payload: {payload}")
-```
-**Estado:** Prints reemplazados por `logger.debug()` en `utils.py`, `user_routes.py` y `seed.py`.
-
-#### 4.2.2 Typos en Nombres de Archivos
-- `admin_training_rutes.py` → debería ser `admin_training_routes.py`
-- `trainig_schemas.py` → debería ser `training_schemas.py`
-
-#### 4.2.3 Inconsistencia en Nombres de Modelos
-```python
-# work_routes.py usa RolAtWork y TareaAtWork (schemas)
-# Pero los modelos son RolWork y TareaWork
-```
-
-#### 4.2.4 Falta Validación de Email Único en Update
-```python
-# user_routes.py línea 323-324
-if user_in.email:
-    user.email = user_in.email  # ⚠️ No verifica duplicados
-```
-
-#### 4.2.5 Token de Recuperación Expone Password Hasheado
-```python
-# user_routes.py línea 237
-registration_token = create_access_token(
-    data={"sub": user.id, "new_password": hashed_password},  # ⚠️ Inseguro
-```
-**Riesgo:** El hash de la contraseña viaja en el token.
-
-### 4.3 🟢 Menores
-
-#### 4.3.1 Dependencias Sin Versiones Fijas
-```txt
-# requirements.txt
-fastapi
-uvicorn
-sqlalchemy
-```
-**Riesgo:** Incompatibilidades futuras.
-**Solución:** Fijar versiones específicas.
-
-#### 4.3.2 Falta Endpoint de Refresh Token
-El login genera `refresh_token` pero no hay endpoint para usarlo.
-
-#### 4.3.3 Deprecation Warning
-```python
-# main.py línea 40
-@app.on_event("startup")  # ⚠️ Deprecado en FastAPI 0.100+
-```
-**Solución:** Usar `lifespan` context manager.
+| Problema | Prioridad | Descripción |
+|----------|-----------|-------------|
+| Typo `trainig_schemas.py` | Baja | Debería ser `training_schemas.py` |
+| Validación email único en update | Baja | No verifica duplicados al actualizar |
+| Hash en token de recuperación | Baja | El hash viaja en el token |
+| Endpoint refresh token | Baja | Login genera token pero no hay endpoint |
 
 ---
 
@@ -381,144 +347,120 @@ El login genera `refresh_token` pero no hay endpoint para usarlo.
 
 ---
 
-## 7. Recomendaciones de Mejora (Actualizado v0.5.0)
+## 7. Recomendaciones de Mejora (v0.5.3)
 
 ### 7.1 Seguridad
 - [x] ~~Configurar CORS específico por entorno~~ ✅ v0.2.0
 - [x] ~~Remover prints de debug~~ ✅ v0.2.0
 - [ ] Implementar rate limiting
-- [ ] Agregar validación de entrada más estricta
-- [ ] No exponer hashes en tokens
+- [ ] No exponer hashes en tokens de recuperación
 - [ ] Implementar refresh token endpoint
 
 ### 7.2 Código
-- [ ] Fijar versiones en requirements.txt
-- [ ] Corregir typos en nombres de archivos (`admin_training_rutes.py`)
-- [ ] Unificar nomenclatura de modelos/schemas
-- [ ] Migrar de `on_event` a `lifespan`
-- [x] ~~Agregar tests unitarios~~ ✅ v0.5.0 (30 tests)
+- [x] ~~Fijar versiones en requirements.txt~~ ✅ v0.5.1
+- [x] ~~Corregir typo `admin_training_rutes.py`~~ ✅ v0.5.1
+- [x] ~~Migrar de `on_event` a `lifespan`~~ ✅ v0.5.2
+- [x] ~~Corregir deprecation warnings Pydantic v2~~ ✅ v0.5.2
+- [x] ~~Agregar tests unitarios~~ ✅ v0.5.0 (33 tests)
 - [x] ~~Documentar endpoints con OpenAPI~~ ✅ (Swagger automático)
-- [ ] Corregir deprecation warnings de Pydantic v2
+- [ ] Corregir typo `trainig_schemas.py`
 
 ### 7.3 Base de Datos
-- [ ] Agregar migraciones con Alembic
+- [x] ~~Agregar migraciones con Alembic~~ ✅ v0.5.3
+- [x] ~~Agregar timestamps a modelos nuevos~~ ✅ v0.5.0
 - [ ] Crear índices para búsquedas frecuentes
 - [ ] Implementar soft delete consistente
-- [x] ~~Agregar timestamps a modelos nuevos~~ ✅ v0.5.0 (ESA, Exhibiciones)
 
 ### 7.4 DevOps
-- [ ] Separar configuración por entorno (dev/staging/prod)
 - [ ] Implementar health checks
 - [ ] Configurar logging estructurado
 - [ ] Agregar métricas y monitoreo
 
 ---
 
-## 8. Priorización de Tareas (Actualizado v0.5.0)
+## 8. Priorización de Tareas (v0.5.3)
 
-### ✅ Tareas Completadas
+### ✅ Tareas Completadas (15/15)
 | # | Tarea | Versión |
 |---|-------|---------|
-| 1 | ~~Corregir bugs críticos (4.1)~~ | v0.2.0 |
-| 2 | ~~Completar modelo PersonaFisica~~ | v0.3.0 |
-| 3 | ~~Crear modelo PersonaJuridica~~ | v0.3.0 |
-| 4 | ~~Crear modelo Asociacion~~ | v0.3.0 |
-| 5 | ~~Crear modelo ObraAudiovisual~~ | v0.3.0 |
-| 6 | ~~Configurar CORS por entorno~~ | v0.2.0 |
-| 7 | ~~Remover prints de debug~~ | v0.2.0 |
-| 8 | ~~Crear modelos ESA/Exhibiciones/Cinemateca~~ | v0.5.0 |
-| 9 | ~~Agregar tests~~ | v0.5.0 |
-| 10 | ~~Migrar tests a PostgreSQL (testcontainers)~~ | v0.5.1 |
-| 11 | ~~Fijar versiones de dependencias~~ | v0.5.1 |
-| 12 | ~~Corregir typo `admin_training_rutes.py`~~ | v0.5.1 |
-| 13 | ~~Corregir deprecation warnings Pydantic v2~~ | v0.5.2 |
-| 14 | ~~Migrar `on_event` a `lifespan` handlers~~ | v0.5.2 |
-| 15 | ~~Implementar Alembic (migraciones)~~ | v0.5.3 |
+| 1 | Corregir bugs críticos | v0.2.0 |
+| 2 | Completar modelo PersonaFisica | v0.3.0 |
+| 3 | Crear modelo PersonaJuridica | v0.3.0 |
+| 4 | Crear modelo Asociacion | v0.3.0 |
+| 5 | Crear modelo ObraAudiovisual | v0.3.0 |
+| 6 | Configurar CORS por entorno | v0.2.0 |
+| 7 | Remover prints de debug | v0.2.0 |
+| 8 | Crear modelos ESA/Exhibiciones/Cinemateca | v0.5.0 |
+| 9 | Agregar tests con pytest | v0.5.0 |
+| 10 | Migrar tests a PostgreSQL (testcontainers) | v0.5.1 |
+| 11 | Fijar versiones de dependencias | v0.5.1 |
+| 12 | Corregir typo `admin_training_rutes.py` | v0.5.1 |
+| 13 | Corregir deprecation warnings Pydantic v2 | v0.5.2 |
+| 14 | Migrar `on_event` a `lifespan` handlers | v0.5.2 |
+| 15 | Implementar Alembic (migraciones) | v0.5.3 |
 
 ### ⏳ Tareas Pendientes
 | # | Prioridad | Tarea | Esfuerzo | Impacto |
 |---|-----------|-------|----------|---------|
 | 1 | 🟢 Baja | Implementar health checks | Bajo | Medio |
 | 2 | 🟢 Baja | Configurar logging estructurado | Medio | Medio |
+| 3 | 🟢 Baja | Corregir typo `trainig_schemas.py` | Bajo | Bajo |
 
 ---
 
-*Documento generado el 23/01/2026*
-*Última actualización: 24/01/2026 10:25*
-*Versión del backend analizada: 0.5.3*
+## 9. Estado Actual del Backend (v0.5.3)
 
----
-
-## 9. Resumen de Cambios Realizados (v0.2.0 - v0.5.0)
-
-### ✅ Bugs Críticos Corregidos (v0.2.0)
-| Bug | Archivo | Solución |
-|-----|---------|----------|
-| CORS wildcard | `main.py` | Variable de entorno `CORS_ORIGINS` |
-| Import incorrecto | `person_model.py` | Eliminado, reemplazado por `persona_fisica_model.py` |
-| FK incorrecta | `person_model.py` | Nuevo modelo con `user_id` correcto |
-| `db` no definida | `user_routes.py` | Agregada dependency `Depends(get_db)` |
-| Variable `training` | `training_routes.py` | Corregido a `trainings` |
-| Prints de debug | Varios | Reemplazados por `logger.debug()` |
-
-### ✅ Modelos Creados (v0.3.0)
-| Modelo | Tablas | Descripción |
-|--------|--------|-------------|
-| `PersonaFisica` | `personas_fisicas` + 8 subperfiles | Formulario PF completo |
-| `PersonaJuridica` | `personas_juridicas` + `integrantes_pj` | Formulario PJ completo |
-| `Asociacion` | `asociaciones` + `integrantes_asociacion` | Formulario AS completo |
-| `ObraAudiovisual` | `obras_audiovisuales` + `equipo_tecnico_obra` | Formulario AGAM completo |
-
-### ✅ Schemas y Rutas (v0.4.0)
-| Endpoint | Métodos | Descripción |
-|----------|---------|-------------|
-| `/persona-fisica` | CRUD + subperfiles | 20+ endpoints |
-| `/persona-juridica` | CRUD + integrantes | 8 endpoints |
-| `/asociacion` | CRUD + integrantes | 8 endpoints |
-| `/obras` | CRUD + equipo técnico | 10 endpoints |
-
-### ✅ Modelos ESA y Exhibiciones (v0.5.0)
-| Modelo | Tabla | Descripción |
-|--------|-------|-------------|
-| `EstudianteESA` | `estudiantes_esa` | Registro estudiantes audiovisual (vigencia 1 año) |
-| `Sala` | `salas` | Salas de exhibición con características técnicas |
-| `Exhibicion` | `exhibiciones` | Registro de proyecciones y espectadores |
-| `Festival` | `festivales` | Festivales de cine con categorías |
-| `Cinemateca` | `cinemateca` | Gestión archivo físico de obras |
-
-### ✅ Rutas Nuevas (v0.5.0)
-| Endpoint | Métodos | Descripción |
-|----------|---------|-------------|
-| `/esa` | CRUD + renovación | Estudiantes ESA |
-| `/exhibiciones` | CRUD | Exhibiciones |
-| `/exhibiciones/salas` | CRUD | Salas de exhibición |
-| `/exhibiciones/festivales` | CRUD | Festivales |
-| `/exhibiciones/cinemateca` | CRUD | Cinemateca |
-
-### ✅ Suite de Tests (v0.5.0)
-| Archivo | Tests | Estado |
-|---------|-------|--------|
-| `test_auth.py` | 9 | 7 passed, 2 skipped |
-| `test_persona_fisica.py` | 9 | ✅ passed |
-| `test_esa.py` | 7 | ✅ passed |
-| `test_exhibiciones.py` | 10 | 9 passed, 1 failed |
-| **Total** | **35** | **30 passed, 2 skipped, 3 failed** |
-
-### 📊 Estado Actual del Backend (v0.5.0)
+### 📊 Resumen
 ```
-✅ Operativo en Docker (localhost:8000)
+✅ Backend 100% operativo en Docker (localhost:8000)
 ✅ Swagger UI disponible (/docs)
 ✅ 9 formularios/módulos RePA implementados
 ✅ Autenticación JWT funcionando
 ✅ CORS configurado por entorno
-✅ Suite de tests configurada (pytest)
-✅ 85% tests pasando (30/35)
-
-⏳ Pendiente: Migraciones con Alembic
-⏳ Pendiente: Mejorar configuración de tests (SQLite vs PostgreSQL)
-⏳ Pendiente: Deprecation warnings de Pydantic v2
+✅ 33/33 tests pasando (100%)
+✅ Tests con PostgreSQL real (testcontainers)
+✅ Migraciones con Alembic configuradas
+✅ Deprecation warnings corregidos (24 warnings restantes de SQLAlchemy)
 ```
 
-### 🔧 Warnings Detectados
-- **Pydantic**: `class Config` deprecado → migrar a `ConfigDict`
-- **FastAPI**: `on_event` deprecado → migrar a `lifespan` handlers
+### 🧪 Suite de Tests
+| Archivo | Tests | Estado |
+|---------|-------|--------|
+| `test_auth.py` | 9 | ✅ 9/9 passed |
+| `test_persona_fisica.py` | 9 | ✅ 9/9 passed |
+| `test_esa.py` | 6 | ✅ 6/6 passed |
+| `test_exhibiciones.py` | 9 | ✅ 9/9 passed |
+| **Total** | **33** | **✅ 33/33 passed** |
+
+### 📁 Modelos Implementados
+| Modelo | Archivo | Tablas |
+|--------|---------|--------|
+| User + Roles | `user_models.py` | `users`, `roles`, `user_roles`, `token_recovery` |
+| PersonaFisica | `persona_fisica_model.py` | `personas_fisicas` + 8 subperfiles |
+| PersonaJuridica | `persona_juridica_model.py` | `personas_juridicas`, `integrantes_pj` |
+| Asociacion | `asociacion_model.py` | `asociaciones`, `integrantes_asociacion` |
+| ObraAudiovisual | `obra_audiovisual_model.py` | `obras_audiovisuales`, `equipo_tecnico_obra` |
+| EstudianteESA | `esa_model.py` | `estudiantes_esa` |
+| Exhibiciones | `exhibicion_model.py` | `salas`, `exhibiciones`, `festivales`, `cinemateca` |
+| Training | `training_models.py` | `trainings` |
+| Work | `work_models.py` | `trabajos`, `rol_at_work`, `tareas_at_work` |
+
+### 🔗 Endpoints Disponibles
+| Prefijo | Descripción | Métodos |
+|---------|-------------|---------|
+| `/users` | Autenticación y perfil | 8 endpoints |
+| `/admin_user` | Administración de usuarios | 5 endpoints |
+| `/persona-fisica` | Formulario PF | 20+ endpoints |
+| `/persona-juridica` | Formulario PJ | 8 endpoints |
+| `/asociacion` | Formulario AS | 8 endpoints |
+| `/obras` | AGAM | 10 endpoints |
+| `/esa` | Estudiantes ESA | 6 endpoints |
+| `/exhibiciones` | Exhibiciones, Salas, Festivales, Cinemateca | 16 endpoints |
+| `/training` | Capacitaciones | 5 endpoints |
+| `/work` | Trabajos | 7 endpoints |
+
+---
+
+*Documento generado el 23/01/2026*
+*Última actualización: 24/01/2026 10:30*
+*Versión del backend analizada: 0.5.3*
