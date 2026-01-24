@@ -64,13 +64,12 @@ class TestUserLogin:
         assert "access_token" in data
         assert data["token_type"] == "bearer"
     
-    @pytest.mark.skip(reason="Requiere usuario activo - verificación email pendiente en tests")
     def test_login_wrong_password(self, client, test_user_data):
-        """Test: Login con contraseña incorrecta devuelve error"""
+        """Test: Login con contraseña incorrecta devuelve error 400"""
         # Registrar usuario
         client.post("/users/register", json=test_user_data)
         
-        # Login con contraseña incorrecta - debe fallar
+        # Login con contraseña incorrecta - debe fallar con 400
         response = client.post(
             "/users/token",
             data={
@@ -78,12 +77,12 @@ class TestUserLogin:
                 "password": "WrongPassword123!"
             }
         )
-        # Backend devuelve error para credenciales incorrectas
-        assert response.status_code != 200
+        # Backend devuelve 400 para credenciales incorrectas
+        assert response.status_code == 400
+        assert "incorrecto" in response.json()["detail"].lower()
     
-    @pytest.mark.skip(reason="Requiere configuración específica de DB para tests")
     def test_login_nonexistent_user(self, client):
-        """Test: Login con usuario inexistente devuelve error"""
+        """Test: Login con usuario inexistente devuelve error 400"""
         response = client.post(
             "/users/token",
             data={
@@ -91,8 +90,8 @@ class TestUserLogin:
                 "password": "SomePassword123!"
             }
         )
-        # Backend devuelve error para usuario no encontrado
-        assert response.status_code != 200
+        # Backend devuelve 400 para usuario no encontrado
+        assert response.status_code == 400
 
 
 class TestUserProfile:
