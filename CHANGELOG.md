@@ -7,6 +7,26 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.6.0] - 2026-01-24
+
+### Added
+- **Health check endpoints**:
+  - `/health` - Estado general con versión y conexión a BD
+  - `/health/live` - Liveness probe
+  - `/health/ready` - Readiness probe
+- **Logging estructurado JSON** en archivos de log
+  - Formato JSON con timestamp, level, module, function, line
+  - Consola mantiene formato legible
+  - Configurable via `LOG_LEVEL` env var
+
+### Removed
+- Módulos `training` y `work` no utilizados (873 líneas eliminadas)
+  - `training_routes.py`, `admin_training_routes.py`, `work_routes.py`
+  - `trainig_schemas.py`, `work_schemas.py`
+  - `training_models.py`, `work_models.py`
+
+---
+
 ## [0.5.3] - 2026-01-24
 
 ### Added
@@ -17,9 +37,6 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Soporte para autogenerate de migraciones
 - Archivo `.env.example` con configuración de ejemplo
 - Puerto 5432 expuesto en `docker-compose.yml` para desarrollo local
-
-### Changed
-- Versión actualizada a 0.5.3
 
 ---
 

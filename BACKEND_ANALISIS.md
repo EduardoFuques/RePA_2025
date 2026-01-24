@@ -131,17 +131,15 @@ alembic upgrade head
 | v0.5.1 | Tests con PostgreSQL, dependencias fijadas |
 | v0.5.2 | Deprecation warnings Pydantic/FastAPI |
 | v0.5.3 | Alembic migraciones |
+| v0.5.4 | Eliminar módulos training/work no usados |
+| v0.6.0 | Health checks, logging estructurado JSON |
 
 ---
 
 ## 8. Tareas Pendientes
 
-| Prioridad | Tarea |
-|-----------|-------|
-| 🟢 Baja | Implementar health checks |
-| 🟢 Baja | Configurar logging estructurado |
-| 🟢 Baja | Corregir typo `trainig_schemas.py` |
+✅ **Todas las tareas completadas**
 
 ---
 
-*Última actualización: 24/01/2026 - v0.5.3*
+*Última actualización: 24/01/2026 - v0.6.0*

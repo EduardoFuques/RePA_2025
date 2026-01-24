@@ -1,10 +1,13 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 import os
 
 from src.logger import logger
+from src.database import get_db
 from src.middlewarelogg import log_requests
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -42,7 +45,7 @@ origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
 app = FastAPI(
     title="Backend RePA - 2025",
-    version="0.5.3",
+    version="0.6.0",
     lifespan=lifespan
 )
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
@@ -74,3 +77,39 @@ app.include_router(admin_router, prefix="/admin_user", tags=["Administrator User
 def root():
     logger.info("ROOT - FastAPI funcionando correctamente...")
     return {"message": "FastAPI funcionando correctamente..."}
+
+
+@app.get("/health", tags=["Health"])
+def health_check(db: Session = Depends(get_db)):
+    """
+    Health check endpoint para verificar el estado del servicio.
+    Verifica conexión a la base de datos.
+    """
+    try:
+        db.execute(text("SELECT 1"))
+        db_status = "healthy"
+    except Exception as e:
+        logger.error(f"Health check - DB error: {e}")
+        db_status = "unhealthy"
+    
+    return {
+        "status": "healthy" if db_status == "healthy" else "degraded",
+        "version": app.version,
+        "database": db_status
+    }
+
+
+@app.get("/health/live", tags=["Health"])
+def liveness():
+    """Liveness probe - verifica que la aplicación está corriendo."""
+    return {"status": "alive"}
+
+
+@app.get("/health/ready", tags=["Health"])
+def readiness(db: Session = Depends(get_db)):
+    """Readiness probe - verifica que la aplicación puede recibir tráfico."""
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ready"}
+    except Exception:
+        return {"status": "not_ready"}
