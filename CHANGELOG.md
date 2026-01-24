@@ -7,6 +7,21 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.1] - 2026-01-24
+
+### Changed
+- **Tests migrados a PostgreSQL real** usando testcontainers
+  - Reemplazado SQLite en memoria por PostgresContainer
+  - 33/33 tests pasando (100%)
+- **Versiones de dependencias fijadas** en `requirements.txt`
+  - Rangos de versiones compatibles para evitar breaking changes
+
+### Fixed
+- Renombrado `admin_training_rutes.py` → `admin_training_routes.py` (typo)
+- Tests de autenticación que estaban en skip ahora funcionan
+
+---
+
 ## [0.5.0] - 2026-01-24
 
 ### Added

@@ -1,17 +1,17 @@
-fastapi
-uvicorn
-sqlalchemy # ORM de BAse de datos
-psycopg2-binary # Librería de PostgrSQL
-pydantic # Librería para validación de datos
-pydantic[email]
-python-multipart # Librería para subir archivos
-python-jose[cryptography] # Librería para JWT
-passlib[bcrypt]==1.7.4
-bcrypt==3.2.0 # Librería para encriptar contraseñas
-python-dotenv # Librería para manejar variables de entorno
+fastapi>=0.115.0,<1.0.0
+uvicorn>=0.30.0,<1.0.0
+sqlalchemy>=2.0.0,<3.0.0
+psycopg2-binary>=2.9.0,<3.0.0
+pydantic>=2.0.0,<3.0.0
+pydantic[email]>=2.0.0,<3.0.0
+python-multipart>=0.0.9,<1.0.0
+python-jose[cryptography]>=3.3.0,<4.0.0
+passlib[bcrypt]>=1.7.4,<2.0.0
+bcrypt>=4.0.0,<5.0.0
+python-dotenv>=1.0.0,<2.0.0
 
 # Testing
-pytest
-pytest-asyncio
-httpx
-testcontainers[postgres]
+pytest>=8.0.0,<10.0.0
+pytest-asyncio>=0.23.0,<1.0.0
+httpx>=0.27.0,<1.0.0
+testcontainers[postgres]>=4.0.0,<5.0.0

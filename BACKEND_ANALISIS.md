@@ -428,6 +428,9 @@ El login genera `refresh_token` pero no hay endpoint para usarlo.
 | 7 | ~~Remover prints de debug~~ | v0.2.0 |
 | 8 | ~~Crear modelos ESA/Exhibiciones/Cinemateca~~ | v0.5.0 |
 | 9 | ~~Agregar tests~~ | v0.5.0 |
+| 10 | ~~Migrar tests a PostgreSQL (testcontainers)~~ | v0.5.1 |
+| 11 | ~~Fijar versiones de dependencias~~ | v0.5.1 |
+| 12 | ~~Corregir typo `admin_training_rutes.py`~~ | v0.5.1 |
 
 ### ⏳ Tareas Pendientes
 | # | Prioridad | Tarea | Esfuerzo | Impacto |
@@ -435,17 +438,14 @@ El login genera `refresh_token` pero no hay endpoint para usarlo.
 | 1 | 🟡 Media | Implementar Alembic (migraciones) | Medio | Alto |
 | 2 | 🟡 Media | Corregir deprecation warnings Pydantic v2 | Bajo | Medio |
 | 3 | 🟡 Media | Migrar `on_event` a `lifespan` handlers | Bajo | Medio |
-| 4 | 🟡 Media | Mejorar configuración de tests (SQLite vs PostgreSQL) | Medio | Medio |
-| 5 | 🟢 Baja | Fijar versiones de dependencias | Bajo | Bajo |
-| 6 | 🟢 Baja | Corregir typos en archivos (`admin_training_rutes.py`) | Bajo | Bajo |
-| 7 | 🟢 Baja | Implementar health checks | Bajo | Medio |
-| 8 | 🟢 Baja | Configurar logging estructurado | Medio | Medio |
+| 4 |  Baja | Implementar health checks | Bajo | Medio |
+| 5 | 🟢 Baja | Configurar logging estructurado | Medio | Medio |
 
 ---
 
 *Documento generado el 23/01/2026*
-*Última actualización: 24/01/2026 08:50*
-*Versión del backend analizada: 0.5.0*
+*Última actualización: 24/01/2026 10:00*
+*Versión del backend analizada: 0.5.1*
 
 ---
 

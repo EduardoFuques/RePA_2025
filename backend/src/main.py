@@ -12,7 +12,7 @@ from src.database import init_db
 from src.routes.user_routes import user_router
 from src.routes.admin_routes import admin_router
 from src.routes.training_routes import training_router
-from src.routes.admin_training_rutes import admin_training
+from src.routes.admin_training_routes import admin_training
 from src.routes.work_routes import work_router
 from src.routes.persona_fisica_routes import persona_fisica_router
 from src.routes.persona_juridica_routes import persona_juridica_router
@@ -30,7 +30,7 @@ init_db()
 
 app = FastAPI()
 app.title = "Backend RePA - 2025"
-app.version = "0.5.0"
+app.version = "0.5.1"
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
 
 logger.info("FastAPI iniciado correctamente...")
