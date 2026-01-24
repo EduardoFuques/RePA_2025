@@ -63,10 +63,18 @@ def test_user_data():
 
 
 @pytest.fixture
-def auth_headers(client, test_user_data):
-    """Fixture que registra un usuario y retorna headers de autenticación"""
+def auth_headers(client, test_user_data, db_session):
+    """Fixture que registra un usuario, lo activa y retorna headers de autenticación"""
+    from src.models.user_models import User
+    
     # Registrar usuario
     client.post("/users/register", json=test_user_data)
+    
+    # Activar usuario manualmente para tests (bypass verificación email)
+    user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+    if user:
+        user.is_active = True
+        db_session.commit()
     
     # Login para obtener token
     response = client.post(

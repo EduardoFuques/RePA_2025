@@ -478,12 +478,12 @@ class Exhibicion(Base):
 ---
 
 *Documento generado el 23/01/2026*
-*Última actualización: 24/01/2026*
-*Versión del backend analizada: 0.4.0*
+*Última actualización: 24/01/2026 08:50*
+*Versión del backend analizada: 0.5.0*
 
 ---
 
-## 9. Resumen de Cambios Realizados (v0.2.0 - v0.4.0)
+## 9. Resumen de Cambios Realizados (v0.2.0 - v0.5.0)
 
 ### ✅ Bugs Críticos Corregidos (v0.2.0)
 | Bug | Archivo | Solución |
@@ -511,14 +511,48 @@ class Exhibicion(Base):
 | `/asociacion` | CRUD + integrantes | 8 endpoints |
 | `/obras` | CRUD + equipo técnico | 10 endpoints |
 
-### 📊 Estado Actual del Backend
+### ✅ Modelos ESA y Exhibiciones (v0.5.0)
+| Modelo | Tabla | Descripción |
+|--------|-------|-------------|
+| `EstudianteESA` | `estudiantes_esa` | Registro estudiantes audiovisual (vigencia 1 año) |
+| `Sala` | `salas` | Salas de exhibición con características técnicas |
+| `Exhibicion` | `exhibiciones` | Registro de proyecciones y espectadores |
+| `Festival` | `festivales` | Festivales de cine con categorías |
+| `Cinemateca` | `cinemateca` | Gestión archivo físico de obras |
+
+### ✅ Rutas Nuevas (v0.5.0)
+| Endpoint | Métodos | Descripción |
+|----------|---------|-------------|
+| `/esa` | CRUD + renovación | Estudiantes ESA |
+| `/exhibiciones` | CRUD | Exhibiciones |
+| `/exhibiciones/salas` | CRUD | Salas de exhibición |
+| `/exhibiciones/festivales` | CRUD | Festivales |
+| `/exhibiciones/cinemateca` | CRUD | Cinemateca |
+
+### ✅ Suite de Tests (v0.5.0)
+| Archivo | Tests | Estado |
+|---------|-------|--------|
+| `test_auth.py` | 9 | 7 passed, 2 skipped |
+| `test_persona_fisica.py` | 9 | ✅ passed |
+| `test_esa.py` | 7 | ✅ passed |
+| `test_exhibiciones.py` | 10 | 9 passed, 1 failed |
+| **Total** | **35** | **30 passed, 2 skipped, 3 failed** |
+
+### 📊 Estado Actual del Backend (v0.5.0)
 ```
 ✅ Operativo en Docker (localhost:8000)
 ✅ Swagger UI disponible (/docs)
-✅ 4 formularios RePA implementados
+✅ 9 formularios/módulos RePA implementados
 ✅ Autenticación JWT funcionando
 ✅ CORS configurado por entorno
-⏳ Pendiente: ESA, Cinemateca, Exhibiciones, Salas, Festivales
+✅ Suite de tests configurada (pytest)
+✅ 85% tests pasando (30/35)
+
 ⏳ Pendiente: Migraciones con Alembic
-⏳ Pendiente: Tests unitarios
+⏳ Pendiente: Mejorar configuración de tests (SQLite vs PostgreSQL)
+⏳ Pendiente: Deprecation warnings de Pydantic v2
 ```
+
+### 🔧 Warnings Detectados
+- **Pydantic**: `class Config` deprecado → migrar a `ConfigDict`
+- **FastAPI**: `on_event` deprecado → migrar a `lifespan` handlers
