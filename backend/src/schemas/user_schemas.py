@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
@@ -9,8 +9,7 @@ class RoleBase(BaseModel):
 class RoleOut(RoleBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Esquemas de usuario
 class UserBase(BaseModel):
@@ -29,8 +28,7 @@ class UserOut(UserBase):
     last_login: Optional[datetime] = None
     roles: List[RoleOut] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Esquema para actualización de usuario
 class UserUpdate(BaseModel):

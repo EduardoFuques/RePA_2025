@@ -1,5 +1,5 @@
 # schemas/persona_fisica_schemas.py
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import List, Optional
 from datetime import date
 
@@ -265,8 +265,7 @@ class PersonaFisicaOut(BaseModel):
     portfolio_link: Optional[str] = None
     declaracion_inicial: bool
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # === SCHEMAS PARA SUBPERFILES (CRUD individual) ===
@@ -277,8 +276,7 @@ class ObraSubperfilOut(ObraSubperfilBase):
     id: int
     persona_fisica_id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TecnicoArtisticoCreate(TecnicoArtisticoBase):
     pass
@@ -287,8 +285,7 @@ class TecnicoArtisticoOut(TecnicoArtisticoBase):
     id: int
     persona_fisica_id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CapacitadorCreate(CapacitadorBase):
     pass
@@ -297,8 +294,7 @@ class CapacitadorOut(CapacitadorBase):
     id: int
     persona_fisica_id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class InvestigadorCreate(InvestigadorBase):
     pass
@@ -307,5 +303,4 @@ class InvestigadorOut(InvestigadorBase):
     id: int
     persona_fisica_id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

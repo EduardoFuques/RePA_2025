@@ -1,5 +1,5 @@
 # schemas/obra_audiovisual_schemas.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 
 # === EQUIPO TÉCNICO ===
@@ -16,8 +16,7 @@ class EquipoTecnicoOut(EquipoTecnicoBase):
     id: int
     obra_id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # === SCHEMA PRINCIPAL ===
 class ObraAudiovisualCreate(BaseModel):
@@ -153,8 +152,7 @@ class ObraAudiovisualOut(BaseModel):
     # Equipo técnico
     equipo_tecnico: List[EquipoTecnicoOut] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ObraAudiovisualList(BaseModel):
@@ -166,5 +164,4 @@ class ObraAudiovisualList(BaseModel):
     genero: Optional[str] = None
     extension: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

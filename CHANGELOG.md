@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.5.2] - 2026-01-24
+
+### Changed
+- **Migrado `on_event` a `lifespan` handler** (FastAPI moderno)
+- **Corregidos deprecation warnings de Pydantic v2**:
+  - `class Config` → `model_config = ConfigDict(from_attributes=True)`
+  - `@validator` → `@field_validator` con `@classmethod`
+  - Afecta 10 archivos de schemas
+
+### Fixed
+- Warnings reducidos de 49 a 24 en tests
+
+---
+
 ## [0.5.1] - 2026-01-24
 
 ### Changed

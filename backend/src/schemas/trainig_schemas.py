@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator, HttpUrl, Field
+from pydantic import BaseModel, field_validator, HttpUrl, Field, ConfigDict
 from typing import Optional
 from datetime import date
 
@@ -56,6 +56,5 @@ class TrainingOut(TrainingBase):
     id: int
     user_id: str
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 

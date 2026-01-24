@@ -1,4 +1,4 @@
-from pydantic import BaseModel, validator, ValidationError
+from pydantic import BaseModel, field_validator, ValidationError, ConfigDict
 from datetime import date
 from typing import Optional, Literal
 
@@ -43,10 +43,11 @@ class PersonBase(BaseModel):
     dir_provincia: str
     dir_pais: str
 
-    @validator("etnia_nombre")
-    def validate_etnia_nombre(cls, etnia_nombre, values):
+    @field_validator("etnia_nombre")
+    @classmethod
+    def validate_etnia_nombre(cls, etnia_nombre, info):
         # Si "etnia" es True, "etnia_nombre" debe ser proporcionado
-        if values.get("etnia") and not etnia_nombre:
+        if info.data.get("etnia") and not etnia_nombre:
             raise ValueError("Si 'etnia' es True, 'etnia_nombre' debe completarse")
         return etnia_nombre
 
@@ -57,5 +58,4 @@ class PersonOut(PersonBase):
     id: int
     user_email: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

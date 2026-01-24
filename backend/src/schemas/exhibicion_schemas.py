@@ -1,5 +1,5 @@
 # schemas/exhibicion_schemas.py
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
 
@@ -74,8 +74,7 @@ class SalaOut(BaseModel):
     activo: bool
     created_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # === EXHIBICIÓN ===
@@ -145,8 +144,7 @@ class ExhibicionOut(BaseModel):
     observaciones: Optional[str] = None
     created_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # === FESTIVAL ===
@@ -233,8 +231,7 @@ class FestivalOut(BaseModel):
     activo: bool
     created_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # === CINEMATECA ===
@@ -306,5 +303,4 @@ class CinematecaOut(BaseModel):
     fecha_ingreso: Optional[date] = None
     created_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

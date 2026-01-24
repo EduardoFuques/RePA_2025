@@ -1,5 +1,5 @@
 # schemas/asociacion_schemas.py
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import List, Optional
 
 # === INTEGRANTE ===
@@ -17,8 +17,7 @@ class IntegranteAsociacionOut(IntegranteAsociacionBase):
     id: int
     asociacion_id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # === SCHEMA PRINCIPAL ===
 class AsociacionCreate(BaseModel):
@@ -162,5 +161,4 @@ class AsociacionOut(BaseModel):
     # Integrantes
     integrantes: List[IntegranteAsociacionOut] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

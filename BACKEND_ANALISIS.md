@@ -431,21 +431,21 @@ El login genera `refresh_token` pero no hay endpoint para usarlo.
 | 10 | ~~Migrar tests a PostgreSQL (testcontainers)~~ | v0.5.1 |
 | 11 | ~~Fijar versiones de dependencias~~ | v0.5.1 |
 | 12 | ~~Corregir typo `admin_training_rutes.py`~~ | v0.5.1 |
+| 13 | ~~Corregir deprecation warnings Pydantic v2~~ | v0.5.2 |
+| 14 | ~~Migrar `on_event` a `lifespan` handlers~~ | v0.5.2 |
 
 ### ⏳ Tareas Pendientes
 | # | Prioridad | Tarea | Esfuerzo | Impacto |
 |---|-----------|-------|----------|---------|
 | 1 | 🟡 Media | Implementar Alembic (migraciones) | Medio | Alto |
-| 2 | 🟡 Media | Corregir deprecation warnings Pydantic v2 | Bajo | Medio |
-| 3 | 🟡 Media | Migrar `on_event` a `lifespan` handlers | Bajo | Medio |
-| 4 |  Baja | Implementar health checks | Bajo | Medio |
-| 5 | 🟢 Baja | Configurar logging estructurado | Medio | Medio |
+| 2 | � Baja | Implementar health checks | Bajo | Medio |
+| 3 | 🟢 Baja | Configurar logging estructurado | Medio | Medio |
 
 ---
 
 *Documento generado el 23/01/2026*
-*Última actualización: 24/01/2026 10:00*
-*Versión del backend analizada: 0.5.1*
+*Última actualización: 24/01/2026 10:20*
+*Versión del backend analizada: 0.5.2*
 
 ---
 

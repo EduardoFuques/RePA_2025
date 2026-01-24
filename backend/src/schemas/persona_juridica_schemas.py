@@ -1,5 +1,5 @@
 # schemas/persona_juridica_schemas.py
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import List, Optional
 from datetime import date
 
@@ -18,8 +18,7 @@ class IntegrantePJOut(IntegrantePJBase):
     id: int
     persona_juridica_id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # === SCHEMA PRINCIPAL ===
 class PersonaJuridicaCreate(BaseModel):
@@ -149,5 +148,4 @@ class PersonaJuridicaOut(BaseModel):
     # Integrantes
     integrantes: List[IntegrantePJOut] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

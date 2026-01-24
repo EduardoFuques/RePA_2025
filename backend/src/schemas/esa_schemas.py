@@ -1,5 +1,5 @@
 # schemas/esa_schemas.py
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
 
@@ -109,5 +109,4 @@ class EstudianteESAOut(BaseModel):
     fecha_vencimiento: Optional[datetime] = None
     activo: bool
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

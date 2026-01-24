@@ -11,8 +11,7 @@ class RolAtWorkCreate(RolAtWorkBase):
 class RolAtWork(RolAtWorkBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
     
 class TareaAtWorkBase(BaseModel):
     nombre: str
@@ -23,8 +22,7 @@ class TareaAtWorkCreate(TareaAtWorkBase):
 class TareaAtWork(TareaAtWorkBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TrabajoBase(BaseModel):
     titulo_produccion: str
@@ -44,6 +42,4 @@ class Trabajo(TrabajoBase):
     roles: List[RolAtWork] = []
     tareas: List[TareaAtWork] = []
 
-    class Config:
-        from_attributes = True
-    
+    model_config = ConfigDict(from_attributes=True)
