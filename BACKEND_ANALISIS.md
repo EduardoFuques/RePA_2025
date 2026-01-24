@@ -290,7 +290,7 @@ El login genera `refresh_token` pero no hay endpoint para usarlo.
 
 ## 5. Modelos Faltantes para Frontend
 
-### 5.1 Comparación Frontend vs Backend (Actualizado v0.4.0)
+### 5.1 Comparación Frontend vs Backend (Actualizado v0.5.0)
 
 | Formulario Frontend | Modelo Backend | Estado |
 |---------------------|----------------|--------|
@@ -298,127 +298,82 @@ El login genera `refresh_token` pero no hay endpoint para usarlo.
 | **Persona Jurídica (PJ)** | PersonaJuridica + IntegrantePJ | ✅ Completo |
 | **Asociación/Colectivo (AS)** | Asociacion + IntegranteAsociacion | ✅ Completo |
 | **AGAM (Obras)** | ObraAudiovisual + EquipoTecnicoObra | ✅ Completo |
-| **ESA (Estudiantes)** | - | 🔴 No existe |
-| **Cinemateca** | - | 🔴 No existe |
-| **Exhibiciones** | - | 🔴 No existe |
-| **Salas de Exhibición** | - | 🔴 No existe |
-| **Festivales** | - | 🔴 No existe |
+| **ESA (Estudiantes)** | EstudianteESA | ✅ Completo (v0.5.0) |
+| **Cinemateca** | Cinemateca | ✅ Completo (v0.5.0) |
+| **Exhibiciones** | Exhibicion | ✅ Completo (v0.5.0) |
+| **Salas de Exhibición** | Sala | ✅ Completo (v0.5.0) |
+| **Festivales** | Festival | ✅ Completo (v0.5.0) |
 
-### 5.2 Modelos Requeridos
+### 5.2 Modelos Implementados (v0.5.0)
 
-#### Persona Física (Ampliación)
-```python
-# Campos faltantes según frontend:
-- subperfiles (productor, director, guionista, etc.)
-- situacion_laboral
-- interes_institucional
-- consentimiento
-- documentacion (archivos)
-```
+> **Nota:** Todos los modelos requeridos han sido implementados. Ver archivos en `backend/src/models/`.
 
-#### Persona Jurídica
-```python
-class PersonaJuridica(Base):
-    __tablename__ = "personas_juridicas"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(String, ForeignKey("users.id"))
-    razon_social = Column(String, nullable=False)
-    cuit = Column(String, unique=True, nullable=False)
-    tipo_sociedad = Column(String)
-    fecha_constitucion = Column(Date)
-    objeto_social = Column(Text)
-    # domicilio, contacto, representante legal...
-    # integrantes vinculados al REPA
-    # actividades audiovisuales
-    # documentacion
-```
+#### ✅ Persona Física - `persona_fisica_model.py`
+- `PersonaFisica` + 8 subperfiles (Productor, Director, Guionista, Documentalista, RealizadorIntegral, TecnicoArtistico, Capacitador, Investigador)
 
-#### Asociación/Colectivo
-```python
-class Asociacion(Base):
-    __tablename__ = "asociaciones"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(String, ForeignKey("users.id"))
-    nombre = Column(String, nullable=False)
-    fecha_inicio_actividades = Column(Date)
-    # ambitos de actuacion
-    # integrantes vinculados al REPA
-    # documentacion
-```
+#### ✅ Persona Jurídica - `persona_juridica_model.py`
+- `PersonaJuridica` + `IntegrantePJ`
 
-#### AGAM (Obras Audiovisuales)
-```python
-class ObraAudiovisual(Base):
-    __tablename__ = "obras_audiovisuales"
-    id = Column(Integer, primary_key=True)
-    codigo_agam = Column(String, unique=True)
-    titulo = Column(String, nullable=False)
-    titulo_original = Column(String)
-    anio_produccion = Column(Integer)
-    tipo_obra = Column(String)  # largo, corto, serie, etc.
-    genero = Column(String)
-    duracion_minutos = Column(Integer)
-    sinopsis = Column(Text)
-    # datos técnicos
-    # datos relacionales (director, productor, etc.)
-    # derechos
-```
+#### ✅ Asociación/Colectivo - `asociacion_model.py`
+- `Asociacion` + `IntegranteAsociacion`
 
-#### Cinemateca
-```python
-class RegistroCinemateca(Base):
-    __tablename__ = "registros_cinemateca"
-    id = Column(Integer, primary_key=True)
-    obra_id = Column(Integer, ForeignKey("obras_audiovisuales.id"))
-    tipo_soporte = Column(String)
-    estado_conservacion = Column(String)
-    ubicacion_fisica = Column(String)
-    # prestamos
-```
+#### ✅ AGAM (Obras Audiovisuales) - `obra_audiovisual_model.py`
+- `ObraAudiovisual` + `EquipoTecnicoObra`
 
-#### Exhibiciones
-```python
-class Exhibicion(Base):
-    __tablename__ = "exhibiciones"
-    id = Column(Integer, primary_key=True)
-    obra_id = Column(Integer, ForeignKey("obras_audiovisuales.id"))
-    sala_id = Column(Integer, ForeignKey("salas.id"))
-    fecha_exhibicion = Column(Date)
-    cantidad_funciones = Column(Integer)
-    espectadores_total = Column(Integer)
-    # desglose por tipo de entrada
-```
+#### ✅ ESA (Estudiantes) - `esa_model.py`
+- `EstudianteESA` (vigencia 1 año con renovación)
+
+#### ✅ Exhibiciones - `exhibicion_model.py`
+- `Sala` - Salas de exhibición
+- `Exhibicion` - Registro de proyecciones
+- `Festival` - Festivales de cine
+- `Cinemateca` - Archivo físico de obras
+
+### 5.3 Endpoints Disponibles
+
+| Prefijo | Modelo | Métodos |
+|---------|--------|---------|
+| `/persona-fisica` | PersonaFisica | CRUD + subperfiles |
+| `/persona-juridica` | PersonaJuridica | CRUD + integrantes |
+| `/asociacion` | Asociacion | CRUD + integrantes |
+| `/obras` | ObraAudiovisual | CRUD + equipo técnico |
+| `/esa` | EstudianteESA | CRUD + renovación |
+| `/exhibiciones` | Exhibicion | CRUD |
+| `/exhibiciones/salas` | Sala | CRUD |
+| `/exhibiciones/festivales` | Festival | CRUD |
+| `/exhibiciones/cinemateca` | Cinemateca | CRUD |
 
 ---
 
-## 6. Plan de Integración Frontend-Backend
+## 6. Plan de Integración Frontend-Backend (Actualizado v0.5.0)
 
-### 6.1 Fase 1: Correcciones Críticas
-1. Corregir import en `person_model.py`
-2. Corregir FK de Person (user_email → user_id)
-3. Agregar `db` dependency en `/users/me` GET
-4. Corregir bug en `training_routes.py`
-5. Configurar CORS por entorno
+### ✅ Fase 1: Correcciones Críticas - COMPLETADA (v0.2.0)
+1. ~~Corregir import en `person_model.py`~~ ✅
+2. ~~Corregir FK de Person (user_email → user_id)~~ ✅
+3. ~~Agregar `db` dependency en `/users/me` GET~~ ✅
+4. ~~Corregir bug en `training_routes.py`~~ ✅
+5. ~~Configurar CORS por entorno~~ ✅
 
-### 6.2 Fase 2: Modelos Base
-1. Completar modelo Person con campos del frontend
-2. Crear modelo PersonaJuridica
-3. Crear modelo Asociacion
-4. Crear modelo ObraAudiovisual (AGAM)
+### ✅ Fase 2: Modelos Base - COMPLETADA (v0.3.0)
+1. ~~Completar modelo PersonaFisica con campos del frontend~~ ✅
+2. ~~Crear modelo PersonaJuridica~~ ✅
+3. ~~Crear modelo Asociacion~~ ✅
+4. ~~Crear modelo ObraAudiovisual (AGAM)~~ ✅
 
-### 6.3 Fase 3: Modelos IAAViM
-1. Crear modelo RegistroCinemateca
-2. Crear modelo Exhibicion
-3. Crear modelo Sala
-4. Crear modelo Festival
+### ✅ Fase 3: Modelos IAAViM - COMPLETADA (v0.5.0)
+1. ~~Crear modelo Cinemateca~~ ✅
+2. ~~Crear modelo Exhibicion~~ ✅
+3. ~~Crear modelo Sala~~ ✅
+4. ~~Crear modelo Festival~~ ✅
+5. ~~Crear modelo EstudianteESA~~ ✅
 
-### 6.4 Fase 4: Endpoints
-1. CRUD para cada modelo
-2. Endpoints de búsqueda y filtrado
-3. Endpoints de reportes
-4. Upload de archivos/documentación
+### ✅ Fase 4: Endpoints - COMPLETADA (v0.4.0 - v0.5.0)
+1. ~~CRUD para cada modelo~~ ✅
+2. Endpoints de búsqueda y filtrado ⏳
+3. Endpoints de reportes ⏳
+4. Upload de archivos/documentación ⏳
 
-### 6.5 Fase 5: Integración
+### ⏳ Fase 5: Integración - PENDIENTE
 1. Conectar formularios del frontend con API
 2. Implementar validaciones server-side
 3. Manejo de archivos (documentación, certificados)
@@ -426,11 +381,11 @@ class Exhibicion(Base):
 
 ---
 
-## 7. Recomendaciones de Mejora
+## 7. Recomendaciones de Mejora (Actualizado v0.5.0)
 
 ### 7.1 Seguridad
-- [ ] Configurar CORS específico por entorno
-- [ ] Remover prints de debug
+- [x] ~~Configurar CORS específico por entorno~~ ✅ v0.2.0
+- [x] ~~Remover prints de debug~~ ✅ v0.2.0
 - [ ] Implementar rate limiting
 - [ ] Agregar validación de entrada más estricta
 - [ ] No exponer hashes en tokens
@@ -438,17 +393,18 @@ class Exhibicion(Base):
 
 ### 7.2 Código
 - [ ] Fijar versiones en requirements.txt
-- [ ] Corregir typos en nombres de archivos
+- [ ] Corregir typos en nombres de archivos (`admin_training_rutes.py`)
 - [ ] Unificar nomenclatura de modelos/schemas
 - [ ] Migrar de `on_event` a `lifespan`
-- [ ] Agregar tests unitarios
-- [ ] Documentar endpoints con OpenAPI
+- [x] ~~Agregar tests unitarios~~ ✅ v0.5.0 (30 tests)
+- [x] ~~Documentar endpoints con OpenAPI~~ ✅ (Swagger automático)
+- [ ] Corregir deprecation warnings de Pydantic v2
 
 ### 7.3 Base de Datos
 - [ ] Agregar migraciones con Alembic
 - [ ] Crear índices para búsquedas frecuentes
 - [ ] Implementar soft delete consistente
-- [ ] Agregar timestamps (created_at, updated_at) a todos los modelos
+- [x] ~~Agregar timestamps a modelos nuevos~~ ✅ v0.5.0 (ESA, Exhibiciones)
 
 ### 7.4 DevOps
 - [ ] Separar configuración por entorno (dev/staging/prod)
@@ -458,22 +414,32 @@ class Exhibicion(Base):
 
 ---
 
-## 8. Priorización de Tareas
+## 8. Priorización de Tareas (Actualizado v0.5.0)
 
+### ✅ Tareas Completadas
+| # | Tarea | Versión |
+|---|-------|---------|
+| 1 | ~~Corregir bugs críticos (4.1)~~ | v0.2.0 |
+| 2 | ~~Completar modelo PersonaFisica~~ | v0.3.0 |
+| 3 | ~~Crear modelo PersonaJuridica~~ | v0.3.0 |
+| 4 | ~~Crear modelo Asociacion~~ | v0.3.0 |
+| 5 | ~~Crear modelo ObraAudiovisual~~ | v0.3.0 |
+| 6 | ~~Configurar CORS por entorno~~ | v0.2.0 |
+| 7 | ~~Remover prints de debug~~ | v0.2.0 |
+| 8 | ~~Crear modelos ESA/Exhibiciones/Cinemateca~~ | v0.5.0 |
+| 9 | ~~Agregar tests~~ | v0.5.0 |
+
+### ⏳ Tareas Pendientes
 | # | Prioridad | Tarea | Esfuerzo | Impacto |
 |---|-----------|-------|----------|---------|
-| 1 | 🔴 Alta | Corregir bugs críticos (4.1) | Bajo | Crítico |
-| 2 | 🔴 Alta | Completar modelo Person | Medio | Alto |
-| 3 | 🔴 Alta | Crear modelo PersonaJuridica | Medio | Alto |
-| 4 | 🔴 Alta | Crear modelo Asociacion | Medio | Alto |
-| 5 | 🔴 Alta | Crear modelo ObraAudiovisual | Alto | Alto |
-| 6 | 🟡 Media | Configurar CORS por entorno | Bajo | Alto |
-| 7 | 🟡 Media | Remover prints de debug | Bajo | Medio |
-| 8 | 🟡 Media | Implementar Alembic | Medio | Alto |
-| 9 | 🟡 Media | Crear modelos Cinemateca/Exhibiciones | Alto | Medio |
-| 10 | 🟢 Baja | Fijar versiones de dependencias | Bajo | Bajo |
-| 11 | 🟢 Baja | Corregir typos en archivos | Bajo | Bajo |
-| 12 | 🟢 Baja | Agregar tests | Alto | Alto |
+| 1 | 🟡 Media | Implementar Alembic (migraciones) | Medio | Alto |
+| 2 | 🟡 Media | Corregir deprecation warnings Pydantic v2 | Bajo | Medio |
+| 3 | 🟡 Media | Migrar `on_event` a `lifespan` handlers | Bajo | Medio |
+| 4 | 🟡 Media | Mejorar configuración de tests (SQLite vs PostgreSQL) | Medio | Medio |
+| 5 | 🟢 Baja | Fijar versiones de dependencias | Bajo | Bajo |
+| 6 | 🟢 Baja | Corregir typos en archivos (`admin_training_rutes.py`) | Bajo | Bajo |
+| 7 | 🟢 Baja | Implementar health checks | Bajo | Medio |
+| 8 | 🟢 Baja | Configurar logging estructurado | Medio | Medio |
 
 ---
 
