@@ -1,7 +1,7 @@
 # routes/esa_routes.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.models.esa_model import EstudianteESA
 from src.schemas.esa_schemas import EstudianteESACreate, EstudianteESAUpdate, EstudianteESAOut
@@ -27,7 +27,7 @@ async def create_estudiante_esa(
         )
     
     # Calcular fecha de vencimiento (1 año)
-    fecha_alta = datetime.utcnow()
+    fecha_alta = datetime.now(timezone.utc)
     fecha_vencimiento = fecha_alta + timedelta(days=365)
     
     db_estudiante = EstudianteESA(
@@ -94,7 +94,7 @@ async def renovar_estudiante_esa(
         )
     
     # Renovar por un año desde hoy
-    estudiante.fecha_vencimiento = datetime.utcnow() + timedelta(days=365)
+    estudiante.fecha_vencimiento = datetime.now(timezone.utc) + timedelta(days=365)
     estudiante.activo = True
     
     db.commit()

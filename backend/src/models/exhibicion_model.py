@@ -2,7 +2,7 @@
 from sqlalchemy import Column, String, Integer, Date, ForeignKey, Boolean, Text, JSON, DateTime, Float
 from sqlalchemy.orm import relationship
 from src.database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 class Sala(Base):
     """
@@ -41,8 +41,8 @@ class Sala(Base):
     
     # === METADATOS ===
     activo = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relación con el usuario
     user = relationship("User", back_populates="salas")
@@ -86,8 +86,8 @@ class Exhibicion(Base):
     observaciones = Column(Text, nullable=True)
     
     # === METADATOS ===
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relaciones
     user = relationship("User", back_populates="exhibiciones")
@@ -139,8 +139,8 @@ class Festival(Base):
     
     # === METADATOS ===
     activo = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relación con el usuario
     user = relationship("User", back_populates="festivales")
@@ -185,8 +185,8 @@ class Cinemateca(Base):
     
     # === METADATOS ===
     fecha_ingreso = Column(Date, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relación con la obra
     obra = relationship("ObraAudiovisual", back_populates="registros_cinemateca")

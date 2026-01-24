@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from src.database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Modelo para Token de Verificación de Correo
 class TokenRecovery(Base):
@@ -10,7 +10,7 @@ class TokenRecovery(Base):
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, index=True, nullable=False)
     token_payload = Column(String, unique=True, index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     
@@ -35,7 +35,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_login = Column(DateTime, default=None, nullable=True)
     # Relación con roles a través de la tabla UserRole
     roles = relationship("Role", secondary="user_roles", backref="users")

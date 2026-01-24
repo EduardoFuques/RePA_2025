@@ -2,7 +2,7 @@
 from sqlalchemy import Column, String, Integer, Date, ForeignKey, Boolean, Text, JSON, DateTime
 from sqlalchemy.orm import relationship
 from src.database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 class EstudianteESA(Base):
     """
@@ -50,7 +50,7 @@ class EstudianteESA(Base):
     autoriza_datos = Column(Boolean, nullable=False, default=False)
     
     # === METADATOS ===
-    fecha_alta = Column(DateTime, default=datetime.utcnow)
+    fecha_alta = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     fecha_vencimiento = Column(DateTime, nullable=True)  # fecha_alta + 1 año
     activo = Column(Boolean, default=True)
     

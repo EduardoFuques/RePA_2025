@@ -133,6 +133,7 @@ alembic upgrade head
 | v0.5.3 | Alembic migraciones |
 | v0.5.4 | Eliminar módulos training/work no usados |
 | v0.6.0 | Health checks, logging estructurado JSON |
+| v0.6.1 | Corregir deprecation warnings, eliminar frontend/ |
 
 ---
 
@@ -142,4 +143,4 @@ alembic upgrade head
 
 ---
 
-*Última actualización: 24/01/2026 - v0.6.0*
+*Última actualización: 24/01/2026 - v0.6.1*

@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [0.6.1] - 2026-01-24
+
+### Fixed
+- **Corregidos todos los deprecation warnings**:
+  - `datetime.utcnow()` → `datetime.now(timezone.utc)` en 4 archivos
+  - `declarative_base()` de `sqlalchemy.ext.declarative` → `sqlalchemy.orm`
+- Tests ahora pasan con **solo 1 warning** (de testcontainers, externo)
+
+### Removed
+- Directorio `frontend/` no utilizado del repositorio backend
+
+---
+
 ## [0.6.0] - 2026-01-24
 
 ### Added
