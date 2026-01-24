@@ -4,7 +4,7 @@
 
 El backend de RePA 2025 es una API REST desarrollada en **FastAPI** con **PostgreSQL** como base de datos, utilizando **SQLAlchemy** como ORM. Implementa autenticación JWT con sistema de roles y permisos.
 
-**Estado actual:** MVP funcional con módulos de usuarios, capacitaciones y trabajos. Falta integración con los formularios del frontend (Persona Física, Persona Jurídica, Asociación/Colectivo, AGAM, ESA, Cinemateca, Exhibiciones).
+**Estado actual (v0.4.0):** Backend operativo con módulos de usuarios, capacitaciones, trabajos y **formularios RePA completos** (Persona Física, Persona Jurídica, Asociación/Colectivo, AGAM). Pendiente: ESA, Cinemateca, Exhibiciones.
 
 ---
 
@@ -21,7 +21,7 @@ El backend de RePA 2025 es una API REST desarrollada en **FastAPI** con **Postgr
 | Validación | Pydantic | latest |
 | Contenedores | Docker | 3 |
 
-### 1.2 Estructura de Directorios
+### 1.2 Estructura de Directorios (Actualizada v0.4.0)
 ```
 backend/
 ├── src/
@@ -32,22 +32,33 @@ backend/
 │   ├── token_utils.py       # Manejo de JWT
 │   ├── logger.py            # Configuración de logs
 │   ├── middlewarelogg.py    # Middleware de logging
+│   ├── .env                 # Variables de entorno (CORS_ORIGINS)
 │   ├── models/              # Modelos SQLAlchemy
+│   │   ├── __init__.py           # ✅ Registro centralizado
 │   │   ├── user_models.py
-│   │   ├── person_model.py
+│   │   ├── persona_fisica_model.py    # ✅ NUEVO (reemplaza person_model.py)
+│   │   ├── persona_juridica_model.py  # ✅ NUEVO
+│   │   ├── asociacion_model.py        # ✅ NUEVO
+│   │   ├── obra_audiovisual_model.py  # ✅ NUEVO (AGAM)
 │   │   ├── training_models.py
 │   │   └── work_models.py
 │   ├── schemas/             # Esquemas Pydantic
 │   │   ├── user_schemas.py
-│   │   ├── person_schema.py
+│   │   ├── persona_fisica_schemas.py    # ✅ NUEVO
+│   │   ├── persona_juridica_schemas.py  # ✅ NUEVO
+│   │   ├── asociacion_schemas.py        # ✅ NUEVO
+│   │   ├── obra_audiovisual_schemas.py  # ✅ NUEVO
 │   │   ├── trainig_schemas.py
 │   │   └── work_schemas.py
 │   └── routes/              # Endpoints API
 │       ├── user_routes.py
 │       ├── admin_routes.py
+│       ├── persona_fisica_routes.py     # ✅ NUEVO
+│       ├── persona_juridica_routes.py   # ✅ NUEVO
+│       ├── asociacion_routes.py         # ✅ NUEVO
+│       ├── obra_audiovisual_routes.py   # ✅ NUEVO
 │       ├── training_routes.py
 │       ├── admin_training_rutes.py
-│       ├── person_routes.py
 │       └── work_routes.py
 ├── Dockerfile
 └── requirements.txt
@@ -192,57 +203,41 @@ backend/
 
 ## 4. Observaciones y Problemas Detectados
 
-### 4.1 🔴 Críticos
+### 4.1 🔴 Críticos (TODOS RESUELTOS ✅)
 
-#### 4.1.1 CORS Abierto a Todos
+#### 4.1.1 ~~CORS Abierto a Todos~~ ✅ CORREGIDO v0.2.0
 ```python
-# main.py línea 28
-origin = ['*']  # ⚠️ Permite cualquier origen
+# main.py - Ahora usa variable de entorno CORS_ORIGINS
+cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
 ```
-**Riesgo:** Vulnerabilidad de seguridad en producción.
-**Solución:** Configurar orígenes específicos por entorno.
+**Estado:** Configurado en `.env` con `CORS_ORIGINS`.
 
-#### 4.1.2 Modelo Person con Import Incorrecto
-```python
-# person_model.py línea 4
-from src.db.database import Base  # ⚠️ Ruta incorrecta
-# Debería ser:
-from src.database import Base
-```
-**Impacto:** El modelo Person no se puede usar.
+#### 4.1.2 ~~Modelo Person con Import Incorrecto~~ ✅ CORREGIDO v0.3.0
+**Estado:** Archivo `person_model.py` eliminado y reemplazado por `persona_fisica_model.py`.
 
-#### 4.1.3 Modelo Person con FK Incorrecta
-```python
-# person_model.py línea 10
-user_email = Column(String, ForeignKey("users.email"))  # ⚠️ Debería ser user_id
-```
-**Impacto:** Relación incorrecta con usuarios.
+#### 4.1.3 ~~Modelo Person con FK Incorrecta~~ ✅ CORREGIDO v0.3.0
+**Estado:** Nuevo modelo `PersonaFisica` con FK correcta a `users.id`.
 
-#### 4.1.4 Variable `db` No Definida en `/me`
+#### 4.1.4 ~~Variable `db` No Definida en `/me`~~ ✅ CORREGIDO v0.2.0
 ```python
-# user_routes.py línea 300
-user = db.query(User).filter(...)  # ⚠️ db no está definida
-# Falta: db: Session = Depends(get_db)
+# user_routes.py - Ahora incluye dependency
+async def read_users_me(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
 ```
-**Impacto:** Endpoint `/users/me` GET no funciona.
 
-#### 4.1.5 Bug en training_routes.py
+#### 4.1.5 ~~Bug en training_routes.py~~ ✅ CORREGIDO v0.2.0
 ```python
-# training_routes.py línea 119
-if not training:  # ⚠️ Debería ser 'trainings'
+# training_routes.py línea 119 - Corregido
+if not trainings:  # ✅ Variable correcta
 ```
-**Impacto:** Error de referencia en listado de capacitaciones.
 
 ### 4.2 🟡 Importantes
 
-#### 4.2.1 Prints de Debug en Producción
+#### 4.2.1 ~~Prints de Debug en Producción~~ ✅ CORREGIDO v0.2.0
 ```python
-# utils.py, user_routes.py, token_utils.py
-print(f"Utils - get_current_user - payload: {payload}")  # Debug
-print(f"URL de verificación: {verification_url}")
+# utils.py - Ahora usa logger.debug()
+logger.debug(f"get_current_user - payload: {payload}")
 ```
-**Riesgo:** Exposición de información sensible en logs.
-**Solución:** Usar logger con niveles apropiados.
+**Estado:** Prints reemplazados por `logger.debug()` en `utils.py`, `user_routes.py` y `seed.py`.
 
 #### 4.2.2 Typos en Nombres de Archivos
 - `admin_training_rutes.py` → debería ser `admin_training_routes.py`
@@ -295,14 +290,14 @@ El login genera `refresh_token` pero no hay endpoint para usarlo.
 
 ## 5. Modelos Faltantes para Frontend
 
-### 5.1 Comparación Frontend vs Backend
+### 5.1 Comparación Frontend vs Backend (Actualizado v0.4.0)
 
 | Formulario Frontend | Modelo Backend | Estado |
 |---------------------|----------------|--------|
-| **Persona Física (PF)** | Person (parcial) | 🟡 Incompleto |
-| **Persona Jurídica (PJ)** | - | 🔴 No existe |
-| **Asociación/Colectivo (AS)** | - | 🔴 No existe |
-| **AGAM (Obras)** | - | 🔴 No existe |
+| **Persona Física (PF)** | PersonaFisica + 8 subperfiles | ✅ Completo |
+| **Persona Jurídica (PJ)** | PersonaJuridica + IntegrantePJ | ✅ Completo |
+| **Asociación/Colectivo (AS)** | Asociacion + IntegranteAsociacion | ✅ Completo |
+| **AGAM (Obras)** | ObraAudiovisual + EquipoTecnicoObra | ✅ Completo |
 | **ESA (Estudiantes)** | - | 🔴 No existe |
 | **Cinemateca** | - | 🔴 No existe |
 | **Exhibiciones** | - | 🔴 No existe |
@@ -483,4 +478,47 @@ class Exhibicion(Base):
 ---
 
 *Documento generado el 23/01/2026*
-*Versión del backend analizada: 0.1.0*
+*Última actualización: 24/01/2026*
+*Versión del backend analizada: 0.4.0*
+
+---
+
+## 9. Resumen de Cambios Realizados (v0.2.0 - v0.4.0)
+
+### ✅ Bugs Críticos Corregidos (v0.2.0)
+| Bug | Archivo | Solución |
+|-----|---------|----------|
+| CORS wildcard | `main.py` | Variable de entorno `CORS_ORIGINS` |
+| Import incorrecto | `person_model.py` | Eliminado, reemplazado por `persona_fisica_model.py` |
+| FK incorrecta | `person_model.py` | Nuevo modelo con `user_id` correcto |
+| `db` no definida | `user_routes.py` | Agregada dependency `Depends(get_db)` |
+| Variable `training` | `training_routes.py` | Corregido a `trainings` |
+| Prints de debug | Varios | Reemplazados por `logger.debug()` |
+
+### ✅ Modelos Creados (v0.3.0)
+| Modelo | Tablas | Descripción |
+|--------|--------|-------------|
+| `PersonaFisica` | `personas_fisicas` + 8 subperfiles | Formulario PF completo |
+| `PersonaJuridica` | `personas_juridicas` + `integrantes_pj` | Formulario PJ completo |
+| `Asociacion` | `asociaciones` + `integrantes_asociacion` | Formulario AS completo |
+| `ObraAudiovisual` | `obras_audiovisuales` + `equipo_tecnico_obra` | Formulario AGAM completo |
+
+### ✅ Schemas y Rutas (v0.4.0)
+| Endpoint | Métodos | Descripción |
+|----------|---------|-------------|
+| `/persona-fisica` | CRUD + subperfiles | 20+ endpoints |
+| `/persona-juridica` | CRUD + integrantes | 8 endpoints |
+| `/asociacion` | CRUD + integrantes | 8 endpoints |
+| `/obras` | CRUD + equipo técnico | 10 endpoints |
+
+### 📊 Estado Actual del Backend
+```
+✅ Operativo en Docker (localhost:8000)
+✅ Swagger UI disponible (/docs)
+✅ 4 formularios RePA implementados
+✅ Autenticación JWT funcionando
+✅ CORS configurado por entorno
+⏳ Pendiente: ESA, Cinemateca, Exhibiciones, Salas, Festivales
+⏳ Pendiente: Migraciones con Alembic
+⏳ Pendiente: Tests unitarios
+```
