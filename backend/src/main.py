@@ -72,7 +72,7 @@ Los endpoints sensibles tienen límites de solicitudes:
 - **IAAviM** - Instituto de Artes Audiovisuales de Misiones
 - **Email**: sistemas@iaavim.gob.ar
     """,
-    version="0.8.0",
+    version="0.9.0",
     contact={
         "name": "IAAviM - Sistemas",
         "url": "https://iaavim.gob.ar",
