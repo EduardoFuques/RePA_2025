@@ -231,7 +231,7 @@ Por módulo:
 | Entorno | SECRET_KEY | HTTPS | Estado |
 |---------|------------|-------|--------|
 | **Development** (local) | No configurada | No | ✅ Solo desarrollo |
-| **QA** (demo inversores) | ✅ Generada | Pendiente | ✅ Funcional |
+| **Demo** | ✅ Generada | Pendiente | ✅ Funcional |
 | **Producción** | Pendiente | Pendiente | 🔜 Por configurar |
 
 ### 5.2 Pendiente para Producción
