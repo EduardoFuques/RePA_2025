@@ -113,7 +113,7 @@ jobs:
             # Esperar a que los contenedores estén healthy (máx 60s)
             echo "⏳ Verificando health de contenedores..."
             for i in {1..12}; do
-              if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              if curl -sf http://localhost/api/health > /dev/null 2>&1; then
                 echo "✅ Backend healthy"
                 break
               fi
