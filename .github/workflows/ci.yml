@@ -95,9 +95,15 @@ jobs:
     environment: qa
     
     steps:
-      - name: Deploy notification
-        run: |
-          echo "🚀 Listo para deploy a QA"
-          echo "Commit: ${{ github.sha }}"
-          echo "Para deploy manual, ejecutar en el servidor:"
-          echo "  cd ~/RePA_2025 && ./deploy.sh"
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.QA_HOST }}
+          username: ${{ secrets.QA_USER }}
+          key: ${{ secrets.QA_SSH_KEY }}
+          port: ${{ secrets.QA_SSH_PORT || 22 }}
+          script: |
+            cd ~/RePA_2025
+            git pull origin main
+            ./deploy.sh
+            echo "✅ Deploy completado - Commit: ${{ github.sha }}"
