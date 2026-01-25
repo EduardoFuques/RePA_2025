@@ -2,20 +2,24 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import QueuePool
 
-from src.config import DATABASE_URL
+from src.config import (
+    DATABASE_URL, 
+    DB_POOL_SIZE, DB_MAX_OVERFLOW, DB_POOL_TIMEOUT, 
+    DB_POOL_RECYCLE, DB_CONNECT_TIMEOUT, DB_STATEMENT_TIMEOUT
+)
 
-# Configuración del engine con timeouts y pool de conexiones
+# Configuración del engine con timeouts y pool de conexiones (valores desde .env)
 engine = create_engine(
     DATABASE_URL,
     poolclass=QueuePool,
-    pool_size=5,              # Conexiones permanentes en el pool
-    max_overflow=10,          # Conexiones adicionales permitidas
-    pool_timeout=30,          # Segundos de espera para obtener conexión del pool
-    pool_recycle=1800,        # Reciclar conexiones cada 30 minutos (evita stale connections)
-    pool_pre_ping=True,       # Verificar conexión antes de usarla
+    pool_size=DB_POOL_SIZE,
+    max_overflow=DB_MAX_OVERFLOW,
+    pool_timeout=DB_POOL_TIMEOUT,
+    pool_recycle=DB_POOL_RECYCLE,
+    pool_pre_ping=True,
     connect_args={
-        "connect_timeout": 10,    # Timeout de conexión inicial (segundos)
-        "options": "-c statement_timeout=30000"  # Timeout de queries (30 seg en ms)
+        "connect_timeout": DB_CONNECT_TIMEOUT,
+        "options": f"-c statement_timeout={DB_STATEMENT_TIMEOUT}"
     }
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
