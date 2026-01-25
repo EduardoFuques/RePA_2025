@@ -33,37 +33,51 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_data, ensure_ascii=False)
 
 
-# Crear el directorio de logs si no existe (usar ruta relativa al directorio actual)
-base_dir = os.path.dirname(os.path.abspath(__file__))
-log_directory = os.getenv("LOGS_PATH", os.path.join(base_dir, "logs"))
-os.makedirs(log_directory, exist_ok=True)
-
-# Configurar el archivo de log
-log_file_path = os.path.join(log_directory, "app.log")
-
-# Configurar handler rotativo para archivo (JSON)
-file_handler = TimedRotatingFileHandler(
-    filename=log_file_path,
-    when="midnight",
-    interval=1,
-    backupCount=7,
-    encoding="utf-8",
-    delay=False
-)
-file_handler.setFormatter(JSONFormatter())
+# Configurar nivel desde variable de entorno
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 
 # Handler para consola (formato legible)
 console_handler = logging.StreamHandler()
 console_format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 console_handler.setFormatter(logging.Formatter(console_format))
 
-# Configurar nivel desde variable de entorno
-log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+# Configurar handlers - solo consola por defecto, archivo si se especifica LOGS_PATH
+handlers = [console_handler]
+
+# Solo crear archivo de log si se especifica LOGS_PATH o no estamos en CI/testing
+logs_path = os.getenv("LOGS_PATH")
+is_testing = os.getenv("TESTING", "false").lower() == "true" or os.getenv("CI", "false").lower() == "true"
+
+if logs_path or not is_testing:
+    # Usar directorio temporal si no hay permisos o estamos en CI
+    if is_testing:
+        import tempfile
+        log_directory = tempfile.gettempdir()
+    else:
+        log_directory = logs_path or os.path.join(os.getcwd(), "logs")
+    
+    try:
+        os.makedirs(log_directory, exist_ok=True)
+        log_file_path = os.path.join(log_directory, "app.log")
+        
+        file_handler = TimedRotatingFileHandler(
+            filename=log_file_path,
+            when="midnight",
+            interval=1,
+            backupCount=7,
+            encoding="utf-8",
+            delay=True  # delay=True para no crear archivo hasta el primer log
+        )
+        file_handler.setFormatter(JSONFormatter())
+        handlers.append(file_handler)
+    except (PermissionError, OSError):
+        # Si no hay permisos, solo usar consola
+        pass
 
 # Configurar el logger raíz
 logging.basicConfig(
     level=getattr(logging, log_level, logging.INFO),
-    handlers=[file_handler, console_handler]
+    handlers=handlers
 )
 
 # Obtener el logger principal
