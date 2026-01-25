@@ -1,4 +1,10 @@
-# routes/esa_routes.py
+"""
+Rutas para el registro de Estudiantes del Sector Audiovisual (ESA).
+
+Registro temporal (vigencia 1 año) para estudiantes que aún no están
+inscriptos en el RePA principal. Permite acceder a beneficios y actividades
+del IAAviM mientras completan su formación.
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
@@ -11,13 +17,28 @@ from src.utils import get_current_user
 esa_router = APIRouter()
 
 
-@esa_router.post("/", response_model=EstudianteESAOut, status_code=status.HTTP_201_CREATED)
+@esa_router.post(
+    "/", 
+    response_model=EstudianteESAOut, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear registro de Estudiante ESA",
+    responses={
+        201: {"description": "Registro creado exitosamente (vigencia 1 año)"},
+        400: {"description": "El usuario ya tiene un registro ESA"},
+        401: {"description": "No autenticado"}
+    }
+)
 async def create_estudiante_esa(
     data: EstudianteESACreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Crear registro de Estudiante ESA para el usuario actual"""
+    """
+    Crear registro de Estudiante ESA para el usuario autenticado.
+    
+    El registro tiene **vigencia de 1 año** desde la fecha de alta.
+    Requisitos: ser estudiante activo y no estar inscripto en el RePA principal.
+    """
     # Verificar que el usuario no tenga ya un registro ESA
     existing = db.query(EstudianteESA).filter(EstudianteESA.user_id == current_user["id"]).first()
     if existing:

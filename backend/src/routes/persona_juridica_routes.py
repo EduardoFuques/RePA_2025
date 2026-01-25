@@ -1,4 +1,9 @@
-# routes/persona_juridica_routes.py
+"""
+Rutas para el formulario de Persona Jurídica del RePA.
+
+Permite registrar empresas, productoras, cooperativas y otras entidades
+del sector audiovisual, incluyendo sus integrantes vinculados al RePA.
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -16,13 +21,28 @@ persona_juridica_router = APIRouter()
 
 # === CRUD PERSONA JURÍDICA ===
 
-@persona_juridica_router.post("/", response_model=PersonaJuridicaOut, status_code=status.HTTP_201_CREATED)
+@persona_juridica_router.post(
+    "/", 
+    response_model=PersonaJuridicaOut, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear registro de Persona Jurídica",
+    responses={
+        201: {"description": "Registro creado exitosamente"},
+        400: {"description": "El usuario ya tiene un registro"},
+        401: {"description": "No autenticado"}
+    }
+)
 async def create_persona_juridica(
     data: PersonaJuridicaCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Crear registro de Persona Jurídica para el usuario actual"""
+    """
+    Crear el registro de Persona Jurídica para el usuario autenticado.
+    
+    Incluye datos institucionales, representación legal, actividades audiovisuales
+    y documentación. Cada usuario solo puede tener **un registro** de Persona Jurídica.
+    """
     existing = db.query(PersonaJuridica).filter(PersonaJuridica.user_id == current_user["id"]).first()
     if existing:
         raise HTTPException(

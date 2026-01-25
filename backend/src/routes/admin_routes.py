@@ -1,3 +1,11 @@
+"""
+Rutas de administración del sistema RePA.
+
+Todos los endpoints requieren rol **admin**. Incluye:
+- Gestión de usuarios (listar, modificar, activar/desactivar)
+- Gestión de roles
+- Consulta de logs de auditoría
+"""
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -12,11 +20,20 @@ from src.utils import get_password_hash, validar_password, get_current_user, has
 
 admin_router = APIRouter()
 
-@admin_router.get("/users", response_model=List[UserOut], description="Obtener todos los usuarios")
+@admin_router.get(
+    "/users", 
+    response_model=List[UserOut],
+    summary="Listar todos los usuarios",
+    responses={
+        200: {"description": "Lista de usuarios"},
+        403: {"description": "No autorizado (requiere rol admin)"}
+    }
+)
 async def get_users(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-
     """
-    Obtener todos los usuarios (Sólo para Administradores).
+    Obtener todos los usuarios registrados en el sistema.
+    
+    **Requiere rol admin.**
     """
     # Verificar si el usuario tiene el rol "admin"
     if not has_user_role(current_user, ["admin"]):
