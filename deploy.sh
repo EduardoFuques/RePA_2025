@@ -1,34 +1,61 @@
 #!/bin/bash
 
-# Script de deploy para el backend RePA
+# Script de deploy para RePA (backend + frontend unificado)
+# El frontend actúa como proxy reverso - backend y DB no expuestos externamente
 
-# Detener y eliminar contenedores existentes
+set -e
+
+FRONTEND_REPO="https://github.com/EduardoFuques/Repa2025-Frontend.git"
+FRONTEND_BRANCH="feature/esa"
+
+echo "=== Deploy RePA ==="
+echo ""
+
+# Detener contenedores existentes
+echo "Deteniendo contenedores..."
 docker compose down
 
-# Pullear ultima version del repositorio
+# Pullear ultima version del backend
+echo "Actualizando backend..."
 git pull
 
-# Construir y iniciar los nuevos contenedores
+# Clonar o actualizar el frontend
+echo "Actualizando frontend..."
+if [ -d "frontend" ]; then
+  cd frontend
+  git fetch origin
+  git checkout $FRONTEND_BRANCH
+  git pull origin $FRONTEND_BRANCH
+  cd ..
+else
+  git clone -b $FRONTEND_BRANCH $FRONTEND_REPO frontend
+fi
+
+# Copiar configuración de nginx para proxy reverso
+cp -f frontend/nginx.conf frontend/nginx.conf 2>/dev/null || true
+
+# Construir y iniciar los contenedores
+echo "Construyendo e iniciando contenedores..."
 docker compose up -d --build
 
-# Esperar a que PostgreSQL esté listo (el healthcheck se encarga)
+# Esperar a que los servicios estén listos
 echo "Esperando a que los servicios estén listos..."
-sleep 5
+sleep 10
 
-# Verificar estado de los contenedores
+# Verificar estado
+echo ""
+echo "=== Estado de los contenedores ==="
 docker compose ps
 
 # Mostrar logs del backend
 echo ""
 echo "=== Logs del backend ==="
-docker compose logs backend --tail 10
+docker compose logs backend --tail 5
 
-# Determinar si estamos en producción o desarrollo
-if [ -n "$PROD" ] || [ "$1" == "prod" ]; then
-  echo ""
-  echo "Backend desplegado en producción"
-else
-  echo ""
-  echo "Backend desplegado en http://localhost:8000"
-  echo "Adminer disponible en http://localhost:8081"
-fi
+echo ""
+echo "=== Deploy completado ==="
+echo "Frontend: http://localhost (puerto 80)"
+echo "API: http://localhost/api (proxy al backend)"
+echo "Adminer: http://localhost:8081 (solo desde el servidor)"
+echo ""
+echo "Backend y PostgreSQL NO están expuestos externamente."

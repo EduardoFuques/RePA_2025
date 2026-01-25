@@ -3,65 +3,71 @@ version: "3"
 services:
   db:
     image: postgres
-    #restart: always
-    # set shared memory limit when using docker-compose
+    restart: unless-stopped
     shm_size: 128mb
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       PGDATA: /var/lib/postgresql/data
+      TZ: America/Argentina/Buenos_Aires
     volumes:
       - ./pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Puerto NO expuesto externamente - solo accesible dentro de la red Docker
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} && psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c 'SELECT 1'"]
       interval: 2s
       timeout: 5s
       retries: 15
       start_period: 10s
+    networks:
+      - repa-network
 
   adminer:
     image: adminer
-    #restart: always
+    restart: unless-stopped
     ports:
-      - 8081:8080
+      - "127.0.0.1:8081:8080"  # Solo accesible desde localhost del servidor
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+    networks:
+      - repa-network
 
   backend:
     build: ./backend
+    restart: unless-stopped
     volumes:
       - type: bind
         source: ./backend/src
         target: /code/src
-      - ~/.local/share/zed/languages/pylsp/pylsp-venv:/opt/pylsp # Montar entorno virtual
     environment:
-      PYTHONPATH: "/opt/pylsp/lib/python3.9/site-packages" # Ajustar según versión
-    ports:
-      - "8000:80"
+      TZ: America/Argentina/Buenos_Aires
+    # Puerto NO expuesto externamente - solo accesible dentro de la red Docker
+    expose:
+      - "80"
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - repa-network
 
-  # frontend:
-  #   build: ./frontend
-  #   environment:
-  #     NODE_ENV: ${NODE_ENV}
-  #   ports:
-  #     - ${PORT}:${PORT}
-  #   command: npm run dev
-  #   develop:
-  #     watch:
-  #       - action: rebuild
-  #         path: ./frontend/src
-  #         target: /usr/src/app/
-  #         ignore:
-  #           - node_modules/
-  #       - action: rebuild
-  #         path: package.json
-  #   #depends_on:
-  #   #  - backend
-  #   #  - db
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+    depends_on:
+      - backend
+    networks:
+      - repa-network
+
+networks:
+  repa-network:
+    driver: bridge
 
 volumes:
   pgdata:
