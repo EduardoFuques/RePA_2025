@@ -5,21 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
-from jose import JWTError, jwt
+from jose import jwt
 from src.models.user_models import User, Role, TokenRecovery
-from src.schemas.user_schemas import UserCreate, UserOut, UserUpdate, TokenData, TokenDB
+from src.schemas.user_schemas import UserCreate, UserOut, UserUpdate
 from src.database import get_db
 from src.utils import get_password_hash, validar_password, update_last_login, get_current_user
 from src.token_utils import create_access_token, decode_access_token
 from src.rate_limiter import limiter
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-URL_SITE = os.getenv("URL_SITE")
 
 user_router = APIRouter()
 
@@ -96,14 +90,14 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
         db.add(new_user)
         db.add(recovery_record)
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Error en el registro de New User"
         )
     # TODO: Implementar envío de email en producción
-    verification_url = f"{URL_SITE}/users/confirm/{registration_token}"
+    # verification_url = f"{URL_SITE}/users/confirm/{registration_token}"
     
     return new_user # Retorna el usuario creado{"detail": "Registro exitoso. Verifica tu email"}
 
@@ -175,27 +169,6 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
     # Actualizar la fecha y hora del último acceso
     update_last_login(user.email, db)
     
-    # Convertir usuario a formato UserOut compatible con JSON
-    data_access = {
-        "id": user.id,
-        "email": user.email,
-        "is_active": user.is_active,
-        "created_at": user.created_at.isoformat(),
-        "last_login": user.last_login.isoformat() if user.last_login else None,
-        "roles": [{"id": role.id, "rol": role.rol} for role in user.roles],
-        "type": "access"
-    }
-    
-    data_refresh = {
-        "id": user.id,
-        "email": user.email,
-        "is_active": user.is_active,
-        "created_at": user.created_at.isoformat(),
-        "last_login": user.last_login.isoformat() if user.last_login else None,
-        "roles": [{"id": role.id, "rol": role.rol} for role in user.roles],
-        "type": "refresh"
-    }
-
     # Generar token de acceso (30 minutos)
     access_token = create_access_token(
         data={"sub": user.id, "email": user.email, "roles": [{"id": role.id, "rol": role.rol} for role in user.roles]},
@@ -250,14 +223,14 @@ async def recovery_passwd_user(user_in: UserUpdate, db: Session = Depends(get_db
     try:
         db.add(recovery_record)
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Error en el registro de Token Recovery"
         )
     # TODO: Implementar envío de email en producción
-    verification_url = f"{URL_SITE}/users/recovery/{registration_token}"
+    # verification_url = f"{URL_SITE}/users/recovery/{registration_token}"
     
     return user # Retorna el usuario 
 

@@ -33,8 +33,9 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_data, ensure_ascii=False)
 
 
-# Crear el directorio de logs si no existe
-log_directory = os.getenv("LOGS_PATH", "src/logs")
+# Crear el directorio de logs si no existe (usar ruta relativa al directorio actual)
+base_dir = os.path.dirname(os.path.abspath(__file__))
+log_directory = os.getenv("LOGS_PATH", os.path.join(base_dir, "logs"))
 os.makedirs(log_directory, exist_ok=True)
 
 # Configurar el archivo de log

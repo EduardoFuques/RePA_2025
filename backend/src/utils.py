@@ -8,7 +8,7 @@ from src.models.user_models import User
 from src.schemas.user_schemas import UserUpdate
 from src.database import get_db
 from src.logger import logger
-from src.token_utils import decode_access_token, decode_refresh_token
+from src.token_utils import decode_access_token
 import re
 
 # Objeto necesario para la función de 'get_current_user' que valida los datos del usuario
