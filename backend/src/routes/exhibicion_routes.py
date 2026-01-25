@@ -1,4 +1,12 @@
-# routes/exhibicion_routes.py
+"""
+Rutas para el registro de espacios de exhibición audiovisual.
+
+Incluye:
+- **Salas**: Espacios físicos de proyección
+- **Exhibiciones**: Eventos de exhibición audiovisual
+- **Festivales**: Festivales de cine y audiovisual
+- **Cinematecas**: Archivos y espacios de preservación audiovisual
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List

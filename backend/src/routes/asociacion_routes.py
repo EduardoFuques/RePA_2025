@@ -1,4 +1,9 @@
-# routes/asociacion_routes.py
+"""
+Rutas para el formulario de Asociación/Colectivo del RePA.
+
+Permite registrar grupos, colectivos y asociaciones audiovisuales,
+incluyendo sus ámbitos de actuación e integrantes vinculados al RePA.
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -16,13 +21,28 @@ asociacion_router = APIRouter()
 
 # === CRUD ASOCIACIÓN ===
 
-@asociacion_router.post("/", response_model=AsociacionOut, status_code=status.HTTP_201_CREATED)
+@asociacion_router.post(
+    "/", 
+    response_model=AsociacionOut, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear registro de Asociación/Colectivo",
+    responses={
+        201: {"description": "Registro creado exitosamente"},
+        400: {"description": "El usuario ya tiene un registro"},
+        401: {"description": "No autenticado"}
+    }
+)
 async def create_asociacion(
     data: AsociacionCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Crear registro de Asociación/Colectivo para el usuario actual"""
+    """
+    Crear el registro de Asociación/Colectivo para el usuario autenticado.
+    
+    Incluye datos básicos, ámbitos de actuación (producción, formación, exhibición, etc.)
+    e integrantes. Cada usuario solo puede tener **un registro** de Asociación.
+    """
     existing = db.query(Asociacion).filter(Asociacion.user_id == current_user["id"]).first()
     if existing:
         raise HTTPException(

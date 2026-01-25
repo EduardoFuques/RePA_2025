@@ -21,16 +21,31 @@ user_router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Crear un usuario nuevo
-@user_router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED, description="Crear un nuevo usuario")
+@user_router.post(
+    "/register", 
+    response_model=UserOut, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar nuevo usuario",
+    description="Crea una nueva cuenta de usuario. El usuario queda inactivo hasta verificar su email.",
+    responses={
+        201: {"description": "Usuario creado exitosamente"},
+        400: {"description": "Email ya registrado o contraseña inválida"},
+        429: {"description": "Demasiados intentos (rate limit)"}
+    }
+)
 @limiter.limit("10/minute")
 def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     """
-    Registrar un nuevo usuario con el rol "user" por defecto.
+    Registrar un nuevo usuario en el sistema RePA.
     
-    Args:
-        user_in (UserCreate): Datos del usuario a crear.
-    Return:
-        new_user (UserOut): Usuario Creado.
+    El usuario se crea con estado **inactivo** y rol **user** por defecto.
+    Se genera un token de verificación que debe ser confirmado via email.
+    
+    **Requisitos de contraseña:**
+    - Mínimo 8 caracteres
+    - Al menos una mayúscula
+    - Al menos una minúscula
+    - Al menos un número
     """
     
     # Verificar si el usuario ya existe
@@ -156,12 +171,26 @@ async def confirm_registration(token: str, db: Session = Depends(get_db)):
     except jwt.JWTError:
         raise HTTPException(status_code=400, detail="Token inválido")
 
-# Inicio de sesión [form_data: OAuth2PasswordRequestForm = Depends()]
-@user_router.post("/token")
+# Inicio de sesión
+@user_router.post(
+    "/token",
+    summary="Iniciar sesión",
+    description="Autenticar usuario y obtener tokens JWT",
+    responses={
+        200: {"description": "Login exitoso, retorna access_token y refresh_token"},
+        400: {"description": "Credenciales inválidas"},
+        429: {"description": "Demasiados intentos (rate limit: 5/minuto)"}
+    }
+)
 @limiter.limit("5/minute")
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
-    Iniciar sesión con un usuario registrado.
+    Iniciar sesión con email y contraseña.
+    
+    Retorna un **access_token** (válido 30 min) y un **refresh_token** (válido 7 días).
+    
+    El access_token debe incluirse en el header `Authorization: Bearer <token>` 
+    para acceder a endpoints protegidos.
     """
     # Buscar el usuario en la base de datos
     user = db.query(User).filter(User.email == form_data.username).first()
