@@ -56,3 +56,7 @@ BETTER_STACKTRACE = os.getenv("BETTER_STACKTRACE", "false").lower() == "true"
 
 # URLs
 URL_SITE = os.getenv("URL_SITE", "http://localhost:8000")
+
+# API Root Path (para proxy reverso como nginx)
+# En producción con nginx: "/api", en desarrollo local: ""
+API_ROOT_PATH = os.getenv("API_ROOT_PATH", "")
