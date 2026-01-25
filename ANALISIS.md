@@ -224,24 +224,35 @@ Por módulo:
 
 ---
 
-## 5. Pendientes para Producción
+## 5. Estado de Entornos
 
-### 5.1 Crítico (antes de deploy)
+### 5.1 Entornos Configurados
 
-| Tarea | Esfuerzo |
-|-------|----------|
-| Generar SECRET_KEY segura | 5 min |
-| Configurar HTTPS/SSL | 2h |
-| Proteger seed.py en producción | 1h |
+| Entorno | SECRET_KEY | HTTPS | Estado |
+|---------|------------|-------|--------|
+| **Development** (local) | No configurada | No | ✅ Solo desarrollo |
+| **QA** (demo inversores) | ✅ Generada | Pendiente | ✅ Funcional |
+| **Producción** | Pendiente | Pendiente | 🔜 Por configurar |
 
-### 5.2 Recomendado
+### 5.2 Pendiente para Producción
 
-| Tarea | Esfuerzo |
-|-------|----------|
-| Verificación de email | 8h |
-| Blacklist de tokens (Redis) | 4h |
-| Métricas Prometheus | 4h |
-| Ambiente de staging | 4h |
+| Tarea | Esfuerzo | Nota |
+|-------|----------|------|
+| Generar SECRET_KEY | 5 min | Usar `python -c "import secrets; print(secrets.token_hex(32))"` |
+| Configurar HTTPS/SSL | 30 min | Certbot con Let's Encrypt |
+
+### 5.3 Nota sobre seed.py
+
+El archivo `seed.py` crea usuarios de prueba con contraseñas conocidas. 
+**No ejecutar en producción.** Solo usar en development/QA.
+
+### 5.4 Mejoras Opcionales
+
+| Tarea | Esfuerzo | Descripción |
+|-------|----------|-------------|
+| Verificación de email | 8h | Confirmar email al registrarse |
+| Blacklist de tokens (Redis) | 4h | Invalidar tokens en logout |
+| Métricas Prometheus + Grafana | 4h | Dashboards de rendimiento, alertas automáticas |
 
 ---
 
