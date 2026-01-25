@@ -3,6 +3,7 @@ Módulo de Rate Limiting para protección contra ataques de fuerza bruta.
 
 Utiliza slowapi para limitar la cantidad de solicitudes por IP en endpoints sensibles.
 """
+import os
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -28,8 +29,11 @@ def get_client_ip(request: Request) -> str:
     return get_remote_address(request)
 
 
-# Crear instancia del limiter
-limiter = Limiter(key_func=get_client_ip)
+# Deshabilitar rate limiting en CI/testing
+is_testing = os.getenv("CI", "false").lower() == "true" or os.getenv("TESTING", "false").lower() == "true"
+
+# Crear instancia del limiter (deshabilitado en testing)
+limiter = Limiter(key_func=get_client_ip, enabled=not is_testing)
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
