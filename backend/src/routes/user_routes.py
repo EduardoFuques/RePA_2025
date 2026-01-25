@@ -22,7 +22,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Crear un usuario nuevo
 @user_router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED, description="Crear un nuevo usuario")
 @limiter.limit("10/minute")
-def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
+def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     """
     Registrar un nuevo usuario con el rol "user" por defecto.
     
