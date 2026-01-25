@@ -5,7 +5,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from src.config import CORS_ORIGINS
+from src.config import CORS_ORIGINS, API_ROOT_PATH
 from src.logger import logger
 from src.database import get_db, init_db
 from src.middlewarelogg import log_requests
@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="API RePA - Registro Provincial del Audiovisual",
+    root_path=API_ROOT_PATH,
     description="""
 ## Sistema de Registro del Sector Audiovisual de Misiones
 
