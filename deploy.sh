@@ -5,7 +5,7 @@
 
 set -e
 
-FRONTEND_REPO="https://github.com/EduardoFuques/Repa2025-Frontend.git"
+FRONTEND_REPO="git@github.com:EduardoFuques/Repa2025-Frontend.git"
 FRONTEND_BRANCH="main"
 
 echo "=== Deploy RePA ==="
