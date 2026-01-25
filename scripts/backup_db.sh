@@ -4,13 +4,25 @@
 # =============================================================================
 # Uso: ./backup_db.sh
 # Configurar en cron: 0 2 * * * /ruta/al/proyecto/scripts/backup_db.sh
+# Las variables se leen desde el archivo .env en la raíz del proyecto
 # =============================================================================
 
 set -e
 
-# Configuración (puede sobrescribirse con variables de entorno)
+# Obtener el directorio del script y la raíz del proyecto
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Cargar variables desde .env si existe
+ENV_FILE="${PROJECT_ROOT}/.env"
+if [ -f "$ENV_FILE" ]; then
+    # Exportar variables del .env (ignorando comentarios y líneas vacías)
+    export $(grep -v '^#' "$ENV_FILE" | grep -v '^$' | xargs)
+fi
+
+# Configuración (usa valores del .env o defaults)
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/repa}"
-RETENTION_DAYS="${RETENTION_DAYS:-7}"
+RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 CONTAINER_NAME="${CONTAINER_NAME:-repa_2025-db-1}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="repa_backup_${TIMESTAMP}.sql.gz"

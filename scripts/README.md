@@ -23,16 +23,24 @@ crontab -e
 
 ### Variables de Configuración
 
+Las variables se configuran en el archivo `.env` en la raíz del proyecto:
+
+```env
+# En .env
+BACKUP_DIR=/var/backups/repa
+BACKUP_RETENTION_DAYS=7
+```
+
 | Variable | Default | Descripción |
 |----------|---------|-------------|
 | `BACKUP_DIR` | `/var/backups/repa` | Directorio donde se guardan los backups |
-| `RETENTION_DAYS` | `7` | Días de retención de backups |
+| `BACKUP_RETENTION_DAYS` | `7` | Días de retención de backups |
 | `CONTAINER_NAME` | `repa_2025-db-1` | Nombre del contenedor PostgreSQL |
 
-Ejemplo con variables personalizadas:
+También se pueden sobrescribir al ejecutar:
 
 ```bash
-BACKUP_DIR=/mnt/backups RETENTION_DAYS=14 ./scripts/backup_db.sh
+BACKUP_DIR=/mnt/backups BACKUP_RETENTION_DAYS=14 ./scripts/backup_db.sh
 ```
 
 ## Restauración de Base de Datos

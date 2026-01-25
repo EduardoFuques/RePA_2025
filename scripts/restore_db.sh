@@ -4,12 +4,24 @@
 # =============================================================================
 # Uso: ./restore_db.sh <archivo_backup.sql.gz>
 # Ejemplo: ./restore_db.sh /var/backups/repa/repa_backup_20260125_020000.sql.gz
+# Las variables se leen desde el archivo .env en la raíz del proyecto
 # =============================================================================
 
 set -e
 
-# Configuración
+# Obtener el directorio del script y la raíz del proyecto
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Cargar variables desde .env si existe
+ENV_FILE="${PROJECT_ROOT}/.env"
+if [ -f "$ENV_FILE" ]; then
+    export $(grep -v '^#' "$ENV_FILE" | grep -v '^$' | xargs)
+fi
+
+# Configuración (usa valores del .env o defaults)
 CONTAINER_NAME="${CONTAINER_NAME:-repa_2025-db-1}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/repa}"
 
 # Colores para output
 RED='\033[0;31m'
