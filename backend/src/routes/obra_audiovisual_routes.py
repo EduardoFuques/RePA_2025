@@ -10,8 +10,17 @@ from src.schemas.obra_audiovisual_schemas import (
 )
 from src.database import get_db
 from src.utils import get_current_user
+from src.crud_helpers import get_record_by_id, update_record, delete_record
 
 obra_audiovisual_router = APIRouter()
+
+# Mensajes de error reutilizables
+MSG_OBRA_NOT_FOUND = "Obra no encontrada"
+
+
+def _get_obra(db: Session, obra_id: int, user_id: str) -> ObraAudiovisual:
+    """Helper para obtener obra verificando pertenencia al usuario"""
+    return get_record_by_id(db, ObraAudiovisual, obra_id, user_id, MSG_OBRA_NOT_FOUND)
 
 
 # === CRUD OBRA AUDIOVISUAL ===
@@ -23,7 +32,6 @@ async def create_obra(
     db: Session = Depends(get_db)
 ):
     """Crear una nueva Obra Audiovisual"""
-    # Extraer equipo técnico si viene en el request
     equipo_data = data.equipo_tecnico
     obra_data = data.model_dump(exclude={'equipo_tecnico'})
     
@@ -32,7 +40,6 @@ async def create_obra(
     db.commit()
     db.refresh(db_obra)
     
-    # Agregar equipo técnico si se proporcionó
     if equipo_data:
         for miembro in equipo_data:
             equipo = EquipoTecnicoObra(**miembro.model_dump(), obra_id=db_obra.id)
@@ -59,16 +66,7 @@ async def get_obra(
     db: Session = Depends(get_db)
 ):
     """Obtener una Obra Audiovisual por ID"""
-    obra = db.query(ObraAudiovisual).filter(
-        ObraAudiovisual.id == obra_id,
-        ObraAudiovisual.user_id == current_user["id"]
-    ).first()
-    if not obra:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Obra no encontrada"
-        )
-    return obra
+    return _get_obra(db, obra_id, current_user["id"])
 
 
 @obra_audiovisual_router.put("/{obra_id}", response_model=ObraAudiovisualOut)
@@ -79,23 +77,8 @@ async def update_obra(
     db: Session = Depends(get_db)
 ):
     """Actualizar una Obra Audiovisual"""
-    obra = db.query(ObraAudiovisual).filter(
-        ObraAudiovisual.id == obra_id,
-        ObraAudiovisual.user_id == current_user["id"]
-    ).first()
-    if not obra:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Obra no encontrada"
-        )
-    
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(obra, key, value)
-    
-    db.commit()
-    db.refresh(obra)
-    return obra
+    obra = _get_obra(db, obra_id, current_user["id"])
+    return update_record(db, obra, data)
 
 
 @obra_audiovisual_router.delete("/{obra_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -105,18 +88,8 @@ async def delete_obra(
     db: Session = Depends(get_db)
 ):
     """Eliminar una Obra Audiovisual"""
-    obra = db.query(ObraAudiovisual).filter(
-        ObraAudiovisual.id == obra_id,
-        ObraAudiovisual.user_id == current_user["id"]
-    ).first()
-    if not obra:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Obra no encontrada"
-        )
-    
-    db.delete(obra)
-    db.commit()
+    obra = _get_obra(db, obra_id, current_user["id"])
+    delete_record(db, obra)
     return None
 
 
@@ -130,12 +103,7 @@ async def add_miembro_equipo(
     db: Session = Depends(get_db)
 ):
     """Agregar un miembro al equipo técnico de una obra"""
-    obra = db.query(ObraAudiovisual).filter(
-        ObraAudiovisual.id == obra_id,
-        ObraAudiovisual.user_id == current_user["id"]
-    ).first()
-    if not obra:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Obra no encontrada")
+    obra = _get_obra(db, obra_id, current_user["id"])
     
     miembro = EquipoTecnicoObra(**data.model_dump(), obra_id=obra.id)
     db.add(miembro)
@@ -151,13 +119,7 @@ async def get_equipo_tecnico(
     db: Session = Depends(get_db)
 ):
     """Obtener el equipo técnico de una obra"""
-    obra = db.query(ObraAudiovisual).filter(
-        ObraAudiovisual.id == obra_id,
-        ObraAudiovisual.user_id == current_user["id"]
-    ).first()
-    if not obra:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Obra no encontrada")
-    
+    obra = _get_obra(db, obra_id, current_user["id"])
     return db.query(EquipoTecnicoObra).filter(EquipoTecnicoObra.obra_id == obra.id).all()
 
 

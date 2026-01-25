@@ -22,8 +22,16 @@ from src.schemas.persona_fisica_schemas import (
 )
 from src.database import get_db
 from src.utils import get_current_user
+from src.crud_helpers import (
+    get_user_record, check_duplicate_record, 
+    create_record, update_record, delete_record
+)
 
 persona_fisica_router = APIRouter()
+
+# Mensajes de error reutilizables
+MSG_NOT_FOUND = "No se encontró registro de Persona Física"
+MSG_DUPLICATE = "El usuario ya tiene un registro de Persona Física"
 
 
 # === CRUD PERSONA FÍSICA ===
@@ -50,20 +58,8 @@ async def create_persona_fisica(
     Incluye datos personales, identidades, situación laboral e interés institucional.
     Cada usuario solo puede tener **un registro** de Persona Física.
     """
-    # Verificar que el usuario no tenga ya un registro
-    existing = db.query(PersonaFisica).filter(PersonaFisica.user_id == current_user["id"]).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El usuario ya tiene un registro de Persona Física"
-        )
-    
-    # Crear el registro
-    db_persona = PersonaFisica(**data.model_dump(), user_id=current_user["id"])
-    db.add(db_persona)
-    db.commit()
-    db.refresh(db_persona)
-    return db_persona
+    check_duplicate_record(db, PersonaFisica, current_user["id"], MSG_DUPLICATE)
+    return create_record(db, PersonaFisica, data, current_user["id"])
 
 
 @persona_fisica_router.get("/me", response_model=PersonaFisicaOut)
@@ -72,13 +68,7 @@ async def get_my_persona_fisica(
     db: Session = Depends(get_db)
 ):
     """Obtener el registro de Persona Física del usuario actual"""
-    persona = db.query(PersonaFisica).filter(PersonaFisica.user_id == current_user["id"]).first()
-    if not persona:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró registro de Persona Física"
-        )
-    return persona
+    return get_user_record(db, PersonaFisica, current_user["id"], MSG_NOT_FOUND)
 
 
 @persona_fisica_router.put("/me", response_model=PersonaFisicaOut)
@@ -88,21 +78,8 @@ async def update_my_persona_fisica(
     db: Session = Depends(get_db)
 ):
     """Actualizar el registro de Persona Física del usuario actual"""
-    persona = db.query(PersonaFisica).filter(PersonaFisica.user_id == current_user["id"]).first()
-    if not persona:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró registro de Persona Física"
-        )
-    
-    # Actualizar solo los campos proporcionados
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(persona, key, value)
-    
-    db.commit()
-    db.refresh(persona)
-    return persona
+    persona = get_user_record(db, PersonaFisica, current_user["id"], MSG_NOT_FOUND)
+    return update_record(db, persona, data)
 
 
 @persona_fisica_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
@@ -111,15 +88,8 @@ async def delete_my_persona_fisica(
     db: Session = Depends(get_db)
 ):
     """Eliminar el registro de Persona Física del usuario actual"""
-    persona = db.query(PersonaFisica).filter(PersonaFisica.user_id == current_user["id"]).first()
-    if not persona:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró registro de Persona Física"
-        )
-    
-    db.delete(persona)
-    db.commit()
+    persona = get_user_record(db, PersonaFisica, current_user["id"], MSG_NOT_FOUND)
+    delete_record(db, persona)
     return None
 
 

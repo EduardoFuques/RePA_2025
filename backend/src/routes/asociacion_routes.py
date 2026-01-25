@@ -15,8 +15,16 @@ from src.schemas.asociacion_schemas import (
 )
 from src.database import get_db
 from src.utils import get_current_user
+from src.crud_helpers import (
+    get_user_record, check_duplicate_record, 
+    create_record, update_record, delete_record
+)
 
 asociacion_router = APIRouter()
+
+# Mensajes de error reutilizables
+MSG_NOT_FOUND = "No se encontró registro de Asociación/Colectivo"
+MSG_DUPLICATE = "El usuario ya tiene un registro de Asociación/Colectivo"
 
 
 # === CRUD ASOCIACIÓN ===
@@ -43,18 +51,8 @@ async def create_asociacion(
     Incluye datos básicos, ámbitos de actuación (producción, formación, exhibición, etc.)
     e integrantes. Cada usuario solo puede tener **un registro** de Asociación.
     """
-    existing = db.query(Asociacion).filter(Asociacion.user_id == current_user["id"]).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El usuario ya tiene un registro de Asociación/Colectivo"
-        )
-    
-    db_asoc = Asociacion(**data.model_dump(), user_id=current_user["id"])
-    db.add(db_asoc)
-    db.commit()
-    db.refresh(db_asoc)
-    return db_asoc
+    check_duplicate_record(db, Asociacion, current_user["id"], MSG_DUPLICATE)
+    return create_record(db, Asociacion, data, current_user["id"])
 
 
 @asociacion_router.get("/me", response_model=AsociacionOut)
@@ -63,13 +61,7 @@ async def get_my_asociacion(
     db: Session = Depends(get_db)
 ):
     """Obtener el registro de Asociación/Colectivo del usuario actual"""
-    asoc = db.query(Asociacion).filter(Asociacion.user_id == current_user["id"]).first()
-    if not asoc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró registro de Asociación/Colectivo"
-        )
-    return asoc
+    return get_user_record(db, Asociacion, current_user["id"], MSG_NOT_FOUND)
 
 
 @asociacion_router.put("/me", response_model=AsociacionOut)
@@ -79,20 +71,8 @@ async def update_my_asociacion(
     db: Session = Depends(get_db)
 ):
     """Actualizar el registro de Asociación/Colectivo del usuario actual"""
-    asoc = db.query(Asociacion).filter(Asociacion.user_id == current_user["id"]).first()
-    if not asoc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró registro de Asociación/Colectivo"
-        )
-    
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(asoc, key, value)
-    
-    db.commit()
-    db.refresh(asoc)
-    return asoc
+    asoc = get_user_record(db, Asociacion, current_user["id"], MSG_NOT_FOUND)
+    return update_record(db, asoc, data)
 
 
 @asociacion_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
@@ -101,15 +81,8 @@ async def delete_my_asociacion(
     db: Session = Depends(get_db)
 ):
     """Eliminar el registro de Asociación/Colectivo del usuario actual"""
-    asoc = db.query(Asociacion).filter(Asociacion.user_id == current_user["id"]).first()
-    if not asoc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró registro de Asociación/Colectivo"
-        )
-    
-    db.delete(asoc)
-    db.commit()
+    asoc = get_user_record(db, Asociacion, current_user["id"], MSG_NOT_FOUND)
+    delete_record(db, asoc)
     return None
 
 
@@ -122,9 +95,7 @@ async def add_integrante(
     db: Session = Depends(get_db)
 ):
     """Agregar un integrante a la Asociación/Colectivo"""
-    asoc = db.query(Asociacion).filter(Asociacion.user_id == current_user["id"]).first()
-    if not asoc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asociación no encontrada")
+    asoc = get_user_record(db, Asociacion, current_user["id"], "Asociación no encontrada")
     
     integrante = IntegranteAsociacion(**data.model_dump(), asociacion_id=asoc.id)
     db.add(integrante)
@@ -139,10 +110,7 @@ async def get_integrantes(
     db: Session = Depends(get_db)
 ):
     """Obtener integrantes de la Asociación/Colectivo"""
-    asoc = db.query(Asociacion).filter(Asociacion.user_id == current_user["id"]).first()
-    if not asoc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asociación no encontrada")
-    
+    asoc = get_user_record(db, Asociacion, current_user["id"], "Asociación no encontrada")
     return db.query(IntegranteAsociacion).filter(IntegranteAsociacion.asociacion_id == asoc.id).all()
 
 

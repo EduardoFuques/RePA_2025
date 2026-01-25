@@ -60,3 +60,15 @@ URL_SITE = os.getenv("URL_SITE", "http://localhost:8000")
 # API Root Path (para proxy reverso como nginx)
 # En producción con nginx: "/api", en desarrollo local: ""
 API_ROOT_PATH = os.getenv("API_ROOT_PATH", "")
+
+# =============================================================================
+# Pool de conexiones de base de datos
+# =============================================================================
+# Para ~300 usuarios concurrentes: pool_size=20 + max_overflow=30 = 50 conexiones máx
+# PostgreSQL default max_connections=100, así que 50 deja margen para admin/backups
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "20"))
+DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "30"))
+DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))
+DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "1800"))
+DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))
+DB_STATEMENT_TIMEOUT = int(os.getenv("DB_STATEMENT_TIMEOUT", "30000"))  # en milisegundos
