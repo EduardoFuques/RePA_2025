@@ -48,9 +48,8 @@ app = FastAPI(
     version="0.6.1",
     lifespan=lifespan
 )
-app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
 
-# Configuración de CORS
+# Configuración de CORS (debe agregarse DESPUÉS del logging para ejecutarse ANTES)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -58,6 +57,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Middleware de logging (se ejecuta después de CORS)
+app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
 
 # Incluir rutas a módulos
 app.include_router(user_router, prefix="/users", tags=["Users"])

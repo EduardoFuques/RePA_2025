@@ -1,6 +1,7 @@
 # schemas/asociacion_schemas.py
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import List, Optional
+from datetime import datetime
 
 # === INTEGRANTE ===
 class IntegranteAsociacionBase(BaseModel):
@@ -157,6 +158,10 @@ class AsociacionOut(BaseModel):
     # Consentimiento
     consentimiento: bool
     declaracion_inicial: bool
+    
+    # Metadatos
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     # Integrantes
     integrantes: List[IntegranteAsociacionOut] = []

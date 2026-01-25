@@ -1,6 +1,7 @@
 # models/asociacion_model.py
-from sqlalchemy import Column, String, Integer, Date, ForeignKey, Boolean, Text, JSON
+from sqlalchemy import Column, String, Integer, Date, ForeignKey, Boolean, Text, JSON, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from src.database import Base
 
 class Asociacion(Base):
@@ -58,6 +59,8 @@ class Asociacion(Base):
     # === CONSENTIMIENTO ===
     consentimiento = Column(Boolean, nullable=False, default=False)
     declaracion_inicial = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relación con el usuario
     user = relationship("User", back_populates="asociacion")

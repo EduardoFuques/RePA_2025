@@ -1,7 +1,7 @@
 # schemas/persona_fisica_schemas.py
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime
 
 # === DATOS PERSONALES ===
 class DatosPersonalesBase(BaseModel):
@@ -264,6 +264,10 @@ class PersonaFisicaOut(BaseModel):
     acepta_terminos: bool
     portfolio_link: Optional[str] = None
     declaracion_inicial: bool
+    
+    # Metadatos
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
 

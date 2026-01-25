@@ -108,5 +108,7 @@ class EstudianteESAOut(BaseModel):
     fecha_alta: Optional[datetime] = None
     fecha_vencimiento: Optional[datetime] = None
     activo: bool
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)

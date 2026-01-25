@@ -1,6 +1,7 @@
 # models/persona_fisica_model.py
-from sqlalchemy import Column, String, Integer, Date, ForeignKey, Boolean, Text, JSON
+from sqlalchemy import Column, String, Integer, Date, ForeignKey, Boolean, Text, JSON, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from src.database import Base
 
 class PersonaFisica(Base):
@@ -75,6 +76,8 @@ class PersonaFisica(Base):
     
     # === METADATOS ===
     declaracion_inicial = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relación con el usuario
     user = relationship("User", back_populates="persona_fisica")
