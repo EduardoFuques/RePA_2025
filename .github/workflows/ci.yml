@@ -101,9 +101,29 @@ jobs:
           host: ${{ secrets.QA_HOST }}
           username: ${{ secrets.QA_USER }}
           key: ${{ secrets.QA_SSH_KEY }}
-          port: ${{ secrets.QA_SSH_PORT || 22 }}
+          port: ${{ secrets.QA_SSH_PORT }}
           script: |
+            set -e  # Fallar si algún comando falla
             cd ~/RePA_2025
             git pull origin main
+            
+            # Ejecutar deploy
             ./deploy.sh
+            
+            # Esperar a que los contenedores estén healthy (máx 60s)
+            echo "⏳ Verificando health de contenedores..."
+            for i in {1..12}; do
+              if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+                echo "✅ Backend healthy"
+                break
+              fi
+              if [ $i -eq 12 ]; then
+                echo "❌ Backend no responde después de 60s"
+                docker compose logs backend --tail=50
+                exit 1
+              fi
+              echo "Esperando backend... ($i/12)"
+              sleep 5
+            done
+            
             echo "✅ Deploy completado - Commit: ${{ github.sha }}"
