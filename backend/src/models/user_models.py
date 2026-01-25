@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from src.database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Modelo para Token de Verificación de Correo
 class TokenRecovery(Base):
@@ -10,7 +10,7 @@ class TokenRecovery(Base):
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, index=True, nullable=False)
     token_payload = Column(String, unique=True, index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     
@@ -35,9 +35,19 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_login = Column(DateTime, default=None, nullable=True)
     # Relación con roles a través de la tabla UserRole
     roles = relationship("Role", secondary="user_roles", backref="users")
-    trainings = relationship("Training", back_populates="user")  # Relación 1:N con Training
-    trabajos = relationship('Work', back_populates='user') # Relación 1:N con Trabajo
+    
+    # Relaciones con formularios RePA
+    persona_fisica = relationship("PersonaFisica", back_populates="user", uselist=False)  # 1:1
+    persona_juridica = relationship("PersonaJuridica", back_populates="user", uselist=False)  # 1:1
+    asociacion = relationship("Asociacion", back_populates="user", uselist=False)  # 1:1
+    obras_audiovisuales = relationship("ObraAudiovisual", back_populates="user")  # 1:N
+    
+    # Relaciones con ESA y Exhibiciones
+    estudiante_esa = relationship("EstudianteESA", back_populates="user", uselist=False)  # 1:1
+    salas = relationship("Sala", back_populates="user")  # 1:N
+    exhibiciones = relationship("Exhibicion", back_populates="user")  # 1:N
+    festivales = relationship("Festival", back_populates="user")  # 1:N

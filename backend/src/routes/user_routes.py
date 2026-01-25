@@ -99,9 +99,8 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Error en el registro de New User"
         )
-    # Envío de email (ejemplo simplificado) Agregar la variable de entrono de URL_SITE
+    # TODO: Implementar envío de email en producción
     verification_url = f"{URL_SITE}/users/confirm/{registration_token}"
-    print(f"URL de verificación: {verification_url}")  # En producción usar servicio de email
     
     return new_user # Retorna el usuario creado{"detail": "Registro exitoso. Verifica tu email"}
 
@@ -122,8 +121,7 @@ async def confirm_registration(token: str, db: Session = Depends(get_db)):
 
         # Verificar token
         payload = decode_access_token(token)
-        #print(f"Token Confirm Input: {payload}") # Debug
-
+        
         # Validaciones críticas
         if payload.get("type") != "access" or "unverified" not in payload.get("roles", []):
             raise HTTPException(status_code=400, detail="Token inválido")
@@ -255,9 +253,8 @@ async def recovery_passwd_user(user_in: UserUpdate, db: Session = Depends(get_db
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Error en el registro de Token Recovery"
         )
-    # Envío de email (ejemplo simplificado) Agregar la variable de entrono de URL_SITE
+    # TODO: Implementar envío de email en producción
     verification_url = f"{URL_SITE}/users/recovery/{registration_token}"
-    print(f"URL de verificación: {verification_url}")  # En producción usar servicio de email
     
     return user # Retorna el usuario 
 
@@ -271,7 +268,6 @@ async def recovery_passwd(token: str, db: Session = Depends(get_db)):
     """
     # Verificar token
     payload = decode_access_token(token)
-    print(f"payload: {payload}") # Debug
     user_id = payload.get("sub")
     # Buscar el usuario en la base de datos
     user = db.query(User).filter(User.id == user_id).first()
@@ -281,7 +277,6 @@ async def recovery_passwd(token: str, db: Session = Depends(get_db)):
             detail="Usuario no existe")
     # Actualizar la contraseña del usuario
     user.hashed_password = payload.get("new_password")
-    print(f"Token_password:{payload.get('new_password')}")
     db.commit()
     db.refresh(user)
     # Eliminar el token de recuperación
@@ -292,12 +287,12 @@ async def recovery_passwd(token: str, db: Session = Depends(get_db)):
 
 # Obtener los datos del usuario actual
 @user_router.get("/me", response_model=UserOut, description="Obtener datos del usuario actual")
-async def read_users_me(current_user: dict = Depends(get_current_user)):
+async def read_users_me(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Obtener los datos del usuario actual.
     """
     # Buscar el usuario en la base de datos
-    user = db.query(User).filter(User.email == current_user["sub"]).first()
+    user = db.query(User).filter(User.id == current_user["id"]).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
