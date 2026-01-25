@@ -1,13 +1,8 @@
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta, timezone
 from jose import jwt
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = "HS256"  # Algoritmo fijo para mayor seguridad
+from src.config import SECRET_KEY, ALGORITHM
 ACCESS_TOKEN_EXPIRE = 30  # minutos
 REFRESH_TOKEN_EXPIRE = 7  # días
 

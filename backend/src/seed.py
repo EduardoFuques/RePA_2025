@@ -4,7 +4,7 @@ Seed de datos de prueba para desarrollo.
 IMPORTANTE: Este módulo NO debe ejecutarse en producción.
 Se deshabilita automáticamente si ENVIRONMENT=production.
 """
-import os
+from src.config import IS_PRODUCTION
 from src.database import init_db, SessionLocal
 from src.models.user_models import Role, User, UserRole
 from src.models.persona_fisica_model import PersonaFisica
@@ -361,13 +361,10 @@ def seed_data():
     IMPORTANTE: No se ejecuta si ENVIRONMENT=production.
     Solo crea roles básicos en producción.
     """
-    # Verificar si estamos en producción
-    is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
-    
     # Inicializa las tablas
     init_db()
     
-    if is_production:
+    if IS_PRODUCTION:
         # En producción, solo crear roles si no existen
         db = SessionLocal()
         try:
