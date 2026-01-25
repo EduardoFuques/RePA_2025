@@ -23,6 +23,9 @@ from src.models.obra_audiovisual_model import ObraAudiovisual, EquipoTecnicoObra
 from src.models.esa_model import EstudianteESA
 from src.models.exhibicion_model import Sala, Exhibicion, Festival, Cinemateca
 
+# Audit Trail
+from src.models.audit_model import AuditLog, AuditAction
+
 __all__ = [
     # User & Auth
     "User",
@@ -55,4 +58,7 @@ __all__ = [
     "Exhibicion",
     "Festival",
     "Cinemateca",
+    # Audit Trail
+    "AuditLog",
+    "AuditAction",
 ]

@@ -6,10 +6,10 @@ import os
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("SECRET_KEY") # Cambia esto a un valor seguro
-ALGORITHM = os.getenv("ALGORITHM")
-ACCESS_TOKEN_EXPIRE = 30 #os.getenv(ACCESS_TOKEN_EXPIRE_MINUTES)
-REFRESH_TOKEN_EXPIRE = 7 #os.getenv(REFRESH_TOKEN_EXPIRE_DAYS)
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = "HS256"  # Algoritmo fijo para mayor seguridad
+ACCESS_TOKEN_EXPIRE = 30  # minutos
+REFRESH_TOKEN_EXPIRE = 7  # días
 
 # Decodificar el token de acceso 
 def decode_access_token(token: str):

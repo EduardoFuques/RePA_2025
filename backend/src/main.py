@@ -1,17 +1,18 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import os
 
 from src.logger import logger
-from src.database import get_db
+from src.database import get_db, init_db
 from src.middlewarelogg import log_requests
+from src.rate_limiter import limiter, rate_limit_exceeded_handler
 from starlette.middleware.base import BaseHTTPMiddleware
-
-from src.database import init_db
 
 from src.routes.user_routes import user_router
 from src.routes.admin_routes import admin_router
@@ -45,17 +46,21 @@ origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
 app = FastAPI(
     title="Backend RePA - 2025",
-    version="0.6.1",
+    version="0.7.0",
     lifespan=lifespan
 )
 
-# Configuración de CORS (debe agregarse DESPUÉS del logging para ejecutarse ANTES)
+# Rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+# Configuración de CORS - Restringido a métodos y headers necesarios
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 # Middleware de logging (se ejecuta después de CORS)

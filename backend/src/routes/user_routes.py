@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+"""
+Rutas de usuarios: registro, login, recuperación de contraseña y gestión de perfil.
+"""
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
@@ -6,8 +9,9 @@ from jose import JWTError, jwt
 from src.models.user_models import User, Role, TokenRecovery
 from src.schemas.user_schemas import UserCreate, UserOut, UserUpdate, TokenData, TokenDB
 from src.database import get_db
-from src.utils import get_password_hash,validar_password,update_last_login,get_current_user
+from src.utils import get_password_hash, validar_password, update_last_login, get_current_user
 from src.token_utils import create_access_token, decode_access_token
+from src.rate_limiter import limiter
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 from dotenv import load_dotenv
@@ -16,15 +20,14 @@ import os
 load_dotenv()
 
 URL_SITE = os.getenv("URL_SITE")
-SECRET_KEY = os.getenv("SECRET_KEY") # Cambia esto a un valor seguro
-ALGORITHM = os.getenv("ALGORITHM")
 
 user_router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Crear un usuario nuevo# Crear un usuario nuevo
-@user_router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED ,description="Crear un nuevo usuario")
+# Crear un usuario nuevo
+@user_router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED, description="Crear un nuevo usuario")
+@limiter.limit("10/minute")
 def create_user(user_in: UserCreate, db: Session = Depends(get_db)):
     """
     Registrar un nuevo usuario con el rol "user" por defecto.
@@ -149,7 +152,8 @@ async def confirm_registration(token: str, db: Session = Depends(get_db)):
 
 # Inicio de sesión [form_data: OAuth2PasswordRequestForm = Depends()]
 @user_router.post("/token")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
     Iniciar sesión con un usuario registrado.
     """
@@ -192,16 +196,15 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "type": "refresh"
     }
 
-    # Generar un token de acceso
-    #access_token = create_access_token(data=data_access)
+    # Generar token de acceso (30 minutos)
     access_token = create_access_token(
         data={"sub": user.id, "email": user.email, "roles": [{"id": role.id, "rol": role.rol} for role in user.roles]},
-        expires_delta=1440  # 24 horas en minutos
+        expires_delta=30  # 30 minutos
     )
-    # refresh_token = create_refresh_token(data=data_refresh)
+    # Generar refresh token (7 días)
     refresh_token = create_access_token(
         data={"sub": user.id, "email": user.email, "roles": [{"id": role.id, "rol": role.rol} for role in user.roles], "type": "refresh"},
-        expires_delta=(60*24*7)  # 7 dias, en minutos
+        expires_delta=(60*24*7)  # 7 días en minutos
     )
 
     return {
