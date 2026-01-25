@@ -1,4 +1,9 @@
-# routes/persona_fisica_routes.py
+"""
+Rutas para el formulario de Persona Física del RePA.
+
+Permite a los usuarios registrar sus datos personales, situación laboral,
+y seleccionar subperfiles según su rol en el sector audiovisual.
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -23,13 +28,28 @@ persona_fisica_router = APIRouter()
 
 # === CRUD PERSONA FÍSICA ===
 
-@persona_fisica_router.post("/", response_model=PersonaFisicaOut, status_code=status.HTTP_201_CREATED)
+@persona_fisica_router.post(
+    "/", 
+    response_model=PersonaFisicaOut, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear registro de Persona Física",
+    responses={
+        201: {"description": "Registro creado exitosamente"},
+        400: {"description": "El usuario ya tiene un registro"},
+        401: {"description": "No autenticado"}
+    }
+)
 async def create_persona_fisica(
     data: PersonaFisicaCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Crear registro de Persona Física para el usuario actual"""
+    """
+    Crear el registro de Persona Física para el usuario autenticado.
+    
+    Incluye datos personales, identidades, situación laboral e interés institucional.
+    Cada usuario solo puede tener **un registro** de Persona Física.
+    """
     # Verificar que el usuario no tenga ya un registro
     existing = db.query(PersonaFisica).filter(PersonaFisica.user_id == current_user["id"]).first()
     if existing:

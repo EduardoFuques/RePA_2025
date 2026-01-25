@@ -37,8 +37,87 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Backend RePA - 2025",
+    title="API RePA - Registro Provincial del Audiovisual",
+    description="""
+## Sistema de Registro del Sector Audiovisual de Misiones
+
+La API de RePA permite gestionar el registro de:
+
+- **Personas Físicas**: Realizadores, técnicos, productores del sector audiovisual
+- **Personas Jurídicas**: Productoras, cooperativas, empresas audiovisuales
+- **Asociaciones/Colectivos**: Grupos y colectivos audiovisuales
+- **Estudiantes ESA**: Estudiantes del sector audiovisual (registro temporal)
+- **Exhibiciones**: Salas, festivales, cinematecas
+- **Obras Audiovisuales (AGAM)**: Registro de obras audiovisuales
+
+### Autenticación
+
+La API utiliza **JWT (JSON Web Tokens)** para autenticación. 
+Para acceder a endpoints protegidos, incluir el header:
+
+```
+Authorization: Bearer <token>
+```
+
+### Rate Limiting
+
+Los endpoints sensibles tienen límites de solicitudes:
+- **Login**: 5 intentos por minuto
+- **Registro**: 10 solicitudes por minuto
+- **Recuperación de contraseña**: 3 solicitudes por minuto
+
+### Contacto
+
+- **IAAviM** - Instituto de Artes Audiovisuales de Misiones
+- **Email**: sistemas@iaavim.gob.ar
+    """,
     version="0.8.0",
+    contact={
+        "name": "IAAviM - Sistemas",
+        "url": "https://iaavim.gob.ar",
+        "email": "sistemas@iaavim.gob.ar",
+    },
+    license_info={
+        "name": "Uso interno - Gobierno de Misiones",
+    },
+    openapi_tags=[
+        {
+            "name": "Users",
+            "description": "Registro, autenticación y gestión de usuarios"
+        },
+        {
+            "name": "Persona Física",
+            "description": "Formulario de registro para personas físicas del sector audiovisual"
+        },
+        {
+            "name": "Persona Jurídica",
+            "description": "Formulario de registro para empresas y productoras audiovisuales"
+        },
+        {
+            "name": "Asociación/Colectivo",
+            "description": "Formulario de registro para asociaciones y colectivos audiovisuales"
+        },
+        {
+            "name": "Estudiantes ESA",
+            "description": "Registro temporal para estudiantes del sector audiovisual (vigencia 1 año)"
+        },
+        {
+            "name": "Obras Audiovisuales (AGAM)",
+            "description": "Registro de obras audiovisuales producidas en Misiones"
+        },
+        {
+            "name": "Exhibiciones, Salas, Festivales, Cinemateca",
+            "description": "Registro de espacios de exhibición audiovisual"
+        },
+        {
+            "name": "Administrator User",
+            "description": "Endpoints de administración (requiere rol admin)"
+        },
+        {
+            "name": "Health",
+            "description": "Endpoints de monitoreo y health checks"
+        },
+    ],
     lifespan=lifespan
 )
 
