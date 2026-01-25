@@ -21,18 +21,18 @@ git pull
 
 # Clonar o actualizar el frontend
 echo "Actualizando frontend..."
-if [ -d "frontend" ]; then
+if [ -d "frontend/.git" ]; then
+  # Es un repo git clonado, actualizar
   cd frontend
   git fetch origin
   git checkout $FRONTEND_BRANCH
   git pull origin $FRONTEND_BRANCH
   cd ..
 else
+  # No es un repo git, eliminar y clonar
+  rm -rf frontend
   git clone -b $FRONTEND_BRANCH $FRONTEND_REPO frontend
 fi
-
-# Copiar configuración de nginx para proxy reverso
-cp -f frontend/nginx.conf frontend/nginx.conf 2>/dev/null || true
 
 # Construir y iniciar los contenedores
 echo "Construyendo e iniciando contenedores..."
