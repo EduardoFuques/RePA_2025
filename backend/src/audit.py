@@ -16,10 +16,10 @@ Uso:
 """
 from sqlalchemy.orm import Session
 from fastapi import Request
-from typing import Optional, Any
+from typing import Optional
 import json
 
-from src.models.audit_model import AuditLog, AuditAction
+from src.models.audit_model import AuditLog
 from src.logger import logger
 
 

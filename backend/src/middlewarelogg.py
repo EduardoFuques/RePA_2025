@@ -1,10 +1,8 @@
-from fastapi import FastAPI, Request
+from fastapi import Request
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 from src.logger import logger
 from src.token_utils import SECRET_KEY, ALGORITHM
-
-import os
 
 load_dotenv()
 

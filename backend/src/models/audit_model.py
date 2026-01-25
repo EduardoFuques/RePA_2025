@@ -6,7 +6,6 @@ Permite rastrear quién hizo qué, cuándo y sobre qué recurso.
 from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
-import uuid
 
 from src.database import Base
 

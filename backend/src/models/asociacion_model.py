@@ -1,5 +1,5 @@
 # models/asociacion_model.py
-from sqlalchemy import Column, String, Integer, Date, ForeignKey, Boolean, Text, JSON, DateTime
+from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, Text, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from src.database import Base

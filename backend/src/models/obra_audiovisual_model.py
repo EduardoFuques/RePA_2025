@@ -1,5 +1,5 @@
 # models/obra_audiovisual_model.py
-from sqlalchemy import Column, String, Integer, Date, ForeignKey, Boolean, Text, JSON
+from sqlalchemy import Column, String, Integer, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from src.database import Base
 

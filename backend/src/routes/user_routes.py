@@ -110,7 +110,7 @@ async def confirm_registration(token: str, db: Session = Depends(get_db)):
         token (str): Token de verificación.
     """
     # Validar si existe el token, y está activo
-    token_record = db.query(TokenRecovery).filter(token == TokenRecovery.token_payload, TokenRecovery.is_active == True).first()
+    token_record = db.query(TokenRecovery).filter(token == TokenRecovery.token_payload, TokenRecovery.is_active.is_(True)).first()
     if token_record is None:
         raise HTTPException(status_code=404, detail="Token no encontrado o inactivo")
     
@@ -133,7 +133,7 @@ async def confirm_registration(token: str, db: Session = Depends(get_db)):
         user.is_active = True
         db.query(TokenRecovery).filter(
             TokenRecovery.token_payload == token,
-            TokenRecovery.is_active == True
+            TokenRecovery.is_active.is_(True)
         ).update({"is_active": False})
         
         db.commit()

@@ -1,12 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError # PAra el debug de errores
-from fastapi.security import OAuth2PasswordRequestForm
-from passlib.context import CryptContext
 from typing import List
 
-from src.models.user_models import User, Role, UserRole
-from src.schemas.user_schemas import UserOut, UserUpdate, RoleOut
+from src.models.user_models import User, Role
+from src.schemas.user_schemas import UserOut, UserUpdate
 
 from src.database import get_db
 from src.utils import get_password_hash, validar_password,get_current_user,has_user_role
