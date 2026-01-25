@@ -12,6 +12,7 @@ from src.database import get_db
 from src.utils import get_password_hash, validar_password, update_last_login, get_current_user
 from src.token_utils import create_access_token, decode_access_token
 from src.rate_limiter import limiter
+from src.audit import audit_log
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 
@@ -90,6 +91,17 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
         db.add(new_user)
         db.add(recovery_record)
         db.commit()
+        
+        # Registrar en audit trail
+        audit_log(
+            db=db,
+            action="USER_REGISTER",
+            user_id=new_user_id,
+            resource_type="User",
+            resource_id=new_user_id,
+            details={"email": user_in.email},
+            request=request
+        )
     except Exception:
         db.rollback()
         raise HTTPException(
@@ -178,6 +190,17 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
     refresh_token = create_access_token(
         data={"sub": user.id, "email": user.email, "roles": [{"id": role.id, "rol": role.rol} for role in user.roles], "type": "refresh"},
         expires_delta=(60*24*7)  # 7 días en minutos
+    )
+
+    # Registrar login en audit trail
+    audit_log(
+        db=db,
+        action="USER_LOGIN",
+        user_id=user.id,
+        resource_type="User",
+        resource_id=user.id,
+        details={"email": user.email},
+        request=request
     )
 
     return {

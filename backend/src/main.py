@@ -45,7 +45,7 @@ origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
 app = FastAPI(
     title="Backend RePA - 2025",
-    version="0.7.0",
+    version="0.8.0",
     lifespan=lifespan
 )
 
