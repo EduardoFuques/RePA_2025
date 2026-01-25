@@ -6,8 +6,8 @@ que pueden fallar por errores transitorios (conexión perdida, timeout, etc.)
 """
 import time
 import functools
-from typing import Callable, Type, Tuple, Optional
-from sqlalchemy.exc import OperationalError, InterfaceError, DBAPIError
+from typing import Callable, Type, Tuple
+from sqlalchemy.exc import OperationalError, InterfaceError
 
 from src.logger import logger
 from src.config import IS_TESTING

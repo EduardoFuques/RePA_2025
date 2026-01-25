@@ -5,7 +5,7 @@ Registro temporal (vigencia 1 año) para estudiantes que aún no están
 inscriptos en el RePA principal. Permite acceder a beneficios y actividades
 del IAAviM mientras completan su formación.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 
