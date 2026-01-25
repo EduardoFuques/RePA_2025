@@ -3,6 +3,10 @@ import os
 import pytest
 from testcontainers.postgres import PostgresContainer
 
+# Configurar variables de entorno ANTES de importar cualquier módulo
+os.environ["TESTING"] = "true"
+os.environ["CI"] = "true"
+
 # Variable global para el engine (se configura en el fixture de sesión)
 _engine = None
 _TestingSessionLocal = None
