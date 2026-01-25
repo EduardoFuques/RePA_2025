@@ -1,12 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL")
+from src.config import DATABASE_URL
 
 engine = create_engine(DATABASE_URL)  # ← ,echo True ¡Habilita logs!
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

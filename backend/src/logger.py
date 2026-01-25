@@ -2,10 +2,9 @@ import os
 import json
 import logging
 from datetime import datetime, timezone
-from dotenv import load_dotenv
 from logging.handlers import TimedRotatingFileHandler
 
-load_dotenv()
+from src.config import LOGS_PATH, IS_TESTING
 
 
 class JSONFormatter(logging.Formatter):
@@ -45,16 +44,13 @@ console_handler.setFormatter(logging.Formatter(console_format))
 handlers = [console_handler]
 
 # Solo crear archivo de log si se especifica LOGS_PATH o no estamos en CI/testing
-logs_path = os.getenv("LOGS_PATH")
-is_testing = os.getenv("TESTING", "false").lower() == "true" or os.getenv("CI", "false").lower() == "true"
-
-if logs_path or not is_testing:
+if LOGS_PATH or not IS_TESTING:
     # Usar directorio temporal si no hay permisos o estamos en CI
-    if is_testing:
+    if IS_TESTING:
         import tempfile
         log_directory = tempfile.gettempdir()
     else:
-        log_directory = logs_path or os.path.join(os.getcwd(), "logs")
+        log_directory = LOGS_PATH or os.path.join(os.getcwd(), "logs")
     
     try:
         os.makedirs(log_directory, exist_ok=True)

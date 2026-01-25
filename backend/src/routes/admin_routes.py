@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from datetime import datetime, timedelta, timezone
 
 from src.models.user_models import User, Role
+from src.models.audit_model import AuditLog
 from src.schemas.user_schemas import UserOut, UserUpdate
 
 from src.database import get_db
-from src.utils import get_password_hash, validar_password,get_current_user,has_user_role
+from src.utils import get_password_hash, validar_password, get_current_user, has_user_role
 
 admin_router = APIRouter()
 
@@ -143,3 +145,60 @@ async def delete_user(user_id: str, db: Session = Depends(get_db), current_user:
     db.commit()
     db.refresh(user)
     return user
+
+
+@admin_router.get("/audit-logs", description="Obtener registros de auditoría")
+async def get_audit_logs(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+    action: Optional[str] = Query(None, description="Filtrar por acción (USER_LOGIN, USER_REGISTER, etc.)"),
+    user_id: Optional[str] = Query(None, description="Filtrar por ID de usuario"),
+    days: int = Query(7, description="Días hacia atrás a consultar (default: 7)"),
+    limit: int = Query(100, description="Límite de registros (default: 100, max: 500)")
+):
+    """
+    Obtener registros de auditoría (Sólo para Administradores).
+    
+    Permite filtrar por:
+    - action: tipo de acción (USER_LOGIN, USER_REGISTER, PASSWORD_CHANGE, etc.)
+    - user_id: ID del usuario específico
+    - days: cantidad de días hacia atrás
+    - limit: cantidad máxima de registros
+    """
+    if not has_user_role(current_user, ["admin"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para realizar esta acción",
+        )
+    
+    # Limitar el máximo de registros
+    limit = min(limit, 500)
+    
+    # Calcular fecha de inicio
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    
+    # Construir query
+    query = db.query(AuditLog).filter(AuditLog.created_at >= start_date)
+    
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if user_id:
+        query = query.filter(AuditLog.user_id == user_id)
+    
+    # Ordenar por fecha descendente y limitar
+    logs = query.order_by(AuditLog.created_at.desc()).limit(limit).all()
+    
+    return [
+        {
+            "id": log.id,
+            "action": log.action,
+            "user_id": log.user_id,
+            "resource_type": log.resource_type,
+            "resource_id": log.resource_id,
+            "details": log.details,
+            "ip_address": log.ip_address,
+            "user_agent": log.user_agent,
+            "created_at": log.created_at.isoformat() if log.created_at else None
+        }
+        for log in logs
+    ]

@@ -2,11 +2,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
-from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-import os
 
+from src.config import CORS_ORIGINS
 from src.logger import logger
 from src.database import get_db, init_db
 from src.middlewarelogg import log_requests
@@ -24,8 +23,6 @@ from src.routes.exhibicion_routes import exhibicion_router
 
 from src.seed import seed_data
 
-load_dotenv()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,10 +35,6 @@ async def lifespan(app: FastAPI):
     # Shutdown (si necesitas limpiar recursos, va aquí)
     logger.info("FastAPI cerrando...")
 
-
-# CORS - Cargar orígenes desde variable de entorno
-cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
-origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
 app = FastAPI(
     title="Backend RePA - 2025",
@@ -56,7 +49,7 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 # Configuración de CORS - Restringido a métodos y headers necesarios
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],

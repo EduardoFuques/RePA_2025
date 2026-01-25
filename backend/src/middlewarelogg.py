@@ -1,10 +1,7 @@
 from fastapi import Request
 from jose import JWTError, jwt
-from dotenv import load_dotenv
 from src.logger import logger
-from src.token_utils import SECRET_KEY, ALGORITHM
-
-load_dotenv()
+from src.config import SECRET_KEY, ALGORITHM
 
 def filtrar_headers_sensibles(headers: dict) -> dict:
     """
