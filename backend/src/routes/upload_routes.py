@@ -5,10 +5,7 @@ import uuid
 import shutil
 from datetime import datetime
 from ..database import get_db
-from ..dependencies import get_current_user
-from ..config import get_settings
-
-settings = get_settings()
+from ..utils import get_current_user
 upload_router = APIRouter(prefix="/upload", tags=["upload"])
 
 # Directorio base para uploads
