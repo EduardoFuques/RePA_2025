@@ -94,7 +94,7 @@ async def delete_dni(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al eliminar el archivo: {str(e)}")
 
-@upload_router.get("/dni/{filename}")
+@upload_router.get("/dni/{filename:path}")
 async def get_dni(
     filename: str,
     current_user: dict = Depends(get_current_user),
@@ -102,9 +102,20 @@ async def get_dni(
 ):
     """
     Obtener un archivo DNI del usuario
+    filename puede ser solo el nombre o la ruta completa (user_id/filename)
     """
     user_id = current_user["id"]
-    file_path = os.path.join(get_user_upload_dir(user_id), filename)
+    
+    # Si filename incluye una barra, asumimos que es la ruta completa
+    if '/' in filename:
+        # Validar que el archivo pertenezca al usuario
+        file_user_id = filename.split('/')[0]
+        if file_user_id != user_id:
+            raise HTTPException(status_code=403, detail="No autorizado")
+        file_path = os.path.join(UPLOAD_BASE_DIR, filename)
+    else:
+        # Es solo el nombre del archivo
+        file_path = os.path.join(get_user_upload_dir(user_id), filename)
     
     # Validar que el archivo exista
     if not os.path.exists(file_path):
@@ -115,5 +126,38 @@ async def get_dni(
     return FileResponse(
         path=file_path,
         media_type='application/pdf',
-        filename=filename
+        filename=filename.split('/')[-1]  # Solo el nombre del archivo
+    )
+
+@upload_router.get("/my-dni")
+async def get_my_dni(
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """
+    Obtener el DNI del usuario actual (si existe)
+    """
+    from ..models.persona_fisica_model import PersonaFisica
+    
+    # Buscar el DNI en la base de datos
+    persona = db.query(PersonaFisica).filter(
+        PersonaFisica.user_id == current_user["id"]
+    ).first()
+    
+    if not persona or not persona.dni_adjunto_path:
+        raise HTTPException(status_code=404, detail="No hay DNI adjunto")
+    
+    # Construir la ruta completa
+    file_path = os.path.join(UPLOAD_BASE_DIR, persona.dni_adjunto_path)
+    
+    # Validar que el archivo exista
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    
+    # Devolver archivo
+    from fastapi.responses import FileResponse
+    return FileResponse(
+        path=file_path,
+        media_type='application/pdf',
+        filename=persona.dni_adjunto_path.split('/')[-1]
     )
