@@ -24,11 +24,11 @@ class EducacionBase(BaseModel):
 
 # === IDENTIDADES ===
 class IdentidadesBase(BaseModel):
-    pueblo_originario: Optional[bool] = None
+    pueblo_originario: Optional[str] = None  # si, no, prefiere_no_responder
     cual_pueblo: Optional[str] = None
-    afrodescendiente: Optional[str] = None
-    lgbtiq: Optional[bool] = None
-    discapacidad: Optional[bool] = None
+    afrodescendiente: Optional[str] = None  # si, no, prefiere_no_responder
+    lgbtiq: Optional[str] = None  # si, no, prefiere_no_responder
+    discapacidad: Optional[str] = None  # si, no, prefiere_no_responder
     tipo_discapacidad: Optional[str] = None
     personas_a_cargo: Optional[bool] = None
     tipo_personas_a_cargo: Optional[List[str]] = None
@@ -40,7 +40,7 @@ class LaboralBase(BaseModel):
     otra_fuente: Optional[str] = None
     relacion_laboral: Optional[str] = None
     otra_relacion: Optional[str] = None
-    inscripto_afip: Optional[bool] = None
+    inscripto_afip: Optional[str] = None
     situacion_iva: Optional[str] = None
     pertenece_red: Optional[bool] = None
     nombre_red: Optional[str] = None
@@ -48,7 +48,7 @@ class LaboralBase(BaseModel):
 # === INTERÉS INSTITUCIONAL ===
 class InteresBase(BaseModel):
     proyectos_iaavim: Optional[bool] = None
-    conoce_lineas_fomento: Optional[bool] = None
+    conoce_lineas_fomento: Optional[str] = None  # si, no, parcialmente
     interes_formacion: Optional[bool] = None
     areas_capacitacion: Optional[str] = None
     interes_difusion: Optional[bool] = None
@@ -101,17 +101,17 @@ class PersonaFisicaCreate(BaseModel):
     """Schema para crear una Persona Física"""
     declaracion_inicial: bool = True
     
-    # Datos personales (requeridos)
-    nombre: str = Field(..., min_length=1, max_length=100)
-    apellido: str = Field(..., min_length=1, max_length=100)
-    dni: str = Field(..., min_length=1, max_length=20)
-    cuil: str = Field(..., min_length=1, max_length=15)
-    fecha_nacimiento: date
-    email: EmailStr
-    telefono: str = Field(..., min_length=1, max_length=30)
-    domicilio: str = Field(..., min_length=1, max_length=255)
-    municipio: str = Field(..., min_length=1, max_length=100)
-    distrito: str = Field(..., min_length=1, max_length=50)
+    # Datos personales - permitidos null para borradores
+    nombre: Optional[str] = Field(None, max_length=100)
+    apellido: Optional[str] = Field(None, max_length=100)
+    dni: Optional[str] = Field(None, max_length=20)
+    cuil: Optional[str] = Field(None, max_length=15)
+    fecha_nacimiento: Optional[date] = None
+    email: Optional[EmailStr] = None
+    telefono: Optional[str] = Field(None, max_length=30)
+    domicilio: Optional[str] = Field(None, max_length=255)
+    municipio: Optional[str] = Field(None, max_length=100)
+    distrito: Optional[str] = Field(None, max_length=50)
     
     # Educación
     nivel_educativo: Optional[str] = None
@@ -119,11 +119,11 @@ class PersonaFisicaCreate(BaseModel):
     titulo_tesis: Optional[str] = None
     
     # Identidades
-    pueblo_originario: Optional[bool] = None
+    pueblo_originario: Optional[str] = None
     cual_pueblo: Optional[str] = None
     afrodescendiente: Optional[str] = None
-    lgbtiq: Optional[bool] = None
-    discapacidad: Optional[bool] = None
+    lgbtiq: Optional[str] = None
+    discapacidad: Optional[str] = None
     tipo_discapacidad: Optional[str] = None
     personas_a_cargo: Optional[bool] = None
     tipo_personas_a_cargo: Optional[List[str]] = None
@@ -134,14 +134,14 @@ class PersonaFisicaCreate(BaseModel):
     otra_fuente: Optional[str] = None
     relacion_laboral: Optional[str] = None
     otra_relacion: Optional[str] = None
-    inscripto_afip: Optional[bool] = None
+    inscripto_afip: Optional[str] = None
     situacion_iva: Optional[str] = None
     pertenece_red: Optional[bool] = None
     nombre_red: Optional[str] = None
     
     # Interés institucional
     proyectos_iaavim: Optional[bool] = None
-    conoce_lineas_fomento: Optional[bool] = None
+    conoce_lineas_fomento: Optional[str] = None
     interes_formacion: Optional[bool] = None
     areas_capacitacion: Optional[str] = None
     interes_difusion: Optional[bool] = None
@@ -153,6 +153,7 @@ class PersonaFisicaCreate(BaseModel):
     # Consentimiento
     acepta_terminos: bool = False
     portfolio_link: Optional[str] = None
+    borrador: bool = False
 
 
 class PersonaFisicaUpdate(BaseModel):
@@ -171,11 +172,11 @@ class PersonaFisicaUpdate(BaseModel):
     titulo_tesis: Optional[str] = None
     
     # Identidades
-    pueblo_originario: Optional[bool] = None
+    pueblo_originario: Optional[str] = None
     cual_pueblo: Optional[str] = None
     afrodescendiente: Optional[str] = None
-    lgbtiq: Optional[bool] = None
-    discapacidad: Optional[bool] = None
+    lgbtiq: Optional[str] = None
+    discapacidad: Optional[str] = None
     tipo_discapacidad: Optional[str] = None
     personas_a_cargo: Optional[bool] = None
     tipo_personas_a_cargo: Optional[List[str]] = None
@@ -186,14 +187,14 @@ class PersonaFisicaUpdate(BaseModel):
     otra_fuente: Optional[str] = None
     relacion_laboral: Optional[str] = None
     otra_relacion: Optional[str] = None
-    inscripto_afip: Optional[bool] = None
+    inscripto_afip: Optional[str] = None
     situacion_iva: Optional[str] = None
     pertenece_red: Optional[bool] = None
     nombre_red: Optional[str] = None
     
     # Interés institucional
     proyectos_iaavim: Optional[bool] = None
-    conoce_lineas_fomento: Optional[bool] = None
+    conoce_lineas_fomento: Optional[str] = None
     interes_formacion: Optional[bool] = None
     areas_capacitacion: Optional[str] = None
     interes_difusion: Optional[bool] = None
@@ -203,7 +204,10 @@ class PersonaFisicaUpdate(BaseModel):
     subperfiles_seleccionados: Optional[List[str]] = None
     
     # Consentimiento
+    acepta_terminos: Optional[bool] = None
     portfolio_link: Optional[str] = None
+    declaracion_inicial: Optional[bool] = None
+    borrador: Optional[bool] = None
 
 
 class PersonaFisicaOut(BaseModel):
@@ -211,17 +215,17 @@ class PersonaFisicaOut(BaseModel):
     id: int
     user_id: str
     
-    # Datos personales
-    nombre: str
-    apellido: str
-    dni: str
-    cuil: str
-    fecha_nacimiento: date
-    email: str
-    telefono: str
-    domicilio: str
-    municipio: str
-    distrito: str
+    # Datos personales - permitidos null para borradores
+    nombre: Optional[str] = None
+    apellido: Optional[str] = None
+    dni: Optional[str] = None
+    cuil: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    email: Optional[str] = None
+    telefono: Optional[str] = None
+    domicilio: Optional[str] = None
+    municipio: Optional[str] = None
+    distrito: Optional[str] = None
     
     # Educación
     nivel_educativo: Optional[str] = None
@@ -229,11 +233,11 @@ class PersonaFisicaOut(BaseModel):
     titulo_tesis: Optional[str] = None
     
     # Identidades
-    pueblo_originario: Optional[bool] = None
+    pueblo_originario: Optional[str] = None
     cual_pueblo: Optional[str] = None
     afrodescendiente: Optional[str] = None
-    lgbtiq: Optional[bool] = None
-    discapacidad: Optional[bool] = None
+    lgbtiq: Optional[str] = None
+    discapacidad: Optional[str] = None
     tipo_discapacidad: Optional[str] = None
     personas_a_cargo: Optional[bool] = None
     tipo_personas_a_cargo: Optional[List[str]] = None
@@ -244,14 +248,14 @@ class PersonaFisicaOut(BaseModel):
     otra_fuente: Optional[str] = None
     relacion_laboral: Optional[str] = None
     otra_relacion: Optional[str] = None
-    inscripto_afip: Optional[bool] = None
+    inscripto_afip: Optional[str] = None
     situacion_iva: Optional[str] = None
     pertenece_red: Optional[bool] = None
     nombre_red: Optional[str] = None
     
     # Interés institucional
     proyectos_iaavim: Optional[bool] = None
-    conoce_lineas_fomento: Optional[bool] = None
+    conoce_lineas_fomento: Optional[str] = None
     interes_formacion: Optional[bool] = None
     areas_capacitacion: Optional[str] = None
     interes_difusion: Optional[bool] = None
@@ -264,6 +268,7 @@ class PersonaFisicaOut(BaseModel):
     acepta_terminos: bool
     portfolio_link: Optional[str] = None
     declaracion_inicial: bool
+    borrador: bool = False
     
     # Metadatos
     created_at: Optional[datetime] = None

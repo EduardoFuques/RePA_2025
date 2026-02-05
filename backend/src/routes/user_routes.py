@@ -23,7 +23,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Crear un usuario nuevo
 @user_router.post(
     "/register", 
-    response_model=UserOut, 
     status_code=status.HTTP_201_CREATED,
     summary="Registrar nuevo usuario",
     description="Crea una nueva cuenta de usuario. El usuario queda inactivo hasta verificar su email.",
@@ -126,7 +125,18 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
     # TODO: Implementar envío de email en producción
     # verification_url = f"{URL_SITE}/users/confirm/{registration_token}"
     
-    return new_user # Retorna el usuario creado{"detail": "Registro exitoso. Verifica tu email"}
+    # En desarrollo, retornar el token para poder verificar manualmente
+    # En producción, esto debe eliminarse y enviar el email
+    return {
+        "id": new_user.id,
+        "email": new_user.email,
+        "is_active": new_user.is_active,
+        "created_at": new_user.created_at,
+        "last_login": new_user.last_login,
+        "roles": [{"id": role.id, "rol": role.rol} for role in new_user.roles],
+        "verification_token": registration_token,  # Solo para desarrollo
+        "message": "Registro exitoso. En producción recibirás un email de verificación."
+    }
 
 # 2. Endpoint de Verificación
 @user_router.post("/confirm/{token}", status_code=status.HTTP_201_CREATED, description="Verificar el token de registro")
@@ -205,6 +215,13 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Correo electrónico o contraseña incorrectos",
+        )
+    
+    # Verificar si el usuario está activo (email verificado)
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu cuenta no está verificada. Por favor, revisa tu correo electrónico y confirma tu cuenta.",
         )
     
     # Actualizar la fecha y hora del último acceso

@@ -177,3 +177,9 @@ cython_debug/
 docker-compose.yml
 pgdata/
 backend/src/logs/
+
+backend/frontend/
+
+# Archivos de desarrollo local Windows
+docker-compose.override.yml
+start-dev.bat
