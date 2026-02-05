@@ -153,6 +153,7 @@ class PersonaFisicaCreate(BaseModel):
     # Consentimiento
     acepta_terminos: bool = False
     portfolio_link: Optional[str] = None
+    dni_adjunto_path: Optional[str] = None
     borrador: bool = False
 
 
@@ -206,6 +207,7 @@ class PersonaFisicaUpdate(BaseModel):
     # Consentimiento
     acepta_terminos: Optional[bool] = None
     portfolio_link: Optional[str] = None
+    dni_adjunto_path: Optional[str] = None
     declaracion_inicial: Optional[bool] = None
     borrador: Optional[bool] = None
 
@@ -267,6 +269,7 @@ class PersonaFisicaOut(BaseModel):
     # Consentimiento
     acepta_terminos: bool
     portfolio_link: Optional[str] = None
+    dni_adjunto_path: Optional[str] = None
     declaracion_inicial: bool
     borrador: bool = False
     

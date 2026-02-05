@@ -38,6 +38,9 @@ services:
       - type: bind
         source: ./backend/src
         target: /code/src
+      - type: volume
+        source: repa-uploads
+        target: /app/uploads
     environment:
       TZ: America/Argentina/Buenos_Aires
       DATABASE_URL: ${DATABASE_URL}
@@ -75,3 +78,5 @@ networks:
 
 volumes:
   pgdata:
+  repa-uploads:
+    driver: local
