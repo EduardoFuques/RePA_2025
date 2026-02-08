@@ -125,16 +125,18 @@ class TestPersonaFisicaValidation:
     """Tests de validación para Persona Física"""
     
     def test_create_missing_required_fields(self, client, auth_headers):
-        """Test: Rechaza si faltan campos requeridos"""
+        """Test: Acepta datos parciales (modo borrador)"""
         if not auth_headers:
             pytest.skip("No se pudo autenticar")
         
         response = client.post(
             "/persona-fisica/",
-            json={"nombre": "Juan"},  # Faltan campos requeridos
+            json={"nombre": "Juan"},  # Datos parciales permitidos para borradores
             headers=auth_headers
         )
-        assert response.status_code == 422
+        assert response.status_code == 201
+        data = response.json()
+        assert data["nombre"] == "Juan"
     
     def test_create_invalid_email(self, client, auth_headers):
         """Test: Rechaza email inválido"""
