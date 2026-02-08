@@ -183,3 +183,6 @@ backend/frontend/
 # Archivos de desarrollo local Windows
 docker-compose.override.yml
 start-dev.bat
+
+# Directorio de uploads (archivos subidos por usuarios)
+uploads/

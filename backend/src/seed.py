@@ -11,6 +11,7 @@ from src.models.persona_fisica_model import PersonaFisica
 from src.models.persona_juridica_model import PersonaJuridica
 from src.models.asociacion_model import Asociacion
 from src.models.esa_model import EstudianteESA
+from src.document_generator import generate_test_documents
 from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
 from datetime import date, datetime, timezone, timedelta
@@ -500,6 +501,15 @@ def seed_data():
                     print(f"✓ Estudiante ESA creado para: {email}")
                 else:
                     print(f"- Estudiante ESA ya existe para: {email}")
+                
+        # Generar documentos de prueba para todos los usuarios
+        try:
+            generate_test_documents(db)
+        except ImportError as e:
+            print(f"\n⚠️  No se pudieron generar documentos: falta instalar librerías")
+            print(f"   Ejecuta: pip install reportlab python-docx")
+        except Exception as e:
+            print(f"\n❌ Error generando documentos: {e}")
                 
     except IntegrityError as e:
         db.rollback()
