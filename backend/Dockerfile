@@ -1,7 +1,6 @@
-FROM python:3.10
+FROM python:3.10-slim
 
-RUN pip install --upgrade pip
-RUN pip install python-lsp-server
+RUN pip install --no-cache-dir --upgrade pip
 
 WORKDIR /code
 
@@ -11,6 +10,5 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY ./src /code/src
 
-# CMD ["fastapi", "run", "--proxy-headers","--port", "80", "app/main.py"]
 ENTRYPOINT ["uvicorn"]
 CMD ["src.main:app", "--reload", "--host", "0.0.0.0", "--port", "80"]

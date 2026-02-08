@@ -15,16 +15,16 @@ class PersonaFisica(Base):
     user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
     
     # === DATOS PERSONALES ===
-    nombre = Column(String(100), nullable=False)
-    apellido = Column(String(100), nullable=False)
-    dni = Column(String(20), unique=True, nullable=False)
-    cuil = Column(String(15), unique=True, nullable=False)
-    fecha_nacimiento = Column(Date, nullable=False)
-    email = Column(String(255), nullable=False)
-    telefono = Column(String(30), nullable=False)
-    domicilio = Column(String(255), nullable=False)
-    municipio = Column(String(100), nullable=False)
-    distrito = Column(String(50), nullable=False)
+    nombre = Column(String(100), nullable=True)  # Permitir null para borradores
+    apellido = Column(String(100), nullable=True)
+    dni = Column(String(20), unique=True, nullable=True)
+    cuil = Column(String(15), unique=True, nullable=True)
+    fecha_nacimiento = Column(Date, nullable=True)
+    email = Column(String(255), nullable=True)
+    telefono = Column(String(30), nullable=True)
+    domicilio = Column(String(255), nullable=True)
+    municipio = Column(String(100), nullable=True)
+    distrito = Column(String(50), nullable=True)
     
     # === EDUCACIÓN ===
     nivel_educativo = Column(String(50), nullable=True)
@@ -35,11 +35,11 @@ class PersonaFisica(Base):
     titulo_tesis = Column(String(255), nullable=True)
     
     # === IDENTIDADES Y PERTENENCIAS ===
-    pueblo_originario = Column(Boolean, nullable=True)
+    pueblo_originario = Column(String(30), nullable=True)  # si, no, prefiere_no_responder
     cual_pueblo = Column(String(100), nullable=True)
     afrodescendiente = Column(String(30), nullable=True)  # si, no, prefiere_no_responder
-    lgbtiq = Column(Boolean, nullable=True)
-    discapacidad = Column(Boolean, nullable=True)
+    lgbtiq = Column(String(30), nullable=True)  # si, no, prefiere_no_responder
+    discapacidad = Column(String(30), nullable=True)  # si, no, prefiere_no_responder
     tipo_discapacidad = Column(String(255), nullable=True)
     personas_a_cargo = Column(Boolean, nullable=True)
     tipo_personas_a_cargo = Column(JSON, nullable=True)  # Array: ['hijos', 'adultos_mayores', 'otros']
@@ -51,14 +51,14 @@ class PersonaFisica(Base):
     relacion_laboral = Column(String(50), nullable=True)
     # Opciones: autonomo, relacion_dependencia, cooperativa, otro
     otra_relacion = Column(String(255), nullable=True)
-    inscripto_afip = Column(Boolean, nullable=True)
+    inscripto_afip = Column(String(30), nullable=True)  # si, no, no_sabe
     situacion_iva = Column(String(30), nullable=True)  # responsable_inscripto, monotributo, exento
     pertenece_red = Column(Boolean, nullable=True)
     nombre_red = Column(String(255), nullable=True)
     
     # === ÁREAS DE INTERÉS INSTITUCIONAL ===
     proyectos_iaavim = Column(Boolean, nullable=True)
-    conoce_lineas_fomento = Column(Boolean, nullable=True)
+    conoce_lineas_fomento = Column(String(30), nullable=True)  # si, no, parcialmente
     interes_formacion = Column(Boolean, nullable=True)
     areas_capacitacion = Column(Text, nullable=True)
     interes_difusion = Column(Boolean, nullable=True)
@@ -76,6 +76,7 @@ class PersonaFisica(Base):
     
     # === METADATOS ===
     declaracion_inicial = Column(Boolean, nullable=False, default=False)
+    borrador = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

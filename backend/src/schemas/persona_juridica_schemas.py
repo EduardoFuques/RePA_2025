@@ -25,47 +25,9 @@ class PersonaJuridicaCreate(BaseModel):
     """Schema para crear una Persona Jurídica"""
     declaracion_inicial: bool = True
     
-    # Datos institucionales
-    nombre_pj: str = Field(..., min_length=1, max_length=255)
-    cuit: str = Field(..., min_length=1, max_length=15)
-    figura_legal: str = Field(..., min_length=1, max_length=50)
-    otra_figura_legal: Optional[str] = Field(None, max_length=100)
-    fecha_constitucion: Optional[date] = None
-    objeto_social: Optional[str] = None
-    
-    # Domicilio y contacto
-    domicilio_legal: str = Field(..., min_length=1, max_length=255)
-    localidad: str = Field(..., min_length=1, max_length=100)
-    distrito: str = Field(..., min_length=1, max_length=50)
-    telefono_institucional: str = Field(..., min_length=1, max_length=30)
-    email_contacto: EmailStr
-    web_redes: Optional[List[str]] = None
-    
-    # Representación legal
-    nombre_representante: str = Field(..., min_length=1, max_length=200)
-    dni_representante: str = Field(..., min_length=1, max_length=20)
-    cargo_representante: str = Field(..., min_length=1, max_length=100)
-    telefono_representante: str = Field(..., min_length=1, max_length=30)
-    email_representante: EmailStr
-    vincular_personas: Optional[str] = None
-    
-    # Actividades audiovisuales
-    actividades_principales: Optional[List[str]] = None
-    otra_actividad: Optional[str] = None
-    lineas_trabajo: Optional[str] = None
-    apoyo_iaavim: Optional[str] = None
-    descripcion_apoyo: Optional[str] = None
-    otros_registros: Optional[str] = None
-    cuales_registros: Optional[str] = None
-    
-    # Consentimiento
-    consentimiento: bool = False
-
-
-class PersonaJuridicaUpdate(BaseModel):
-    """Schema para actualizar una Persona Jurídica"""
-    # Datos institucionales
+    # Datos institucionales - permitidos null para borradores
     nombre_pj: Optional[str] = Field(None, max_length=255)
+    cuit: Optional[str] = Field(None, max_length=15)
     figura_legal: Optional[str] = Field(None, max_length=50)
     otra_figura_legal: Optional[str] = Field(None, max_length=100)
     fecha_constitucion: Optional[date] = None
@@ -95,6 +57,49 @@ class PersonaJuridicaUpdate(BaseModel):
     descripcion_apoyo: Optional[str] = None
     otros_registros: Optional[str] = None
     cuales_registros: Optional[str] = None
+    
+    # Consentimiento
+    consentimiento: bool = False
+    borrador: bool = False
+
+
+class PersonaJuridicaUpdate(BaseModel):
+    """Schema para actualizar una Persona Jurídica"""
+    # Datos institucionales
+    nombre_pj: Optional[str] = Field(None, max_length=255)
+    cuit: Optional[str] = Field(None, max_length=15)
+    figura_legal: Optional[str] = Field(None, max_length=50)
+    otra_figura_legal: Optional[str] = Field(None, max_length=100)
+    fecha_constitucion: Optional[date] = None
+    objeto_social: Optional[str] = None
+    
+    # Domicilio y contacto
+    domicilio_legal: Optional[str] = Field(None, max_length=255)
+    localidad: Optional[str] = Field(None, max_length=100)
+    distrito: Optional[str] = Field(None, max_length=50)
+    telefono_institucional: Optional[str] = Field(None, max_length=30)
+    email_contacto: Optional[EmailStr] = None
+    web_redes: Optional[List[str]] = None
+    
+    # Representación legal
+    nombre_representante: Optional[str] = Field(None, max_length=200)
+    dni_representante: Optional[str] = Field(None, max_length=20)
+    cargo_representante: Optional[str] = Field(None, max_length=100)
+    telefono_representante: Optional[str] = Field(None, max_length=30)
+    email_representante: Optional[EmailStr] = None
+    vincular_personas: Optional[str] = None
+    
+    # Actividades audiovisuales
+    actividades_principales: Optional[List[str]] = None
+    otra_actividad: Optional[str] = None
+    lineas_trabajo: Optional[str] = None
+    apoyo_iaavim: Optional[str] = None
+    descripcion_apoyo: Optional[str] = None
+    otros_registros: Optional[str] = None
+    cuales_registros: Optional[str] = None
+    consentimiento: Optional[bool] = None
+    declaracion_inicial: Optional[bool] = None
+    borrador: Optional[bool] = None
 
 
 class PersonaJuridicaOut(BaseModel):
@@ -103,27 +108,27 @@ class PersonaJuridicaOut(BaseModel):
     user_id: str
     
     # Datos institucionales
-    nombre_pj: str
-    cuit: str
-    figura_legal: str
+    nombre_pj: Optional[str] = None
+    cuit: Optional[str] = None
+    figura_legal: Optional[str] = None
     otra_figura_legal: Optional[str] = None
     fecha_constitucion: Optional[date] = None
     objeto_social: Optional[str] = None
     
     # Domicilio y contacto
-    domicilio_legal: str
-    localidad: str
-    distrito: str
-    telefono_institucional: str
-    email_contacto: str
+    domicilio_legal: Optional[str] = None
+    localidad: Optional[str] = None
+    distrito: Optional[str] = None
+    telefono_institucional: Optional[str] = None
+    email_contacto: Optional[str] = None
     web_redes: Optional[List[str]] = None
     
     # Representación legal
-    nombre_representante: str
-    dni_representante: str
-    cargo_representante: str
-    telefono_representante: str
-    email_representante: str
+    nombre_representante: Optional[str] = None
+    dni_representante: Optional[str] = None
+    cargo_representante: Optional[str] = None
+    telefono_representante: Optional[str] = None
+    email_representante: Optional[str] = None
     vincular_personas: Optional[str] = None
     
     # Actividades audiovisuales
@@ -144,6 +149,7 @@ class PersonaJuridicaOut(BaseModel):
     # Consentimiento
     consentimiento: bool
     declaracion_inicial: bool
+    borrador: bool
     
     # Metadatos
     created_at: Optional[datetime] = None

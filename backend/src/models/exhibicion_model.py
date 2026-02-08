@@ -15,15 +15,15 @@ class Sala(Base):
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     
     # === DATOS BÁSICOS ===
-    nombre = Column(String(255), nullable=False)
-    tipo_sala = Column(String(50), nullable=False)
+    nombre = Column(String(255), nullable=True)  # nullable para borrador
+    tipo_sala = Column(String(50), nullable=True)  # nullable para borrador
     # Opciones: cine_comercial, cine_arte, espacio_cultural, auditorio, aire_libre, otro
     otro_tipo = Column(String(100), nullable=True)
     
     # === UBICACIÓN ===
-    domicilio = Column(String(255), nullable=False)
-    localidad = Column(String(100), nullable=False)
-    distrito = Column(String(50), nullable=False)
+    domicilio = Column(String(255), nullable=True)  # nullable para borrador
+    localidad = Column(String(100), nullable=True)  # nullable para borrador
+    distrito = Column(String(50), nullable=True)  # nullable para borrador
     
     # === CARACTERÍSTICAS TÉCNICAS ===
     capacidad = Column(Integer, nullable=True)
@@ -41,6 +41,7 @@ class Sala(Base):
     
     # === METADATOS ===
     activo = Column(Boolean, default=True)
+    borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
@@ -63,12 +64,12 @@ class Exhibicion(Base):
     sala_id = Column(Integer, ForeignKey("salas.id"), nullable=True)
     
     # === DATOS DE LA EXHIBICIÓN ===
-    titulo_obra = Column(String(255), nullable=False)  # Por si no está en AGAM
-    fecha_exhibicion = Column(Date, nullable=False)
+    titulo_obra = Column(String(255), nullable=True)  # nullable para borrador  # Por si no está en AGAM
+    fecha_exhibicion = Column(Date, nullable=True)  # nullable para borrador
     cantidad_funciones = Column(Integer, default=1)
     
     # === TIPO DE EXHIBICIÓN ===
-    tipo_exhibicion = Column(String(50), nullable=False)
+    tipo_exhibicion = Column(String(50), nullable=True)  # nullable para borrador
     # Opciones: estreno, reestreno, ciclo, festival, especial, otro
     nombre_evento = Column(String(255), nullable=True)  # Si es parte de un ciclo/festival
     
@@ -86,6 +87,7 @@ class Exhibicion(Base):
     observaciones = Column(Text, nullable=True)
     
     # === METADATOS ===
+    borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
@@ -105,14 +107,14 @@ class Festival(Base):
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     
     # === DATOS BÁSICOS ===
-    nombre = Column(String(255), nullable=False)
+    nombre = Column(String(255), nullable=True)  # nullable para borrador
     edicion = Column(Integer, nullable=True)  # Número de edición
-    fecha_inicio = Column(Date, nullable=False)
+    fecha_inicio = Column(Date, nullable=True)  # nullable para borrador
     fecha_fin = Column(Date, nullable=True)
     
     # === UBICACIÓN ===
-    localidad = Column(String(100), nullable=False)
-    distrito = Column(String(50), nullable=False)
+    localidad = Column(String(100), nullable=True)  # nullable para borrador
+    distrito = Column(String(50), nullable=True)  # nullable para borrador
     sedes = Column(JSON, nullable=True)  # Lista de sedes/salas
     
     # === CARACTERÍSTICAS ===
@@ -139,6 +141,7 @@ class Festival(Base):
     
     # === METADATOS ===
     activo = Column(Boolean, default=True)
+    borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
@@ -154,22 +157,22 @@ class Cinemateca(Base):
     __tablename__ = "cinemateca"
 
     id = Column(Integer, primary_key=True, index=True)
-    obra_id = Column(Integer, ForeignKey("obras_audiovisuales.id"), nullable=False)
+    obra_id = Column(Integer, ForeignKey("obras_audiovisuales.id"), nullable=True)  # nullable para borrador
     
     # === DATOS DEL SOPORTE ===
-    tipo_soporte = Column(String(50), nullable=False)
+    tipo_soporte = Column(String(50), nullable=True)  # nullable para borrador
     # Opciones: 35mm, 16mm, super8, betacam, dvcam, dvd, bluray, digital, otro
     otro_soporte = Column(String(100), nullable=True)
     cantidad_copias = Column(Integer, default=1)
     
     # === ESTADO DE CONSERVACIÓN ===
-    estado_conservacion = Column(String(30), nullable=False)
+    estado_conservacion = Column(String(30), nullable=True)  # nullable para borrador
     # Opciones: excelente, bueno, regular, malo, critico
     requiere_restauracion = Column(Boolean, default=False)
     observaciones_estado = Column(Text, nullable=True)
     
     # === UBICACIÓN FÍSICA ===
-    ubicacion_fisica = Column(String(255), nullable=False)
+    ubicacion_fisica = Column(String(255), nullable=True)  # nullable para borrador
     estanteria = Column(String(50), nullable=True)
     caja = Column(String(50), nullable=True)
     
@@ -185,6 +188,7 @@ class Cinemateca(Base):
     
     # === METADATOS ===
     fecha_ingreso = Column(Date, nullable=True)
+    borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     

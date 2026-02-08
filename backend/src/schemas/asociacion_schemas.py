@@ -25,22 +25,22 @@ class AsociacionCreate(BaseModel):
     """Schema para crear una Asociación/Colectivo"""
     declaracion_inicial: bool = True
     
-    # Datos básicos y contacto
-    nombre_asociacion: str = Field(..., min_length=1, max_length=255)
+    # Datos básicos y contacto - permitidos null para borradores
+    nombre_asociacion: Optional[str] = Field(None, max_length=255)
     anio_creacion: Optional[int] = None
     personeria_juridica: Optional[str] = None
     tipo_personeria: Optional[str] = None
     otra_personeria: Optional[str] = None
     cuit: Optional[str] = Field(None, max_length=15)
-    domicilio: str = Field(..., min_length=1, max_length=255)
-    localidad: str = Field(..., min_length=1, max_length=100)
-    distrito: str = Field(..., min_length=1, max_length=50)
+    domicilio: Optional[str] = Field(None, max_length=255)
+    localidad: Optional[str] = Field(None, max_length=100)
+    distrito: Optional[str] = Field(None, max_length=50)
     telefono: Optional[str] = Field(None, max_length=30)
-    email: EmailStr
+    email: Optional[EmailStr] = None
     web: Optional[str] = Field(None, max_length=500)
     
     # Representación
-    nombre_referente: str = Field(..., min_length=1, max_length=200)
+    nombre_referente: Optional[str] = Field(None, max_length=200)
     rol_referente: Optional[str] = Field(None, max_length=100)
     telefono_referente: Optional[str] = Field(None, max_length=30)
     email_referente: Optional[EmailStr] = None
@@ -65,6 +65,7 @@ class AsociacionCreate(BaseModel):
     
     # Consentimiento
     consentimiento: bool = False
+    borrador: bool = False
 
 
 class AsociacionUpdate(BaseModel):
@@ -106,6 +107,9 @@ class AsociacionUpdate(BaseModel):
     articulo_iaavim: Optional[str] = None
     descripcion_articulacion: Optional[str] = None
     info_adicional_integrantes: Optional[str] = None
+    consentimiento: Optional[bool] = None
+    declaracion_inicial: Optional[bool] = None
+    borrador: Optional[bool] = None
 
 
 class AsociacionOut(BaseModel):
@@ -158,6 +162,7 @@ class AsociacionOut(BaseModel):
     # Consentimiento
     consentimiento: bool
     declaracion_inicial: bool
+    borrador: bool
     
     # Metadatos
     created_at: Optional[datetime] = None

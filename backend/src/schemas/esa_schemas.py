@@ -6,25 +6,25 @@ from datetime import date, datetime
 class EstudianteESACreate(BaseModel):
     """Schema para crear un registro de Estudiante ESA"""
     
-    # Datos personales
-    nombre_completo: str = Field(..., min_length=1, max_length=200)
-    dni: str = Field(..., min_length=1, max_length=20)
-    cuil: str = Field(..., min_length=1, max_length=15)
-    fecha_nacimiento: date
+    # Datos personales - permitidos null para borradores
+    nombre_completo: Optional[str] = Field(None, max_length=200)
+    dni: Optional[str] = Field(None, max_length=20)
+    cuil: Optional[str] = Field(None, max_length=15)
+    fecha_nacimiento: Optional[date] = None
     genero: Optional[str] = Field(None, max_length=50)
-    email: EmailStr
-    telefono: str = Field(..., min_length=1, max_length=30)
+    email: Optional[EmailStr] = None
+    telefono: Optional[str] = Field(None, max_length=30)
     
     # Localización
-    municipio: str = Field(..., min_length=1, max_length=100)
-    distrito: str = Field(..., min_length=1, max_length=20)
+    municipio: Optional[str] = Field(None, max_length=100)
+    distrito: Optional[str] = Field(None, max_length=20)
     
     # Formación
-    institucion: str = Field(..., min_length=1, max_length=255)
+    institucion: Optional[str] = Field(None, max_length=255)
     otra_institucion: Optional[str] = Field(None, max_length=255)
-    carrera: str = Field(..., min_length=1, max_length=255)
+    carrera: Optional[str] = Field(None, max_length=255)
     anio_cursado: Optional[int] = None
-    modalidad: str = Field(..., min_length=1, max_length=20)
+    modalidad: Optional[str] = Field(None, max_length=20)
     
     # Intereses
     areas_interes: Optional[List[str]] = None
@@ -38,6 +38,7 @@ class EstudianteESACreate(BaseModel):
     no_inscripto_repa: bool = False
     vigencia_un_anio: bool = False
     autoriza_datos: bool = False
+    borrador: bool = False
 
 
 class EstudianteESAUpdate(BaseModel):
@@ -45,6 +46,10 @@ class EstudianteESAUpdate(BaseModel):
     
     # Datos personales
     nombre_completo: Optional[str] = Field(None, max_length=200)
+    dni: Optional[str] = Field(None, max_length=20)
+    cuil: Optional[str] = Field(None, max_length=15)
+    fecha_nacimiento: Optional[date] = None
+    email: Optional[EmailStr] = None
     telefono: Optional[str] = Field(None, max_length=30)
     genero: Optional[str] = Field(None, max_length=50)
     
@@ -64,6 +69,14 @@ class EstudianteESAUpdate(BaseModel):
     otra_area: Optional[str] = None
     participo_proyecto: Optional[bool] = None
     descripcion_experiencia: Optional[str] = None
+    
+    # Declaraciones
+    estudiante_activo: Optional[bool] = None
+    leyo_reglamento: Optional[bool] = None
+    no_inscripto_repa: Optional[bool] = None
+    vigencia_un_anio: Optional[bool] = None
+    autoriza_datos: Optional[bool] = None
+    borrador: Optional[bool] = None
 
 
 class EstudianteESAOut(BaseModel):
@@ -103,6 +116,7 @@ class EstudianteESAOut(BaseModel):
     no_inscripto_repa: bool
     vigencia_un_anio: bool
     autoriza_datos: bool
+    borrador: bool
     
     # Metadatos
     fecha_alta: Optional[datetime] = None

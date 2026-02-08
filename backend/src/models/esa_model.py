@@ -17,24 +17,24 @@ class EstudianteESA(Base):
     user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
     
     # === DATOS PERSONALES ===
-    nombre_completo = Column(String(200), nullable=False)
-    dni = Column(String(20), unique=True, nullable=False)
-    cuil = Column(String(15), unique=True, nullable=False)
-    fecha_nacimiento = Column(Date, nullable=False)
+    nombre_completo = Column(String(200), nullable=True)  # nullable para borrador
+    dni = Column(String(20), unique=True, nullable=True)  # nullable para borrador
+    cuil = Column(String(15), unique=True, nullable=True)  # nullable para borrador
+    fecha_nacimiento = Column(Date, nullable=True)  # nullable para borrador
     genero = Column(String(50), nullable=True)
-    email = Column(String(255), nullable=False)
-    telefono = Column(String(30), nullable=False)
+    email = Column(String(255), nullable=True)  # nullable para borrador
+    telefono = Column(String(30), nullable=True)  # nullable para borrador
     
     # === LOCALIZACIÓN ===
-    municipio = Column(String(100), nullable=False)
-    distrito = Column(String(20), nullable=False)  # sur, norte, parana, uruguay
+    municipio = Column(String(100), nullable=True)  # nullable para borrador
+    distrito = Column(String(20), nullable=True)  # nullable para borrador  # sur, norte, parana, uruguay
     
     # === DATOS DE FORMACIÓN ===
-    institucion = Column(String(255), nullable=False)
+    institucion = Column(String(255), nullable=True)  # nullable para borrador
     otra_institucion = Column(String(255), nullable=True)  # Si eligió "Otra"
-    carrera = Column(String(255), nullable=False)
+    carrera = Column(String(255), nullable=True)  # nullable para borrador
     anio_cursado = Column(Integer, nullable=True)
-    modalidad = Column(String(20), nullable=False)  # presencial, virtual, hibrido
+    modalidad = Column(String(20), nullable=True)  # nullable para borrador  # presencial, virtual, hibrido
     
     # === INTERESES Y PARTICIPACIÓN ===
     areas_interes = Column(JSON, nullable=True)
@@ -54,6 +54,7 @@ class EstudianteESA(Base):
     fecha_alta = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     fecha_vencimiento = Column(DateTime, nullable=True)  # fecha_alta + 1 año
     activo = Column(Boolean, default=True)
+    borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

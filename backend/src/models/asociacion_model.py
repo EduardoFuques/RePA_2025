@@ -15,21 +15,21 @@ class Asociacion(Base):
     user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
     
     # === DATOS BÁSICOS Y CONTACTO ===
-    nombre_asociacion = Column(String(255), nullable=False)
+    nombre_asociacion = Column(String(255), nullable=True)  # nullable para borrador
     anio_creacion = Column(Integer, nullable=True)
     personeria_juridica = Column(String(10), nullable=True)  # si, no, en_tramite
     tipo_personeria = Column(String(50), nullable=True)
     otra_personeria = Column(String(100), nullable=True)
     cuit = Column(String(15), nullable=True)
-    domicilio = Column(String(255), nullable=False)
-    localidad = Column(String(100), nullable=False)
-    distrito = Column(String(50), nullable=False)
+    domicilio = Column(String(255), nullable=True)  # nullable para borrador
+    localidad = Column(String(100), nullable=True)  # nullable para borrador
+    distrito = Column(String(50), nullable=True)  # nullable para borrador
     telefono = Column(String(30), nullable=True)
-    email = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True)  # nullable para borrador
     web = Column(String(500), nullable=True)
     
     # === REPRESENTACIÓN ===
-    nombre_referente = Column(String(200), nullable=False)
+    nombre_referente = Column(String(200), nullable=True)  # nullable para borrador
     rol_referente = Column(String(100), nullable=True)
     telefono_referente = Column(String(30), nullable=True)
     email_referente = Column(String(255), nullable=True)
@@ -59,6 +59,7 @@ class Asociacion(Base):
     # === CONSENTIMIENTO ===
     consentimiento = Column(Boolean, nullable=False, default=False)
     declaracion_inicial = Column(Boolean, nullable=False, default=False)
+    borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
