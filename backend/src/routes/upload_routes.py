@@ -308,3 +308,41 @@ async def view_file(filepath: str):
                     )
     
     raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+
+@files_router.get("/download/{filepath:path}")
+async def download_file(filepath: str):
+    """
+    Descargar un archivo (fuerza descarga en lugar de visualización)
+    """
+    import urllib.parse
+    filepath = urllib.parse.unquote(filepath)
+    
+    # Buscar el archivo en todos los directorios de usuario
+    if os.path.exists(UPLOAD_BASE_DIR):
+        for user_id in os.listdir(UPLOAD_BASE_DIR):
+            user_dir = os.path.join(UPLOAD_BASE_DIR, user_id)
+            if os.path.isdir(user_dir):
+                file_path = os.path.join(user_dir, filepath)
+                if os.path.exists(file_path):
+                    # Determinar media type
+                    if filepath.endswith('.pdf'):
+                        media_type = 'application/pdf'
+                    elif filepath.lower().endswith(('.jpg', '.jpeg')):
+                        media_type = 'image/jpeg'
+                    elif filepath.lower().endswith('.png'):
+                        media_type = 'image/png'
+                    elif filepath.lower().endswith('.docx'):
+                        media_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    else:
+                        media_type = 'application/octet-stream'
+                    
+                    from fastapi.responses import FileResponse
+                    # Usar attachment para forzar descarga
+                    return FileResponse(
+                        path=file_path,
+                        media_type=media_type,
+                        headers={"Content-Disposition": f"attachment; filename=\"{filepath}\""}
+                    )
+    
+    raise HTTPException(status_code=404, detail="Archivo no encontrado en download")
