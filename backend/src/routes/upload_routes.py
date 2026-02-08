@@ -254,8 +254,8 @@ async def get_my_dni(
     if not persona or not persona.dni_adjunto_path:
         raise HTTPException(status_code=404, detail="No hay DNI adjunto")
     
-    # Construir la ruta completa
-    file_path = os.path.join(UPLOAD_BASE_DIR, persona.dni_adjunto_path)
+    # Construir la ruta completa incluyendo el user_id
+    file_path = os.path.join(UPLOAD_BASE_DIR, current_user["id"], persona.dni_adjunto_path)
     
     # Validar que el archivo exista
     if not os.path.exists(file_path):
