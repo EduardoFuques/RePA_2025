@@ -8,6 +8,9 @@ from ..database import get_db
 from ..utils import get_current_user
 upload_router = APIRouter(prefix="/upload", tags=["upload"])
 
+# Alias para compatibilidad con frontend que usa /api/files
+files_router = APIRouter(prefix="/files", tags=["files"])
+
 # Directorio base para uploads
 UPLOAD_BASE_DIR = "/app/uploads"
 
@@ -265,3 +268,42 @@ async def get_my_dni(
         media_type='application/pdf',
         filename=persona.dni_adjunto_path.split('/')[-1]
     )
+
+
+# Endpoint compatibilidad para /api/files/view
+@files_router.get("/view/{filepath:path}")
+async def view_file(filepath: str):
+    """
+    Ver un archivo - endpoint de compatibilidad para frontend
+    """
+    # El filepath puede venir con URL encoding
+    import urllib.parse
+    filepath = urllib.parse.unquote(filepath)
+    
+    # Buscar el archivo en todos los directorios de usuario
+    if os.path.exists(UPLOAD_BASE_DIR):
+        for user_id in os.listdir(UPLOAD_BASE_DIR):
+            user_dir = os.path.join(UPLOAD_BASE_DIR, user_id)
+            if os.path.isdir(user_dir):
+                file_path = os.path.join(user_dir, filepath)
+                if os.path.exists(file_path):
+                    # Determinar media type
+                    if filepath.endswith('.pdf'):
+                        media_type = 'application/pdf'
+                    elif filepath.lower().endswith(('.jpg', '.jpeg')):
+                        media_type = 'image/jpeg'
+                    elif filepath.lower().endswith('.png'):
+                        media_type = 'image/png'
+                    elif filepath.lower().endswith('.docx'):
+                        media_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    else:
+                        media_type = 'application/octet-stream'
+                    
+                    from fastapi.responses import FileResponse
+                    return FileResponse(
+                        path=file_path,
+                        media_type=media_type,
+                        filename=filepath
+                    )
+    
+    raise HTTPException(status_code=404, detail="Archivo no encontrado")
