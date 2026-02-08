@@ -162,6 +162,10 @@ class PersonaFisicaUpdate(BaseModel):
     # Datos personales
     nombre: Optional[str] = Field(None, max_length=100)
     apellido: Optional[str] = Field(None, max_length=100)
+    dni: Optional[str] = Field(None, max_length=20)
+    cuil: Optional[str] = Field(None, max_length=15)
+    fecha_nacimiento: Optional[date] = None
+    email: Optional[EmailStr] = None
     telefono: Optional[str] = Field(None, max_length=30)
     domicilio: Optional[str] = Field(None, max_length=255)
     municipio: Optional[str] = Field(None, max_length=100)

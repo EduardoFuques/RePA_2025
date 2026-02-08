@@ -15,28 +15,28 @@ class PersonaJuridica(Base):
     user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
     
     # === DATOS INSTITUCIONALES ===
-    nombre_pj = Column(String(255), nullable=False)
-    cuit = Column(String(15), unique=True, nullable=False)
-    figura_legal = Column(String(50), nullable=False)
+    nombre_pj = Column(String(255), nullable=True)  # nullable para borrador
+    cuit = Column(String(15), unique=True, nullable=True)  # nullable para borrador
+    figura_legal = Column(String(50), nullable=True)  # nullable para borrador
     # Opciones: sa, srl, sas, cooperativa, fundacion, asociacion_civil, otra
     otra_figura_legal = Column(String(100), nullable=True)
     fecha_constitucion = Column(Date, nullable=True)
     objeto_social = Column(Text, nullable=True)
     
     # === DOMICILIO Y CONTACTO ===
-    domicilio_legal = Column(String(255), nullable=False)
-    localidad = Column(String(100), nullable=False)
-    distrito = Column(String(50), nullable=False)
-    telefono_institucional = Column(String(30), nullable=False)
-    email_contacto = Column(String(255), nullable=False)
+    domicilio_legal = Column(String(255), nullable=True)  # nullable para borrador
+    localidad = Column(String(100), nullable=True)  # nullable para borrador
+    distrito = Column(String(50), nullable=True)  # nullable para borrador
+    telefono_institucional = Column(String(30), nullable=True)  # nullable para borrador
+    email_contacto = Column(String(255), nullable=True)  # nullable para borrador
     web_redes = Column(JSON, nullable=True)  # Array de URLs
     
     # === REPRESENTACIÓN LEGAL ===
-    nombre_representante = Column(String(200), nullable=False)
-    dni_representante = Column(String(20), nullable=False)
-    cargo_representante = Column(String(100), nullable=False)
-    telefono_representante = Column(String(30), nullable=False)
-    email_representante = Column(String(255), nullable=False)
+    nombre_representante = Column(String(200), nullable=True)  # nullable para borrador
+    dni_representante = Column(String(20), nullable=True)  # nullable para borrador
+    cargo_representante = Column(String(100), nullable=True)  # nullable para borrador
+    telefono_representante = Column(String(30), nullable=True)  # nullable para borrador
+    email_representante = Column(String(255), nullable=True)  # nullable para borrador
     vincular_personas = Column(String(10), nullable=True)  # si, no
     
     # === ACTIVIDADES AUDIOVISUALES ===
@@ -58,6 +58,7 @@ class PersonaJuridica(Base):
     # === CONSENTIMIENTO ===
     consentimiento = Column(Boolean, nullable=False, default=False)
     declaracion_inicial = Column(Boolean, nullable=False, default=False)
+    borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

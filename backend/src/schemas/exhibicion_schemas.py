@@ -6,13 +6,13 @@ from datetime import date, datetime
 # === SALA ===
 class SalaCreate(BaseModel):
     """Schema para crear una Sala de Exhibición"""
-    nombre: str = Field(..., min_length=1, max_length=255)
-    tipo_sala: str = Field(..., min_length=1, max_length=50)
+    nombre: Optional[str] = Field(None, max_length=255)
+    tipo_sala: Optional[str] = Field(None, max_length=50)
     otro_tipo: Optional[str] = Field(None, max_length=100)
     
-    domicilio: str = Field(..., min_length=1, max_length=255)
-    localidad: str = Field(..., min_length=1, max_length=100)
-    distrito: str = Field(..., min_length=1, max_length=50)
+    domicilio: Optional[str] = Field(None, max_length=255)
+    localidad: Optional[str] = Field(None, max_length=100)
+    distrito: Optional[str] = Field(None, max_length=50)
     
     capacidad: Optional[int] = None
     tiene_proyector_digital: bool = False
@@ -25,6 +25,7 @@ class SalaCreate(BaseModel):
     telefono: Optional[str] = Field(None, max_length=30)
     email: Optional[EmailStr] = None
     web: Optional[str] = Field(None, max_length=500)
+    borrador: bool = False
 
 
 class SalaUpdate(BaseModel):
@@ -49,6 +50,7 @@ class SalaUpdate(BaseModel):
     email: Optional[EmailStr] = None
     web: Optional[str] = Field(None, max_length=500)
     activo: Optional[bool] = None
+    borrador: Optional[bool] = None
 
 
 class SalaOut(BaseModel):
@@ -72,6 +74,7 @@ class SalaOut(BaseModel):
     email: Optional[str] = None
     web: Optional[str] = None
     activo: bool
+    borrador: bool
     created_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
@@ -99,6 +102,7 @@ class ExhibicionCreate(BaseModel):
     precio_entrada_general: Optional[float] = None
     
     observaciones: Optional[str] = None
+    borrador: bool = False
 
 
 class ExhibicionUpdate(BaseModel):
@@ -122,6 +126,7 @@ class ExhibicionUpdate(BaseModel):
     precio_entrada_general: Optional[float] = None
     
     observaciones: Optional[str] = None
+    borrador: Optional[bool] = None
 
 
 class ExhibicionOut(BaseModel):
@@ -142,6 +147,7 @@ class ExhibicionOut(BaseModel):
     recaudacion_total: Optional[float] = None
     precio_entrada_general: Optional[float] = None
     observaciones: Optional[str] = None
+    borrador: bool
     created_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
@@ -174,6 +180,7 @@ class FestivalCreate(BaseModel):
     
     apoyo_iaavim: bool = False
     tipo_apoyo: Optional[str] = Field(None, max_length=255)
+    borrador: bool = False
 
 
 class FestivalUpdate(BaseModel):
@@ -203,6 +210,7 @@ class FestivalUpdate(BaseModel):
     apoyo_iaavim: Optional[bool] = None
     tipo_apoyo: Optional[str] = Field(None, max_length=255)
     activo: Optional[bool] = None
+    borrador: Optional[bool] = None
 
 
 class FestivalOut(BaseModel):
@@ -229,6 +237,7 @@ class FestivalOut(BaseModel):
     apoyo_iaavim: bool
     tipo_apoyo: Optional[str] = None
     activo: bool
+    borrador: bool
     created_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
@@ -257,6 +266,7 @@ class CinematecaCreate(BaseModel):
     
     disponible_prestamo: bool = True
     fecha_ingreso: Optional[date] = None
+    borrador: bool = False
 
 
 class CinematecaUpdate(BaseModel):
@@ -279,6 +289,7 @@ class CinematecaUpdate(BaseModel):
     
     disponible_prestamo: Optional[bool] = None
     en_prestamo: Optional[bool] = None
+    borrador: Optional[bool] = None
 
 
 class CinematecaOut(BaseModel):
@@ -301,6 +312,7 @@ class CinematecaOut(BaseModel):
     en_prestamo: bool
     fecha_ultimo_prestamo: Optional[date] = None
     fecha_ingreso: Optional[date] = None
+    borrador: bool
     created_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)

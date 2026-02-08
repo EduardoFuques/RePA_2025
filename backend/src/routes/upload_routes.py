@@ -71,6 +71,110 @@ async def upload_dni(
         "filename": unique_filename
     })
 
+ALLOWED_DOC_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'}
+ALLOWED_DOC_TYPES = {
+    'estatuto': {'extensions': {'.pdf', '.jpg', '.jpeg', '.png'}, 'max_size': 5 * 1024 * 1024},
+    'constancia_cuit': {'extensions': {'.pdf', '.jpg', '.jpeg', '.png'}, 'max_size': 5 * 1024 * 1024},
+    'acta_autoridades': {'extensions': {'.pdf', '.jpg', '.jpeg', '.png'}, 'max_size': 5 * 1024 * 1024},
+    'cv_institucional': {'extensions': {'.pdf', '.doc', '.docx'}, 'max_size': 10 * 1024 * 1024},
+}
+
+MIME_MAP = {
+    '.pdf': 'application/pdf',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+}
+
+@upload_router.post("/document/{doc_type}")
+async def upload_document(
+    doc_type: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """
+    Subir un documento genérico (estatuto, constancia_cuit, acta_autoridades, cv_institucional)
+    """
+    if doc_type not in ALLOWED_DOC_TYPES:
+        raise HTTPException(status_code=400, detail=f"Tipo de documento no válido: {doc_type}")
+    
+    doc_config = ALLOWED_DOC_TYPES[doc_type]
+    
+    # Validar extensión
+    file_extension = os.path.splitext(file.filename)[1].lower()
+    if file_extension not in doc_config['extensions']:
+        allowed = ', '.join(doc_config['extensions'])
+        raise HTTPException(status_code=400, detail=f"Extensión no permitida. Permitidas: {allowed}")
+    
+    # Validar tamaño
+    file_content = await file.read()
+    if len(file_content) > doc_config['max_size']:
+        max_mb = doc_config['max_size'] // (1024 * 1024)
+        raise HTTPException(status_code=400, detail=f"El archivo no puede superar los {max_mb}MB")
+    
+    await file.seek(0)
+    
+    # Crear directorio del usuario
+    user_id = current_user["id"]
+    user_dir = ensure_user_dir(user_id)
+    
+    # Generar nombre único
+    unique_filename = f"{doc_type}_{uuid.uuid4().hex}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{file_extension}"
+    file_path = os.path.join(user_dir, unique_filename)
+    
+    # Guardar archivo
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al guardar el archivo: {str(e)}")
+    
+    relative_path = os.path.join(user_id, unique_filename)
+    
+    return JSONResponse({
+        "message": "Archivo subido exitosamente",
+        "path": relative_path,
+        "filename": unique_filename
+    })
+
+@upload_router.get("/document/{filepath:path}")
+async def get_document(
+    filepath: str,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """
+    Obtener un documento subido por el usuario
+    """
+    from fastapi.responses import FileResponse
+    
+    user_id = current_user["id"]
+    
+    # Validar que el archivo pertenezca al usuario
+    if '/' in filepath:
+        file_user_id = filepath.split('/')[0]
+        if file_user_id != user_id:
+            raise HTTPException(status_code=403, detail="No autorizado")
+        file_path = os.path.join(UPLOAD_BASE_DIR, filepath)
+    else:
+        file_path = os.path.join(get_user_upload_dir(user_id), filepath)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    
+    # Determinar media type
+    file_extension = os.path.splitext(file_path)[1].lower()
+    media_type = MIME_MAP.get(file_extension, 'application/octet-stream')
+    
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        filename=filepath.split('/')[-1]
+    )
+
 @upload_router.delete("/dni/{filename}")
 async def delete_dni(
     filename: str,

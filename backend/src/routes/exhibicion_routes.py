@@ -123,6 +123,23 @@ async def list_exhibiciones(
     return db.query(Exhibicion).filter(Exhibicion.user_id == current_user["id"]).all()
 
 
+@exhibicion_router.get("/me", response_model=ExhibicionOut)
+async def get_my_exhibicion(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Obtener la Exhibición del usuario actual"""
+    exhibicion = db.query(Exhibicion).filter(
+        Exhibicion.user_id == current_user["id"]
+    ).first()
+    if not exhibicion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró exhibición para este usuario"
+        )
+    return exhibicion
+
+
 @exhibicion_router.get("/{exhibicion_id}", response_model=ExhibicionOut)
 async def get_exhibicion(
     exhibicion_id: int,

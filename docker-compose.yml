@@ -21,16 +21,6 @@ services:
     networks:
       - repa-network
 
-  adminer:
-    image: adminer
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8081:8080"  # Solo accesible desde localhost del servidor
-    environment:
-      TZ: America/Argentina/Buenos_Aires
-    networks:
-      - repa-network
-
   backend:
     build: ./backend
     restart: unless-stopped
@@ -77,6 +67,5 @@ networks:
     driver: bridge
 
 volumes:
-  pgdata:
   repa-uploads:
     driver: local
