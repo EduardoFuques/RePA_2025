@@ -300,10 +300,11 @@ async def view_file(filepath: str):
                         media_type = 'application/octet-stream'
                     
                     from fastapi.responses import FileResponse
+                    # Usar inline para mostrar en navegador, no descargar
                     return FileResponse(
                         path=file_path,
                         media_type=media_type,
-                        filename=filepath
+                        headers={"Content-Disposition": f"inline; filename=\"{filepath}\""}
                     )
     
     raise HTTPException(status_code=404, detail="Archivo no encontrado")
