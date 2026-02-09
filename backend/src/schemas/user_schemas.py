@@ -51,3 +51,15 @@ class TokenDB(TokenData):
     created_at:datetime
     expires_at: Optional[datetime] = None
     is_active: bool
+
+# Esquema para metadata de formularios del usuario
+class UserFormsMetadata(BaseModel):
+    has_pf: bool = False
+    has_pj: bool = False
+    has_as: bool = False
+    has_esa: bool = False
+    has_agam: bool = False
+    has_sala: bool = False
+    has_exhibicion: bool = False
+    has_festival: bool = False
+    has_cinemateca: bool = False

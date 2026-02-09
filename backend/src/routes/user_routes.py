@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from jose import jwt
 from src.models.user_models import User, Role, TokenRecovery
-from src.schemas.user_schemas import UserCreate, UserOut, UserUpdate
+from src.schemas.user_schemas import UserCreate, UserOut, UserUpdate, UserFormsMetadata
 from src.database import get_db
 from src.utils import get_password_hash, validar_password, update_last_login, get_current_user
 from src.token_utils import create_access_token, decode_access_token
@@ -344,6 +344,36 @@ async def read_users_me(current_user: dict = Depends(get_current_user), db: Sess
             detail="Correo electrónico o contraseña incorrectos",
         )
     return user
+
+# Obtener metadata de formularios del usuario
+@user_router.get("/me/forms", response_model=UserFormsMetadata, description="Obtener qué formularios tiene el usuario")
+async def get_user_forms_metadata(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Obtener metadata de qué formularios tiene completados el usuario.
+    Esto permite al frontend saber qué datos cargar sin hacer múltiples peticiones.
+    """
+    from src.models.persona_fisica_model import PersonaFisica
+    from src.models.persona_juridica_model import PersonaJuridica
+    from src.models.asociacion_model import Asociacion
+    from src.models.esa_model import EstudianteESA
+    from src.models.obra_audiovisual_model import ObraAudiovisual
+    from src.models.exhibicion_model import Sala, Exhibicion, Festival
+    
+    user_id = current_user["id"]
+    
+    # Cinemateca no tiene user_id directo, está relacionado con obra_id
+    # Por ahora solo verificamos los modelos con user_id directo
+    return UserFormsMetadata(
+        has_pf=db.query(PersonaFisica).filter(PersonaFisica.user_id == user_id).first() is not None,
+        has_pj=db.query(PersonaJuridica).filter(PersonaJuridica.user_id == user_id).first() is not None,
+        has_as=db.query(Asociacion).filter(Asociacion.user_id == user_id).first() is not None,
+        has_esa=db.query(EstudianteESA).filter(EstudianteESA.user_id == user_id).first() is not None,
+        has_agam=db.query(ObraAudiovisual).filter(ObraAudiovisual.user_id == user_id).first() is not None,
+        has_sala=db.query(Sala).filter(Sala.user_id == user_id).first() is not None,
+        has_exhibicion=db.query(Exhibicion).filter(Exhibicion.user_id == user_id).first() is not None,
+        has_festival=db.query(Festival).filter(Festival.user_id == user_id).first() is not None,
+        has_cinemateca=False,  # Cinemateca no tiene user_id directo
+    )
 
 # Actualizar usuario
 @user_router.put("/me", response_model=UserUpdate, description="Actualizar los datos del usuario actual")

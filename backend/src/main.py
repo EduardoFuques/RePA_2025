@@ -20,7 +20,7 @@ from src.routes.asociacion_routes import asociacion_router
 from src.routes.obra_audiovisual_routes import obra_audiovisual_router
 from src.routes.esa_routes import esa_router
 from src.routes.exhibicion_routes import exhibicion_router
-from src.routes.upload_routes import upload_router
+from src.routes.upload_routes import upload_router, files_router
 
 from src.seed import seed_data
 
@@ -73,7 +73,7 @@ Los endpoints sensibles tienen límites de solicitudes:
 - **IAAviM** - Instituto de Artes Audiovisuales de Misiones
 - **Email**: sistemas@iaavim.gob.ar
     """,
-    version="0.9.0",
+    version="1.0.1",
     contact={
         "name": "IAAviM - Sistemas",
         "url": "https://iaavim.gob.ar",
@@ -155,6 +155,7 @@ app.include_router(admin_router, prefix="/admin_user", tags=["Administrator User
 
 # Rutas de Upload de archivos
 app.include_router(upload_router, tags=["Upload"])
+app.include_router(files_router, tags=["Files"])
 
 @app.get("/")
 def root():

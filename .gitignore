@@ -183,3 +183,32 @@ backend/frontend/
 # Archivos de desarrollo local Windows
 docker-compose.override.yml
 start-dev.bat
+
+# Directorio de uploads (archivos subidos por usuarios)
+uploads/
+
+# Test files and generated documents
+test_dni_*.pdf
+*.test.pdf
+test_*.pdf
+
+# Backups locales
+backups/
+*.sql.gz
+*.sql.bak
+
+# IDE y editores
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak

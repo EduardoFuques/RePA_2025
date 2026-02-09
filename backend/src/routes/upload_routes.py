@@ -8,6 +8,9 @@ from ..database import get_db
 from ..utils import get_current_user
 upload_router = APIRouter(prefix="/upload", tags=["upload"])
 
+# Alias para compatibilidad con frontend que usa /api/files
+files_router = APIRouter(prefix="/files", tags=["files"])
+
 # Directorio base para uploads
 UPLOAD_BASE_DIR = "/app/uploads"
 
@@ -243,20 +246,29 @@ async def get_my_dni(
     """
     from ..models.persona_fisica_model import PersonaFisica
     
+    print(f"[DEBUG] get_my_dni - user_id: {current_user['id']}, email: {current_user.get('email', 'N/A')}")
+    
     # Buscar el DNI en la base de datos
     persona = db.query(PersonaFisica).filter(
         PersonaFisica.user_id == current_user["id"]
     ).first()
     
     if not persona or not persona.dni_adjunto_path:
+        print(f"[DEBUG] No DNI found for user {current_user['id']}")
         raise HTTPException(status_code=404, detail="No hay DNI adjunto")
     
-    # Construir la ruta completa
-    file_path = os.path.join(UPLOAD_BASE_DIR, persona.dni_adjunto_path)
+    print(f"[DEBUG] DNI path from DB: {persona.dni_adjunto_path}")
+    
+    # Construir la ruta completa incluyendo el user_id
+    file_path = os.path.join(UPLOAD_BASE_DIR, current_user["id"], persona.dni_adjunto_path)
+    print(f"[DEBUG] Full file path: {file_path}")
     
     # Validar que el archivo exista
     if not os.path.exists(file_path):
+        print(f"[DEBUG] File not found at: {file_path}")
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    
+    print(f"[DEBUG] Serving file: {file_path}")
     
     # Devolver archivo
     from fastapi.responses import FileResponse
@@ -265,3 +277,80 @@ async def get_my_dni(
         media_type='application/pdf',
         filename=persona.dni_adjunto_path.split('/')[-1]
     )
+
+
+# Endpoint compatibilidad para /api/files/view
+@files_router.get("/view/{filepath:path}")
+async def view_file(
+    filepath: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Ver un archivo del usuario autenticado
+    """
+    import urllib.parse
+    filepath = urllib.parse.unquote(filepath)
+    
+    # Buscar en el directorio del usuario autenticado
+    user_dir = os.path.join(UPLOAD_BASE_DIR, current_user["id"])
+    file_path = os.path.join(user_dir, filepath)
+    
+    if os.path.exists(file_path):
+        # Determinar media type
+        if filepath.endswith('.pdf'):
+            media_type = 'application/pdf'
+        elif filepath.lower().endswith(('.jpg', '.jpeg')):
+            media_type = 'image/jpeg'
+        elif filepath.lower().endswith('.png'):
+            media_type = 'image/png'
+        elif filepath.lower().endswith('.docx'):
+            media_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        else:
+            media_type = 'application/octet-stream'
+        
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=file_path,
+            media_type=media_type,
+            headers={"Content-Disposition": f"inline; filename=\"{filepath}\""}
+        )
+    
+    raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+
+@files_router.get("/download/{filepath:path}")
+async def download_file(
+    filepath: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Descargar un archivo del usuario autenticado
+    """
+    import urllib.parse
+    filepath = urllib.parse.unquote(filepath)
+    
+    # Buscar en el directorio del usuario autenticado
+    user_dir = os.path.join(UPLOAD_BASE_DIR, current_user["id"])
+    file_path = os.path.join(user_dir, filepath)
+    
+    if os.path.exists(file_path):
+        # Determinar media type
+        if filepath.endswith('.pdf'):
+            media_type = 'application/pdf'
+        elif filepath.lower().endswith(('.jpg', '.jpeg')):
+            media_type = 'image/jpeg'
+        elif filepath.lower().endswith('.png'):
+            media_type = 'image/png'
+        elif filepath.lower().endswith('.docx'):
+            media_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        else:
+            media_type = 'application/octet-stream'
+        
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=file_path,
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename=\"{filepath}\""}
+        )
+    
+    raise HTTPException(status_code=404, detail="Archivo no encontrado")
