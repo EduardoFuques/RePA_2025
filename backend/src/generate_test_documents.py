@@ -39,7 +39,7 @@ def create_sample_pdf(filepath: str, title: str):
     c.setFont("Helvetica", 12)
     y_position = height - 2 * inch
     
-    c.drawString(inch, y_position, f"Documento de ejemplo generado automáticamente")
+    c.drawString(inch, y_position, "Documento de ejemplo generado automáticamente")
     y_position -= 0.5 * inch
     c.drawString(inch, y_position, f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
     y_position -= 0.5 * inch
@@ -136,8 +136,8 @@ def generate_documents():
         print("\n✅ Documentos generados exitosamente!")
         
     except ImportError as e:
-        print(f"\n❌ Error: Falta instalar dependencias para generar documentos:")
-        print(f"   pip install reportlab python-docx")
+        print("\n❌ Error: Falta instalar dependencias para generar documentos:")
+        print("   pip install reportlab python-docx")
         print(f"\nError detallado: {e}")
     except Exception as e:
         print(f"\n❌ Error al generar documentos: {e}")

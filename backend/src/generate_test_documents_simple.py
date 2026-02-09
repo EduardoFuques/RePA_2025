@@ -49,7 +49,7 @@ def create_sample_file(filepath: str, title: str, extension: str):
             c.setFont("Helvetica", 12)
             y_position = height - 2 * inch
             
-            c.drawString(inch, y_position, f"Documento de ejemplo generado automáticamente")
+            c.drawString(inch, y_position, "Documento de ejemplo generado automáticamente")
             y_position -= 0.5 * inch
             c.drawString(inch, y_position, f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
             y_position -= 0.5 * inch
@@ -87,7 +87,7 @@ def create_sample_file(filepath: str, title: str, extension: str):
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write(f"{title}\n")
         f.write("=" * len(title) + "\n\n")
-        f.write(f"Documento de ejemplo generado automáticamente\n\n")
+        f.write("Documento de ejemplo generado automáticamente\n\n")
         f.write(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
         f.write(f"ID único: {uuid.uuid4().hex[:8]}\n\n")
         f.write("Este es un documento de prueba para el sistema RePA.\n")

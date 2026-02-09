@@ -505,9 +505,9 @@ def seed_data():
         # Generar documentos de prueba para todos los usuarios
         try:
             generate_test_documents(db)
-        except ImportError as e:
-            print(f"\n⚠️  No se pudieron generar documentos: falta instalar librerías")
-            print(f"   Ejecuta: pip install reportlab python-docx")
+        except ImportError:
+            print("\n⚠️  No se pudieron generar documentos: falta instalar librerías")
+            print("   Ejecuta: pip install reportlab python-docx")
         except Exception as e:
             print(f"\n❌ Error generando documentos: {e}")
                 

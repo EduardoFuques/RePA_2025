@@ -46,7 +46,7 @@ def create_sample_pdf(filepath: str, title: str, extra_info: dict = None):
             y_position -= 0.3 * inch
         y_position -= 0.2 * inch
     
-    c.drawString(inch, y_position, f"Documento de ejemplo generado automáticamente")
+    c.drawString(inch, y_position, "Documento de ejemplo generado automáticamente")
     y_position -= 0.4 * inch
     c.drawString(inch, y_position, f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
     y_position -= 0.4 * inch
