@@ -15,7 +15,7 @@ def get_user_upload_dir(user_id: str) -> str:
     """Obtener el directorio de uploads para un usuario específico"""
     return os.path.join(UPLOAD_BASE_DIR, user_id)
 
-def create_sample_pdf(filepath: str, title: str):
+def create_sample_pdf(filepath: str, title: str, extra_info: dict = None):
     """Crear un PDF de ejemplo simple"""
     from reportlab.pdfgen import canvas
     from reportlab.lib.pagesizes import letter
@@ -28,19 +28,31 @@ def create_sample_pdf(filepath: str, title: str):
     width, height = letter
     
     # Título
-    c.setFont("Helvetica-Bold", 16)
+    c.setFont("Helvetica-Bold", 18)
     c.drawString(inch, height - inch, title)
     
     # Contenido de ejemplo
     c.setFont("Helvetica", 12)
     y_position = height - 2 * inch
     
+    # Mostrar información adicional si existe
+    if extra_info:
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(inch, y_position, "DATOS DEL DOCUMENTO")
+        y_position -= 0.4 * inch
+        c.setFont("Helvetica", 12)
+        for key, value in extra_info.items():
+            c.drawString(inch, y_position, f"{key}: {value}")
+            y_position -= 0.3 * inch
+        y_position -= 0.2 * inch
+    
     c.drawString(inch, y_position, f"Documento de ejemplo generado automáticamente")
-    y_position -= 0.5 * inch
+    y_position -= 0.4 * inch
     c.drawString(inch, y_position, f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-    y_position -= 0.5 * inch
-    c.drawString(inch, y_position, f"ID único: {uuid.uuid4().hex[:8]}")
-    y_position -= 0.5 * inch
+    y_position -= 0.4 * inch
+    doc_id = uuid.uuid4().hex[:8]
+    c.drawString(inch, y_position, f"ID único del documento: {doc_id}")
+    y_position -= 0.4 * inch
     c.drawString(inch, y_position, "Este es un documento de prueba para el sistema RePA.")
     
     c.save()
@@ -84,8 +96,15 @@ def generate_test_documents(db):
             filename = f"DNI_{pf.apellido}_{pf.nombre}_{uuid.uuid4().hex[:8]}.pdf"
             filepath = os.path.join(get_user_upload_dir(pf.user_id), filename)
             
-            # Crear el PDF
-            create_sample_pdf(filepath, f"DNI - {pf.nombre} {pf.apellido}")
+            # Crear el PDF con datos de la persona
+            extra_info = {
+                "Nombre": pf.nombre or "N/A",
+                "Apellido": pf.apellido or "N/A",
+                "DNI": pf.dni or "N/A",
+                "CUIL": pf.cuil or "N/A",
+                "Email": user.email
+            }
+            create_sample_pdf(filepath, f"DNI - {pf.nombre} {pf.apellido}", extra_info)
             
             # Actualizar la base de datos
             pf.dni_adjunto_path = filename
