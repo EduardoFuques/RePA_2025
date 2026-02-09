@@ -246,20 +246,29 @@ async def get_my_dni(
     """
     from ..models.persona_fisica_model import PersonaFisica
     
+    print(f"[DEBUG] get_my_dni - user_id: {current_user['id']}, email: {current_user.get('email', 'N/A')}")
+    
     # Buscar el DNI en la base de datos
     persona = db.query(PersonaFisica).filter(
         PersonaFisica.user_id == current_user["id"]
     ).first()
     
     if not persona or not persona.dni_adjunto_path:
+        print(f"[DEBUG] No DNI found for user {current_user['id']}")
         raise HTTPException(status_code=404, detail="No hay DNI adjunto")
+    
+    print(f"[DEBUG] DNI path from DB: {persona.dni_adjunto_path}")
     
     # Construir la ruta completa incluyendo el user_id
     file_path = os.path.join(UPLOAD_BASE_DIR, current_user["id"], persona.dni_adjunto_path)
+    print(f"[DEBUG] Full file path: {file_path}")
     
     # Validar que el archivo exista
     if not os.path.exists(file_path):
+        print(f"[DEBUG] File not found at: {file_path}")
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    
+    print(f"[DEBUG] Serving file: {file_path}")
     
     # Devolver archivo
     from fastapi.responses import FileResponse
