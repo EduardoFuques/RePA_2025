@@ -1,15 +1,17 @@
 from fastapi import Request
 from jose import JWTError, jwt
+
+from src.config import ALGORITHM, SECRET_KEY
 from src.logger import logger
-from src.config import SECRET_KEY, ALGORITHM
+
 
 def filtrar_headers_sensibles(headers: dict) -> dict:
     """
     Filtra headers sensibles para no exponerlos en logs.
-    
+
     Args:
         headers: Diccionario de headers HTTP.
-    
+
     Returns:
         dict: Headers filtrados sin datos sensibles.
     """
@@ -24,11 +26,11 @@ async def log_requests(request: Request, call_next):
     """
     Middleware para registrar todas las solicitudes HTTP.
     Filtra datos sensibles como tokens de autorización.
-    
+
     Args:
         request: Objeto Request de FastAPI.
         call_next: Función para continuar con el siguiente middleware.
-    
+
     Returns:
         Response: Respuesta del endpoint.
     """
@@ -45,7 +47,9 @@ async def log_requests(request: Request, call_next):
         try:
             # Decodificar el token para obtener la información del usuario
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            log_dict["user"] = f"User ID: {payload.get('id')}, Email: {payload.get('email')}"
+            log_dict["user"] = (
+                f"User ID: {payload.get('id')}, Email: {payload.get('email')}"
+            )
         except jwt.ExpiredSignatureError:
             # Si el token ha expirado, se registra y se marca el usuario como desconocido
             logger.warning("Token expirado")
@@ -57,7 +61,7 @@ async def log_requests(request: Request, call_next):
     else:
         # Si no hay token, se asume que es una solicitud de un usuario anónimo
         log_dict["user"] = "Anonymous"
-    
+
     logger.info(log_dict, extra=log_dict)
     response = await call_next(request)
     return response

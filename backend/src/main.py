@@ -1,27 +1,27 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
-from sqlalchemy.orm import Session
 from sqlalchemy import text
-
-from src.config import CORS_ORIGINS, API_ROOT_PATH
-from src.logger import logger
-from src.database import get_db, init_db
-from src.middlewarelogg import log_requests
-from src.rate_limiter import limiter, rate_limit_exceeded_handler
+from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.routes.user_routes import user_router
+from src.config import API_ROOT_PATH, CORS_ORIGINS
+from src.database import get_db, init_db
+from src.logger import logger
+from src.middlewarelogg import log_requests
+from src.rate_limiter import limiter, rate_limit_exceeded_handler
 from src.routes.admin_routes import admin_router
-from src.routes.persona_fisica_routes import persona_fisica_router
-from src.routes.persona_juridica_routes import persona_juridica_router
 from src.routes.asociacion_routes import asociacion_router
-from src.routes.obra_audiovisual_routes import obra_audiovisual_router
 from src.routes.esa_routes import esa_router
 from src.routes.exhibicion_routes import exhibicion_router
-from src.routes.upload_routes import upload_router, files_router
-
+from src.routes.obra_audiovisual_routes import obra_audiovisual_router
+from src.routes.persona_fisica_routes import persona_fisica_router
+from src.routes.persona_juridica_routes import persona_juridica_router
+from src.routes.rodaje_routes import rodaje_router
+from src.routes.upload_routes import files_router, upload_router
+from src.routes.user_routes import user_router
 from src.seed import seed_data
 
 
@@ -54,7 +54,7 @@ La API de RePA permite gestionar el registro de:
 
 ### Autenticación
 
-La API utiliza **JWT (JSON Web Tokens)** para autenticación. 
+La API utiliza **JWT (JSON Web Tokens)** para autenticación.
 Para acceder a endpoints protegidos, incluir el header:
 
 ```
@@ -73,7 +73,7 @@ Los endpoints sensibles tienen límites de solicitudes:
 - **IAAviM** - Instituto de Artes Audiovisuales de Misiones
 - **Email**: sistemas@iaavim.gob.ar
     """,
-    version="1.0.1",
+    version="1.2.0",
     contact={
         "name": "IAAviM - Sistemas",
         "url": "https://iaavim.gob.ar",
@@ -85,42 +85,43 @@ Los endpoints sensibles tienen límites de solicitudes:
     openapi_tags=[
         {
             "name": "Users",
-            "description": "Registro, autenticación y gestión de usuarios"
+            "description": "Registro, autenticación y gestión de usuarios",
         },
         {
             "name": "Persona Física",
-            "description": "Formulario de registro para personas físicas del sector audiovisual"
+            "description": "Formulario de registro para personas físicas del sector audiovisual",
         },
         {
             "name": "Persona Jurídica",
-            "description": "Formulario de registro para empresas y productoras audiovisuales"
+            "description": "Formulario de registro para empresas y productoras audiovisuales",
         },
         {
             "name": "Asociación/Colectivo",
-            "description": "Formulario de registro para asociaciones y colectivos audiovisuales"
+            "description": "Formulario de registro para asociaciones y colectivos audiovisuales",
         },
         {
             "name": "Estudiantes ESA",
-            "description": "Registro temporal para estudiantes del sector audiovisual (vigencia 1 año)"
+            "description": "Registro temporal para estudiantes del sector audiovisual (vigencia 1 año)",
         },
         {
             "name": "Obras Audiovisuales (AGAM)",
-            "description": "Registro de obras audiovisuales producidas en Misiones"
+            "description": "Registro de obras audiovisuales producidas en Misiones",
         },
         {
             "name": "Exhibiciones, Salas, Festivales, Cinemateca",
-            "description": "Registro de espacios de exhibición audiovisual"
+            "description": "Registro de espacios de exhibición audiovisual",
+        },
+        {
+            "name": "Comisión de Filmaciones",
+            "description": "Archivo de rodajes, permisos y cartas de aval institucional",
         },
         {
             "name": "Administrator User",
-            "description": "Endpoints de administración (requiere rol admin)"
+            "description": "Endpoints de administración (requiere rol admin)",
         },
-        {
-            "name": "Health",
-            "description": "Endpoints de monitoreo y health checks"
-        },
+        {"name": "Health", "description": "Endpoints de monitoreo y health checks"},
     ],
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Rate limiter
@@ -143,12 +144,25 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
 app.include_router(user_router, prefix="/users", tags=["Users"])
 
 # Rutas de formularios RePA
-app.include_router(persona_fisica_router, prefix="/persona-fisica", tags=["Persona Física"])
-app.include_router(persona_juridica_router, prefix="/persona-juridica", tags=["Persona Jurídica"])
-app.include_router(asociacion_router, prefix="/asociacion", tags=["Asociación/Colectivo"])
-app.include_router(obra_audiovisual_router, prefix="/obras", tags=["Obras Audiovisuales (AGAM)"])
+app.include_router(
+    persona_fisica_router, prefix="/persona-fisica", tags=["Persona Física"]
+)
+app.include_router(
+    persona_juridica_router, prefix="/persona-juridica", tags=["Persona Jurídica"]
+)
+app.include_router(
+    asociacion_router, prefix="/asociacion", tags=["Asociación/Colectivo"]
+)
+app.include_router(
+    obra_audiovisual_router, prefix="/obras", tags=["Obras Audiovisuales (AGAM)"]
+)
 app.include_router(esa_router, prefix="/esa", tags=["Estudiantes ESA"])
-app.include_router(exhibicion_router, prefix="/exhibiciones", tags=["Exhibiciones, Salas, Festivales, Cinemateca"])
+app.include_router(
+    exhibicion_router,
+    prefix="/exhibiciones",
+    tags=["Exhibiciones, Salas, Festivales, Cinemateca"],
+)
+app.include_router(rodaje_router, prefix="/rodajes", tags=["Comisión de Filmaciones"])
 
 # Rutas de Administración
 app.include_router(admin_router, prefix="/admin_user", tags=["Administrator User"])
@@ -156,6 +170,7 @@ app.include_router(admin_router, prefix="/admin_user", tags=["Administrator User
 # Rutas de Upload de archivos
 app.include_router(upload_router, tags=["Upload"])
 app.include_router(files_router, tags=["Files"])
+
 
 @app.get("/")
 def root():
@@ -175,11 +190,11 @@ def health_check(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Health check - DB error: {e}")
         db_status = "unhealthy"
-    
+
     return {
         "status": "healthy" if db_status == "healthy" else "degraded",
         "version": app.version,
-        "database": db_status
+        "database": db_status,
     }
 
 

@@ -1,12 +1,15 @@
-from fastapi import HTTPException, status
 from datetime import datetime, timedelta, timezone
+
+from fastapi import HTTPException, status
 from jose import jwt
 
-from src.config import SECRET_KEY, ALGORITHM
+from src.config import ALGORITHM, SECRET_KEY
+
 ACCESS_TOKEN_EXPIRE = 30  # minutos
 REFRESH_TOKEN_EXPIRE = 7  # días
 
-# Decodificar el token de acceso 
+
+# Decodificar el token de acceso
 def decode_access_token(token: str):
     """
     Decodifica el token de acceso.
@@ -17,7 +20,7 @@ def decode_access_token(token: str):
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        #print(f"Decode_Access_Token:Payload decodificado: {payload}") # Debug
+        # print(f"Decode_Access_Token:Payload decodificado: {payload}") # Debug
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -32,7 +35,8 @@ def decode_access_token(token: str):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-# Decodificar el token de acceso 
+
+# Decodificar el token de acceso
 def decode_refresh_token(token: str):
     """
     Decodifica el token de acceso.
@@ -43,7 +47,7 @@ def decode_refresh_token(token: str):
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        #print(f"Decode_Access_Token:Payload decodificado: {payload}") # Debug
+        # print(f"Decode_Access_Token:Payload decodificado: {payload}") # Debug
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -58,8 +62,14 @@ def decode_refresh_token(token: str):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+
 # Generar un token de acceso
-def create_access_token(data: dict, expires_delta: int = None, type: str = "access", description="Generar un token JWT con los datos del usuario y una fecha de expiración opcional."):
+def create_access_token(
+    data: dict,
+    expires_delta: int = None,
+    type: str = "access",
+    description="Generar un token JWT con los datos del usuario y una fecha de expiración opcional.",
+):
     """
     Genera un access token con expiración corta.
     Args:
@@ -81,7 +91,10 @@ def create_access_token(data: dict, expires_delta: int = None, type: str = "acce
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def create_refresh_token(data: dict, description="Generar un refresh token con expiración larga."):
+
+def create_refresh_token(
+    data: dict, description="Generar un refresh token con expiración larga."
+):
     """
     Genera un refresh token con expiración larga.
     Args:

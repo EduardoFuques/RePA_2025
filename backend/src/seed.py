@@ -4,17 +4,20 @@ Seed de datos de prueba para desarrollo.
 IMPORTANTE: Este módulo NO debe ejecutarse en producción.
 Se deshabilita automáticamente si ENVIRONMENT=production.
 """
+
+from datetime import date, datetime, timedelta, timezone
+
+from passlib.context import CryptContext
+from sqlalchemy.exc import IntegrityError
+
 from src.config import IS_PRODUCTION
-from src.database import init_db, SessionLocal
-from src.models.user_models import Role, User, UserRole
-from src.models.persona_fisica_model import PersonaFisica
-from src.models.persona_juridica_model import PersonaJuridica
+from src.database import SessionLocal, init_db
+from src.document_generator import generate_test_documents
 from src.models.asociacion_model import Asociacion
 from src.models.esa_model import EstudianteESA
-from src.document_generator import generate_test_documents
-from sqlalchemy.exc import IntegrityError
-from passlib.context import CryptContext
-from datetime import date, datetime, timezone, timedelta
+from src.models.persona_fisica_model import PersonaFisica
+from src.models.persona_juridica_model import PersonaJuridica
+from src.models.user_models import Role, User, UserRole
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -38,24 +41,24 @@ TEST_PERSONA_FISICA = {
         "telefono": "+54 376 4123456",
         "domicilio": "Av. Roque Sáenz Peña 1234",
         "municipio": "Posadas",
-        "distrito": "Capital",
+        "distrito": "sur",
         "nivel_educativo": "universitario_completo",
         "trabajo_final": True,
         "titulo_tesis": "Cine documental en la región NEA",
-        "pueblo_originario": False,
+        "pueblo_originario": "no",
         "afrodescendiente": "no",
-        "lgbtiq": False,
-        "discapacidad": False,
+        "lgbtiq": "no",
+        "discapacidad": "no",
         "personas_a_cargo": True,
         "tipo_personas_a_cargo": ["hijos"],
         "principal_fuente_audiovisual": True,
         "relacion_laboral": "autonomo",
-        "inscripto_afip": True,
+        "inscripto_afip": "si",
         "situacion_iva": "monotributo",
         "pertenece_red": True,
         "nombre_red": "Red de Documentalistas del NEA",
         "proyectos_iaavim": True,
-        "conoce_lineas_fomento": True,
+        "conoce_lineas_fomento": "si",
         "interes_formacion": True,
         "areas_capacitacion": "Dirección, Producción, Guión",
         "interes_difusion": True,
@@ -63,6 +66,10 @@ TEST_PERSONA_FISICA = {
         "subperfiles_seleccionados": ["productor", "director", "documentalista"],
         "acepta_terminos": True,
         "portfolio_link": "https://portfolio.mariagonzalez.com.ar",
+        "redes_sociales": [
+            "https://instagram.com/mariagonzalez",
+            "https://linkedin.com/in/mariagonzalez",
+        ],
         "declaracion_inicial": True,
     },
     "usuario1@repa.gob.ar": {
@@ -75,29 +82,31 @@ TEST_PERSONA_FISICA = {
         "telefono": "+54 376 4567890",
         "domicilio": "Calle Bolívar 567",
         "municipio": "Oberá",
-        "distrito": "Oberá",
+        "distrito": "norte",
         "nivel_educativo": "terciario_completo",
         "trabajo_final": False,
-        "pueblo_originario": True,
+        "pueblo_originario": "si",
         "cual_pueblo": "Mbya Guaraní",
         "afrodescendiente": "no",
-        "lgbtiq": False,
-        "discapacidad": False,
+        "lgbtiq": "no",
+        "discapacidad": "no",
         "personas_a_cargo": False,
         "principal_fuente_audiovisual": False,
         "otra_fuente": "Docencia",
-        "relacion_laboral": "relacion_dependencia",
-        "inscripto_afip": True,
+        "relacion_laboral": "dependencia",
+        "inscripto_afip": "si",
         "situacion_iva": "exento",
         "pertenece_red": False,
         "proyectos_iaavim": False,
-        "conoce_lineas_fomento": True,
+        "conoce_lineas_fomento": "parcialmente",
         "interes_formacion": True,
         "areas_capacitacion": "Fotografía, Sonido",
         "interes_difusion": True,
         "interes_experto_iaavim": False,
         "subperfiles_seleccionados": ["tecnicoArtistico", "capacitador"],
         "acepta_terminos": True,
+        "portfolio_link": "https://juancarlos.portfolio.com",
+        "redes_sociales": ["https://instagram.com/juancarlosrodriguez"],
         "declaracion_inicial": True,
     },
     "usuario2@repa.gob.ar": {
@@ -110,22 +119,22 @@ TEST_PERSONA_FISICA = {
         "telefono": "+54 376 4789012",
         "domicilio": "Av. Libertador 890",
         "municipio": "Eldorado",
-        "distrito": "Eldorado",
+        "distrito": "norte",
         "nivel_educativo": "universitario_incompleto",
         "trabajo_final": False,
-        "pueblo_originario": False,
+        "pueblo_originario": "no",
         "afrodescendiente": "prefiere_no_responder",
-        "lgbtiq": True,
-        "discapacidad": False,
+        "lgbtiq": "si",
+        "discapacidad": "no",
         "personas_a_cargo": False,
         "principal_fuente_audiovisual": True,
         "relacion_laboral": "autonomo",
-        "inscripto_afip": True,
+        "inscripto_afip": "si",
         "situacion_iva": "monotributo",
         "pertenece_red": True,
         "nombre_red": "Colectivo Audiovisual Misiones",
         "proyectos_iaavim": True,
-        "conoce_lineas_fomento": True,
+        "conoce_lineas_fomento": "si",
         "interes_formacion": True,
         "areas_capacitacion": "Guión, Dirección de actores",
         "interes_difusion": True,
@@ -133,6 +142,10 @@ TEST_PERSONA_FISICA = {
         "subperfiles_seleccionados": ["guionista", "director", "realizadorIntegral"],
         "acepta_terminos": True,
         "portfolio_link": "https://vimeo.com/lucianafernandez",
+        "redes_sociales": [
+            "https://twitter.com/lucifernandez",
+            "https://behance.net/lucianaf",
+        ],
         "declaracion_inicial": True,
     },
     "usuario3@repa.gob.ar": {
@@ -145,31 +158,32 @@ TEST_PERSONA_FISICA = {
         "telefono": "+54 376 4345678",
         "domicilio": "Calle San Martín 123",
         "municipio": "Apóstoles",
-        "distrito": "Apóstoles",
+        "distrito": "sur",
         "nivel_educativo": "posgrado",
         "trabajo_final": True,
         "titulo_tesis": "Historia del cine misionero 1960-2000",
-        "pueblo_originario": False,
+        "pueblo_originario": "no",
         "afrodescendiente": "no",
-        "lgbtiq": False,
-        "discapacidad": True,
+        "lgbtiq": "no",
+        "discapacidad": "si",
         "tipo_discapacidad": "Motriz",
         "personas_a_cargo": True,
         "tipo_personas_a_cargo": ["adultos_mayores"],
         "principal_fuente_audiovisual": True,
         "relacion_laboral": "autonomo",
-        "inscripto_afip": True,
+        "inscripto_afip": "si",
         "situacion_iva": "responsable_inscripto",
         "pertenece_red": True,
         "nombre_red": "Asociación de Investigadores Audiovisuales",
         "proyectos_iaavim": True,
-        "conoce_lineas_fomento": True,
+        "conoce_lineas_fomento": "si",
         "interes_formacion": False,
         "interes_difusion": True,
         "interes_experto_iaavim": True,
         "subperfiles_seleccionados": ["investigador", "documentalista", "capacitador"],
         "acepta_terminos": True,
         "portfolio_link": "https://academia.edu/pedromartinez",
+        "redes_sociales": ["https://researchgate.net/pedromartinez"],
         "declaracion_inicial": True,
     },
 }
@@ -184,10 +198,13 @@ TEST_PERSONA_JURIDICA = {
         "objeto_social": "Producción, distribución y comercialización de contenidos audiovisuales. Prestación de servicios de producción cinematográfica y televisiva.",
         "domicilio_legal": "Av. Corrientes 1500, Piso 3",
         "localidad": "Posadas",
-        "distrito": "Capital",
+        "distrito": "sur",
         "telefono_institucional": "+54 376 4400100",
         "email_contacto": "contacto@prodlitoral.com.ar",
-        "web_redes": ["https://prodlitoral.com.ar", "https://instagram.com/prodlitoral"],
+        "web_redes": [
+            "https://prodlitoral.com.ar",
+            "https://instagram.com/prodlitoral",
+        ],
         "nombre_representante": "María González",
         "dni_representante": "30123456",
         "cargo_representante": "Socia Gerente",
@@ -211,7 +228,7 @@ TEST_PERSONA_JURIDICA = {
         "objeto_social": "Producción audiovisual comunitaria, formación y capacitación en oficios audiovisuales, exhibición de cine regional.",
         "domicilio_legal": "Calle Libertad 234",
         "localidad": "Oberá",
-        "distrito": "Oberá",
+        "distrito": "norte",
         "telefono_institucional": "+54 3755 421000",
         "email_contacto": "coop.audiovisual.obera@gmail.com",
         "web_redes": ["https://facebook.com/coopaudiovisualobera"],
@@ -239,7 +256,7 @@ TEST_ASOCIACION = {
         "cuit": None,
         "domicilio": "Calle Junín 456",
         "localidad": "Eldorado",
-        "distrito": "Eldorado",
+        "distrito": "norte",
         "telefono": "+54 3751 420500",
         "email": "colectivoaudiovisualmisiones@gmail.com",
         "web": "https://instagram.com/colectivoaudiovisualmisiones",
@@ -270,7 +287,7 @@ TEST_ASOCIACION = {
         "cuit": "30-71890123-5",
         "domicilio": "Av. Mitre 789",
         "localidad": "Apóstoles",
-        "distrito": "Apóstoles",
+        "distrito": "sur",
         "telefono": "+54 3758 422000",
         "email": "aiam.misiones@gmail.com",
         "web": "https://aiam.org.ar",
@@ -355,16 +372,17 @@ TEST_ESA = {
     },
 }
 
+
 def seed_data():
     """
     Carga datos de prueba en la base de datos.
-    
+
     IMPORTANTE: No se ejecuta si ENVIRONMENT=production.
     Solo crea roles básicos en producción.
     """
     # Inicializa las tablas
     init_db()
-    
+
     if IS_PRODUCTION:
         # En producción, solo crear roles si no existen
         db = SessionLocal()
@@ -375,7 +393,9 @@ def seed_data():
                 db.commit()
                 print("✓ Roles creados en producción: admin, user")
             else:
-                print("- Roles ya existen, seed de datos de prueba omitido (producción)")
+                print(
+                    "- Roles ya existen, seed de datos de prueba omitido (producción)"
+                )
         finally:
             db.close()
         return  # No cargar datos de prueba en producción
@@ -385,18 +405,15 @@ def seed_data():
     try:
         # Seed de roles
         if not db.query(Role).first():
-            roles = [
-                Role(rol="admin"),
-                Role(rol="user")
-            ]
+            roles = [Role(rol="admin"), Role(rol="user")]
             db.add_all(roles)
             db.commit()
             print("✓ Roles creados: admin, user")
-        
+
         # Seed de usuarios de prueba
         admin_role = db.query(Role).filter(Role.rol == "admin").first()
         user_role = db.query(Role).filter(Role.rol == "user").first()
-        
+
         for test_user in TEST_USERS:
             existing = db.query(User).filter(User.email == test_user["email"]).first()
             if not existing:
@@ -404,28 +421,32 @@ def seed_data():
                 new_user = User(
                     email=test_user["email"],
                     hashed_password=hashed_password,
-                    is_active=True
+                    is_active=True,
                 )
                 db.add(new_user)
                 db.commit()
                 db.refresh(new_user)
-                
+
                 # Asignar rol
                 role = admin_role if test_user["role"] == "admin" else user_role
                 if role:
                     user_role_entry = UserRole(user_id=new_user.id, role_id=role.id)
                     db.add(user_role_entry)
                     db.commit()
-                
+
                 print(f"✓ Usuario creado: {test_user['email']} ({test_user['role']})")
             else:
                 print(f"- Usuario ya existe: {test_user['email']}")
-                
+
         # Seed de Persona Física para usuarios de prueba
         for email, pf_data in TEST_PERSONA_FISICA.items():
             user = db.query(User).filter(User.email == email).first()
             if user:
-                existing_pf = db.query(PersonaFisica).filter(PersonaFisica.user_id == user.id).first()
+                existing_pf = (
+                    db.query(PersonaFisica)
+                    .filter(PersonaFisica.user_id == user.id)
+                    .first()
+                )
                 if not existing_pf:
                     pf = PersonaFisica(user_id=user.id, **pf_data)
                     db.add(pf)
@@ -433,12 +454,16 @@ def seed_data():
                     print(f"✓ Persona Física creada para: {email}")
                 else:
                     print(f"- Persona Física ya existe para: {email}")
-        
+
         # Seed de Persona Jurídica
         for email, pj_data in TEST_PERSONA_JURIDICA.items():
             user = db.query(User).filter(User.email == email).first()
             if user:
-                existing_pj = db.query(PersonaJuridica).filter(PersonaJuridica.user_id == user.id).first()
+                existing_pj = (
+                    db.query(PersonaJuridica)
+                    .filter(PersonaJuridica.user_id == user.id)
+                    .first()
+                )
                 if not existing_pj:
                     pj = PersonaJuridica(user_id=user.id, **pj_data)
                     db.add(pj)
@@ -446,12 +471,14 @@ def seed_data():
                     print(f"✓ Persona Jurídica creada para: {email}")
                 else:
                     print(f"- Persona Jurídica ya existe para: {email}")
-        
+
         # Seed de Asociación/Colectivo
         for email, as_data in TEST_ASOCIACION.items():
             user = db.query(User).filter(User.email == email).first()
             if user:
-                existing_as = db.query(Asociacion).filter(Asociacion.user_id == user.id).first()
+                existing_as = (
+                    db.query(Asociacion).filter(Asociacion.user_id == user.id).first()
+                )
                 if not existing_as:
                     asoc = Asociacion(user_id=user.id, **as_data)
                     db.add(asoc)
@@ -459,7 +486,7 @@ def seed_data():
                     print(f"✓ Asociación creada para: {email}")
                 else:
                     print(f"- Asociación ya existe para: {email}")
-        
+
         # Seed de usuarios ESA
         for test_user in TEST_ESA_USERS:
             existing = db.query(User).filter(User.email == test_user["email"]).first()
@@ -468,40 +495,46 @@ def seed_data():
                 new_user = User(
                     email=test_user["email"],
                     hashed_password=hashed_password,
-                    is_active=True
+                    is_active=True,
                 )
                 db.add(new_user)
                 db.commit()
                 db.refresh(new_user)
-                
+
                 if user_role:
-                    user_role_entry = UserRole(user_id=new_user.id, role_id=user_role.id)
+                    user_role_entry = UserRole(
+                        user_id=new_user.id, role_id=user_role.id
+                    )
                     db.add(user_role_entry)
                     db.commit()
-                
+
                 print(f"✓ Usuario ESA creado: {test_user['email']}")
             else:
                 print(f"- Usuario ESA ya existe: {test_user['email']}")
-        
+
         # Seed de Estudiantes ESA
         for email, esa_data in TEST_ESA.items():
             user = db.query(User).filter(User.email == email).first()
             if user:
-                existing_esa = db.query(EstudianteESA).filter(EstudianteESA.user_id == user.id).first()
+                existing_esa = (
+                    db.query(EstudianteESA)
+                    .filter(EstudianteESA.user_id == user.id)
+                    .first()
+                )
                 if not existing_esa:
                     fecha_alta = datetime.now(timezone.utc)
                     esa = EstudianteESA(
                         user_id=user.id,
                         fecha_alta=fecha_alta,
                         fecha_vencimiento=fecha_alta + timedelta(days=365),
-                        **esa_data
+                        **esa_data,
                     )
                     db.add(esa)
                     db.commit()
                     print(f"✓ Estudiante ESA creado para: {email}")
                 else:
                     print(f"- Estudiante ESA ya existe para: {email}")
-                
+
         # Generar documentos de prueba para todos los usuarios
         try:
             generate_test_documents(db)
@@ -510,12 +543,13 @@ def seed_data():
             print("   Ejecuta: pip install reportlab python-docx")
         except Exception as e:
             print(f"\n❌ Error generando documentos: {e}")
-                
+
     except IntegrityError as e:
         db.rollback()
         print(f"✗ Error: {e}")
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     seed_data()

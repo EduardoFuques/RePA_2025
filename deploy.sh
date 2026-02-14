@@ -11,6 +11,17 @@ FRONTEND_BRANCH="main"
 echo "=== Deploy RePA ==="
 echo ""
 
+# Cargar versiones desde .version
+if [ -f .version ]; then
+  source .version
+  echo "Versiones: Backend=$BACKEND_VERSION Frontend=$FRONTEND_VERSION"
+else
+  echo "⚠ Archivo .version no encontrado, usando 'latest'"
+  export BACKEND_VERSION=latest
+  export FRONTEND_VERSION=latest
+fi
+echo ""
+
 # Detener contenedores existentes
 echo "Deteniendo contenedores..."
 docker compose down
@@ -54,6 +65,24 @@ for i in {1..6}; do
   sleep 5
 done
 
+# Esperar a que el Backend esté healthy (máx 60s)
+echo "Esperando a que el Backend esté healthy..."
+for i in {1..12}; do
+  if docker compose ps backend | grep -q "healthy"; then
+    echo "✓ Backend healthy"
+    break
+  fi
+  if [ $i -eq 12 ]; then
+    echo "❌ Backend no alcanzó estado healthy"
+    echo ""
+    echo "=== Logs del backend ==="
+    docker compose logs backend --tail=50
+    exit 1
+  fi
+  echo "  Esperando Backend... ($i/12)"
+  sleep 5
+done
+
 # Verificar estado
 echo ""
 echo "=== Estado de los contenedores ==="
@@ -74,6 +103,7 @@ docker compose logs backend --tail 10
 
 echo ""
 echo "=== Deploy completado ==="
+echo "Versiones: Backend=$BACKEND_VERSION Frontend=$FRONTEND_VERSION"
 echo "Frontend: http://localhost (puerto 80)"
 echo "API: http://localhost/api (proxy al backend)"
 echo "Adminer: http://localhost:8081 (solo desde el servidor)"

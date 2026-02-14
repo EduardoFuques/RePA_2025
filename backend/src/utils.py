@@ -1,14 +1,16 @@
+import re
 from datetime import datetime, timezone
+
 from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
-from src.models.user_models import User
-from src.schemas.user_schemas import UserUpdate
+from sqlalchemy.orm import Session
+
 from src.database import get_db
 from src.logger import logger
+from src.models.user_models import User
+from src.schemas.user_schemas import UserUpdate
 from src.token_utils import decode_access_token
-import re
 
 # Objeto necesario para la función de 'get_current_user' que valida los datos del usuario
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/token")
@@ -16,12 +18,18 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/token")
 # Configuración de passlib
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 # Hashear la contraseña
 def get_password_hash(password: str):
     return pwd_context.hash(password)
 
+
 # Actualizar último acceso... Esto se debe integrar a la ruta de logín del usuario.
-def update_last_login(email: str, db: Session = Depends(get_db), description="Actualiza en el registro de usuario, fecha y hora del login."):
+def update_last_login(
+    email: str,
+    db: Session = Depends(get_db),
+    description="Actualiza en el registro de usuario, fecha y hora del login.",
+):
     """
     Actualiza en el registro de usuario, fecha y hora del login.
     """
@@ -34,6 +42,7 @@ def update_last_login(email: str, db: Session = Depends(get_db), description="Ac
     db.refresh(db_user)
     return db_user
 
+
 # Validar el usuario
 async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)):
     """
@@ -42,15 +51,16 @@ async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)
 
     payload = decode_access_token(token)
     logger.debug(f"get_current_user - payload: {payload}")
-    
+
     user_data = {
         "id": payload.get("sub"),
         "email": payload.get("email"),
         "roles": payload.get("roles"),
-        "type": payload.get("type")
+        "type": payload.get("type"),
     }
     logger.debug(f"get_current_user - user_data: {user_data}")
     return user_data
+
 
 def validar_password(password: str):
     """
@@ -75,6 +85,7 @@ def validar_password(password: str):
             detail="La contraseña debe contener al menos un número",
         )
 
+
 # Verifica si el usuario tiene al menos uno de los roles requeridos
 def has_user_role(current_user: dict, required_roles: list[str]) -> bool:
     """
@@ -88,19 +99,33 @@ def has_user_role(current_user: dict, required_roles: list[str]) -> bool:
         bool: True si tiene al menos un rol requerido, False en caso contrario
     """
     logger.debug(f"has_user_role - current_user: {current_user}")
-    
+
     # Extraer los nombres de los roles del usuario en minúsculas
     user_roles = {role["rol"].lower() for role in current_user.get("roles", [])}
     logger.debug(f"has_user_role - user_roles: {user_roles}")
     # Convertir los roles requeridos a minúsculas para comparación insensible a mayúsculas/minúsculas
     required_roles_lower = {role.lower() for role in required_roles}
     logger.debug(f"has_user_role - required_roles_lower: {required_roles_lower}")
-    
+
     hsa_role = user_roles.isdisjoint(required_roles_lower)
     logger.debug(f"has_user_role - hsa_role: {hsa_role}")
-    
+
     # Verificar si hay intersección entre los roles del usuario y los roles requeridos
     return not user_roles.isdisjoint(required_roles_lower)
+
+
+# Verifica que el usuario tenga rol de administrador
+def check_admin_role(current_user: dict):
+    """
+    Verifica que el usuario tenga rol de administrador.
+    Lanza HTTPException 403 si no tiene permisos.
+    """
+    if not has_user_role(current_user, ["admin"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos de administrador para realizar esta acción",
+        )
+
 
 # Verifica que el nuevo email no esté siendo usado por otro usuario
 def verify_email_unique(db: Session, user_in: UserUpdate, current_user: dict):
@@ -119,5 +144,5 @@ def verify_email_unique(db: Session, user_in: UserUpdate, current_user: dict):
     if existing_user and existing_user.id != current_user["id"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo electrónico ya está registrado por otro usuario"
+            detail="El correo electrónico ya está registrado por otro usuario",
         )
