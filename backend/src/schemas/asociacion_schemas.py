@@ -1,50 +1,55 @@
 # schemas/asociacion_schemas.py
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import List, Optional
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
 
 # === INTEGRANTE ===
 class IntegranteAsociacionBase(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=200)
-    dni: Optional[str] = Field(None, max_length=20)
-    rol: Optional[str] = Field(None, max_length=100)
-    email: Optional[EmailStr] = None
+    dni: str | None = Field(None, max_length=20)
+    rol: str | None = Field(None, max_length=100)
+    email: EmailStr | None = None
     vinculado_repa: bool = False
+
 
 class IntegranteAsociacionCreate(IntegranteAsociacionBase):
     pass
 
+
 class IntegranteAsociacionOut(IntegranteAsociacionBase):
     id: int
     asociacion_id: int
-    
+
     model_config = ConfigDict(from_attributes=True)
+
 
 # === SCHEMA PRINCIPAL ===
 class AsociacionCreate(BaseModel):
     """Schema para crear una Asociación/Colectivo"""
+
     declaracion_inicial: bool = True
-    
+
     # Datos básicos y contacto - permitidos null para borradores
-    nombre_asociacion: Optional[str] = Field(None, max_length=255)
-    anio_creacion: Optional[int] = None
-    personeria_juridica: Optional[str] = None
-    tipo_personeria: Optional[str] = None
-    otra_personeria: Optional[str] = None
-    cuit: Optional[str] = Field(None, max_length=15)
-    domicilio: Optional[str] = Field(None, max_length=255)
-    localidad: Optional[str] = Field(None, max_length=100)
-    distrito: Optional[str] = Field(None, max_length=50)
-    telefono: Optional[str] = Field(None, max_length=30)
-    email: Optional[EmailStr] = None
-    web: Optional[str] = Field(None, max_length=500)
-    
+    nombre_asociacion: str | None = Field(None, max_length=255)
+    anio_creacion: int | None = None
+    personeria_juridica: str | None = None
+    tipo_personeria: str | None = None
+    otra_personeria: str | None = None
+    cuit: str | None = Field(None, max_length=15)
+    domicilio: str | None = Field(None, max_length=255)
+    localidad: str | None = Field(None, max_length=100)
+    distrito: str | None = Field(None, max_length=50)
+    telefono: str | None = Field(None, max_length=30)
+    email: EmailStr | None = None
+    web: str | None = Field(None, max_length=500)
+
     # Representación
-    nombre_referente: Optional[str] = Field(None, max_length=200)
-    rol_referente: Optional[str] = Field(None, max_length=100)
-    telefono_referente: Optional[str] = Field(None, max_length=30)
-    email_referente: Optional[EmailStr] = None
-    
+    nombre_referente: str | None = Field(None, max_length=200)
+    rol_referente: str | None = Field(None, max_length=100)
+    telefono_referente: str | None = Field(None, max_length=30)
+    email_referente: EmailStr | None = None
+
     # Ámbitos de actuación
     ambito_produccion: bool = False
     ambito_formacion: bool = False
@@ -54,15 +59,15 @@ class AsociacionCreate(BaseModel):
     ambito_comunidad: bool = False
     ambito_investigacion: bool = False
     ambito_otro: bool = False
-    otro_ambito: Optional[str] = None
-    
+    otro_ambito: str | None = None
+
     # Objetivos e integrantes
-    objetivos: Optional[str] = None
-    cantidad_integrantes: Optional[int] = None
-    articulo_iaavim: Optional[str] = None
-    descripcion_articulacion: Optional[str] = None
-    info_adicional_integrantes: Optional[str] = None
-    
+    objetivos: str | None = None
+    cantidad_integrantes: int | None = None
+    articulo_iaavim: str | None = None
+    descripcion_articulacion: str | None = None
+    info_adicional_integrantes: str | None = None
+
     # Consentimiento
     consentimiento: bool = False
     borrador: bool = False
@@ -70,73 +75,75 @@ class AsociacionCreate(BaseModel):
 
 class AsociacionUpdate(BaseModel):
     """Schema para actualizar una Asociación/Colectivo"""
+
     # Datos básicos y contacto
-    nombre_asociacion: Optional[str] = Field(None, max_length=255)
-    anio_creacion: Optional[int] = None
-    personeria_juridica: Optional[str] = None
-    tipo_personeria: Optional[str] = None
-    otra_personeria: Optional[str] = None
-    cuit: Optional[str] = Field(None, max_length=15)
-    domicilio: Optional[str] = Field(None, max_length=255)
-    localidad: Optional[str] = Field(None, max_length=100)
-    distrito: Optional[str] = Field(None, max_length=50)
-    telefono: Optional[str] = Field(None, max_length=30)
-    email: Optional[EmailStr] = None
-    web: Optional[str] = Field(None, max_length=500)
-    
+    nombre_asociacion: str | None = Field(None, max_length=255)
+    anio_creacion: int | None = None
+    personeria_juridica: str | None = None
+    tipo_personeria: str | None = None
+    otra_personeria: str | None = None
+    cuit: str | None = Field(None, max_length=15)
+    domicilio: str | None = Field(None, max_length=255)
+    localidad: str | None = Field(None, max_length=100)
+    distrito: str | None = Field(None, max_length=50)
+    telefono: str | None = Field(None, max_length=30)
+    email: EmailStr | None = None
+    web: str | None = Field(None, max_length=500)
+
     # Representación
-    nombre_referente: Optional[str] = Field(None, max_length=200)
-    rol_referente: Optional[str] = Field(None, max_length=100)
-    telefono_referente: Optional[str] = Field(None, max_length=30)
-    email_referente: Optional[EmailStr] = None
-    
+    nombre_referente: str | None = Field(None, max_length=200)
+    rol_referente: str | None = Field(None, max_length=100)
+    telefono_referente: str | None = Field(None, max_length=30)
+    email_referente: EmailStr | None = None
+
     # Ámbitos de actuación
-    ambito_produccion: Optional[bool] = None
-    ambito_formacion: Optional[bool] = None
-    ambito_exhibicion: Optional[bool] = None
-    ambito_comunicacion: Optional[bool] = None
-    ambito_distribucion: Optional[bool] = None
-    ambito_comunidad: Optional[bool] = None
-    ambito_investigacion: Optional[bool] = None
-    ambito_otro: Optional[bool] = None
-    otro_ambito: Optional[str] = None
-    
+    ambito_produccion: bool | None = None
+    ambito_formacion: bool | None = None
+    ambito_exhibicion: bool | None = None
+    ambito_comunicacion: bool | None = None
+    ambito_distribucion: bool | None = None
+    ambito_comunidad: bool | None = None
+    ambito_investigacion: bool | None = None
+    ambito_otro: bool | None = None
+    otro_ambito: str | None = None
+
     # Objetivos e integrantes
-    objetivos: Optional[str] = None
-    cantidad_integrantes: Optional[int] = None
-    articulo_iaavim: Optional[str] = None
-    descripcion_articulacion: Optional[str] = None
-    info_adicional_integrantes: Optional[str] = None
-    consentimiento: Optional[bool] = None
-    declaracion_inicial: Optional[bool] = None
-    borrador: Optional[bool] = None
+    objetivos: str | None = None
+    cantidad_integrantes: int | None = None
+    articulo_iaavim: str | None = None
+    descripcion_articulacion: str | None = None
+    info_adicional_integrantes: str | None = None
+    consentimiento: bool | None = None
+    declaracion_inicial: bool | None = None
+    borrador: bool | None = None
 
 
 class AsociacionOut(BaseModel):
     """Schema de salida para Asociación/Colectivo"""
+
     id: int
     user_id: str
-    
+
     # Datos básicos y contacto
     nombre_asociacion: str
-    anio_creacion: Optional[int] = None
-    personeria_juridica: Optional[str] = None
-    tipo_personeria: Optional[str] = None
-    otra_personeria: Optional[str] = None
-    cuit: Optional[str] = None
+    anio_creacion: int | None = None
+    personeria_juridica: str | None = None
+    tipo_personeria: str | None = None
+    otra_personeria: str | None = None
+    cuit: str | None = None
     domicilio: str
     localidad: str
     distrito: str
-    telefono: Optional[str] = None
+    telefono: str | None = None
     email: str
-    web: Optional[str] = None
-    
+    web: str | None = None
+
     # Representación
     nombre_referente: str
-    rol_referente: Optional[str] = None
-    telefono_referente: Optional[str] = None
-    email_referente: Optional[str] = None
-    
+    rol_referente: str | None = None
+    telefono_referente: str | None = None
+    email_referente: str | None = None
+
     # Ámbitos de actuación
     ambito_produccion: bool
     ambito_formacion: bool
@@ -146,29 +153,29 @@ class AsociacionOut(BaseModel):
     ambito_comunidad: bool
     ambito_investigacion: bool
     ambito_otro: bool
-    otro_ambito: Optional[str] = None
-    
+    otro_ambito: str | None = None
+
     # Objetivos e integrantes
-    objetivos: Optional[str] = None
-    cantidad_integrantes: Optional[int] = None
-    articulo_iaavim: Optional[str] = None
-    descripcion_articulacion: Optional[str] = None
-    info_adicional_integrantes: Optional[str] = None
-    
+    objetivos: str | None = None
+    cantidad_integrantes: int | None = None
+    articulo_iaavim: str | None = None
+    descripcion_articulacion: str | None = None
+    info_adicional_integrantes: str | None = None
+
     # Documentación (paths)
-    acta_constitucion_path: Optional[str] = None
-    declaracion_objetivos_path: Optional[str] = None
-    
+    acta_constitucion_path: str | None = None
+    declaracion_objetivos_path: str | None = None
+
     # Consentimiento
     consentimiento: bool
     declaracion_inicial: bool
     borrador: bool
-    
+
     # Metadatos
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
     # Integrantes
-    integrantes: List[IntegranteAsociacionOut] = []
-    
+    integrantes: list[IntegranteAsociacionOut] = []
+
     model_config = ConfigDict(from_attributes=True)

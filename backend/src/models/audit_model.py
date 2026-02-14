@@ -3,9 +3,11 @@ Modelo de Audit Trail para registrar acciones de usuarios.
 
 Permite rastrear quién hizo qué, cuándo y sobre qué recurso.
 """
-from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey
-from sqlalchemy.orm import relationship
+
 from datetime import datetime, timezone
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
 
 from src.database import Base
 
@@ -13,7 +15,7 @@ from src.database import Base
 class AuditLog(Base):
     """
     Modelo para registrar acciones de auditoría.
-    
+
     Attributes:
         id: Identificador único del registro.
         user_id: ID del usuario que realizó la acción.
@@ -25,8 +27,9 @@ class AuditLog(Base):
         user_agent: User-Agent del navegador.
         created_at: Fecha y hora de la acción.
     """
+
     __tablename__ = "audit_logs"
-    
+
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
     action = Column(String(50), nullable=False, index=True)
@@ -35,8 +38,10 @@ class AuditLog(Base):
     details = Column(Text, nullable=True)
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(String(500), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
-    
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
+
     # Relación con User (opcional, puede ser acción anónima)
     user = relationship("User", backref="audit_logs")
 
@@ -44,6 +49,7 @@ class AuditLog(Base):
 # Constantes para tipos de acción
 class AuditAction:
     """Constantes para tipos de acción de auditoría."""
+
     CREATE = "CREATE"
     UPDATE = "UPDATE"
     DELETE = "DELETE"

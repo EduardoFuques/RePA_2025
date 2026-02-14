@@ -1,167 +1,173 @@
 # schemas/obra_audiovisual_schemas.py
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 # === EQUIPO TÉCNICO ===
 class EquipoTecnicoBase(BaseModel):
     rol: str = Field(..., min_length=1, max_length=100)
     nombre: str = Field(..., min_length=1, max_length=200)
-    en_repa: Optional[str] = None
-    codigo_repa: Optional[str] = None
+    en_repa: str | None = None
+    codigo_repa: str | None = None
+
 
 class EquipoTecnicoCreate(EquipoTecnicoBase):
     pass
 
+
 class EquipoTecnicoOut(EquipoTecnicoBase):
     id: int
     obra_id: int
-    
+
     model_config = ConfigDict(from_attributes=True)
+
 
 # === SCHEMA PRINCIPAL ===
 class ObraAudiovisualCreate(BaseModel):
     """Schema para crear una Obra Audiovisual (AGAM)"""
-    
+
     # Identificación
     titulo: str = Field(..., min_length=1, max_length=255)
-    anio_estreno: Optional[int] = None
-    anio_ingreso: Optional[int] = None
-    duracion_minutos: Optional[int] = None
-    tipo_produccion: Optional[str] = None
-    extension: Optional[str] = None
-    formato_narrativo: Optional[str] = None
-    genero: Optional[str] = None
-    subgenero: Optional[str] = None
-    medio: Optional[str] = None
-    
+    anio_estreno: int | None = None
+    anio_ingreso: int | None = None
+    duracion_minutos: int | None = None
+    tipo_produccion: str | None = None
+    extension: str | None = None
+    formato_narrativo: str | None = None
+    genero: str | None = None
+    subgenero: str | None = None
+    medio: str | None = None
+
     # Datos técnicos
-    formatos_disponibles: Optional[List[str]] = None
-    otro_formato: Optional[str] = None
-    resolucion: Optional[str] = None
-    idioma_original: Optional[str] = None
-    subtitulos: Optional[str] = None
-    uso_material: Optional[List[str]] = None
-    otro_uso: Optional[str] = None
-    ubicacion: Optional[str] = None
-    
+    formatos_disponibles: list[str] | None = None
+    otro_formato: str | None = None
+    resolucion: str | None = None
+    idioma_original: str | None = None
+    subtitulos: str | None = None
+    uso_material: list[str] | None = None
+    otro_uso: str | None = None
+    ubicacion: str | None = None
+
     # Datos relacionales
-    productora_responsable: Optional[str] = None
-    codigo_repa_productora: Optional[str] = None
-    participo_fomento: Optional[str] = None
-    lineas_fomento: Optional[List[str]] = None
-    otro_fomento: Optional[str] = None
-    registro_obra_nacional: Optional[str] = None
-    vinculos_areas: Optional[List[str]] = None
-    
+    productora_responsable: str | None = None
+    codigo_repa_productora: str | None = None
+    participo_fomento: str | None = None
+    lineas_fomento: list[str] | None = None
+    otro_fomento: str | None = None
+    registro_obra_nacional: str | None = None
+    vinculos_areas: list[str] | None = None
+
     # Derechos
-    autoriza_exhibicion: Optional[str] = None
-    autoriza_investigacion: Optional[str] = None
-    convenio_cesion: Optional[str] = None
-    restricciones: Optional[str] = None
-    
+    autoriza_exhibicion: str | None = None
+    autoriza_investigacion: str | None = None
+    convenio_cesion: str | None = None
+    restricciones: str | None = None
+
     # Equipo técnico (opcional en creación, se puede agregar después)
-    equipo_tecnico: Optional[List[EquipoTecnicoCreate]] = None
+    equipo_tecnico: list[EquipoTecnicoCreate] | None = None
 
 
 class ObraAudiovisualUpdate(BaseModel):
     """Schema para actualizar una Obra Audiovisual"""
-    
+
     # Identificación
-    titulo: Optional[str] = Field(None, max_length=255)
-    anio_estreno: Optional[int] = None
-    anio_ingreso: Optional[int] = None
-    duracion_minutos: Optional[int] = None
-    tipo_produccion: Optional[str] = None
-    extension: Optional[str] = None
-    formato_narrativo: Optional[str] = None
-    genero: Optional[str] = None
-    subgenero: Optional[str] = None
-    medio: Optional[str] = None
-    
+    titulo: str | None = Field(None, max_length=255)
+    anio_estreno: int | None = None
+    anio_ingreso: int | None = None
+    duracion_minutos: int | None = None
+    tipo_produccion: str | None = None
+    extension: str | None = None
+    formato_narrativo: str | None = None
+    genero: str | None = None
+    subgenero: str | None = None
+    medio: str | None = None
+
     # Datos técnicos
-    formatos_disponibles: Optional[List[str]] = None
-    otro_formato: Optional[str] = None
-    resolucion: Optional[str] = None
-    idioma_original: Optional[str] = None
-    subtitulos: Optional[str] = None
-    uso_material: Optional[List[str]] = None
-    otro_uso: Optional[str] = None
-    ubicacion: Optional[str] = None
-    
+    formatos_disponibles: list[str] | None = None
+    otro_formato: str | None = None
+    resolucion: str | None = None
+    idioma_original: str | None = None
+    subtitulos: str | None = None
+    uso_material: list[str] | None = None
+    otro_uso: str | None = None
+    ubicacion: str | None = None
+
     # Datos relacionales
-    productora_responsable: Optional[str] = None
-    codigo_repa_productora: Optional[str] = None
-    participo_fomento: Optional[str] = None
-    lineas_fomento: Optional[List[str]] = None
-    otro_fomento: Optional[str] = None
-    registro_obra_nacional: Optional[str] = None
-    vinculos_areas: Optional[List[str]] = None
-    
+    productora_responsable: str | None = None
+    codigo_repa_productora: str | None = None
+    participo_fomento: str | None = None
+    lineas_fomento: list[str] | None = None
+    otro_fomento: str | None = None
+    registro_obra_nacional: str | None = None
+    vinculos_areas: list[str] | None = None
+
     # Derechos
-    autoriza_exhibicion: Optional[str] = None
-    autoriza_investigacion: Optional[str] = None
-    convenio_cesion: Optional[str] = None
-    restricciones: Optional[str] = None
+    autoriza_exhibicion: str | None = None
+    autoriza_investigacion: str | None = None
+    convenio_cesion: str | None = None
+    restricciones: str | None = None
 
 
 class ObraAudiovisualOut(BaseModel):
     """Schema de salida para Obra Audiovisual"""
+
     id: int
     user_id: str
-    codigo_agam: Optional[str] = None
-    
+    codigo_agam: str | None = None
+
     # Identificación
     titulo: str
-    anio_estreno: Optional[int] = None
-    anio_ingreso: Optional[int] = None
-    duracion_minutos: Optional[int] = None
-    tipo_produccion: Optional[str] = None
-    extension: Optional[str] = None
-    formato_narrativo: Optional[str] = None
-    genero: Optional[str] = None
-    subgenero: Optional[str] = None
-    medio: Optional[str] = None
-    
+    anio_estreno: int | None = None
+    anio_ingreso: int | None = None
+    duracion_minutos: int | None = None
+    tipo_produccion: str | None = None
+    extension: str | None = None
+    formato_narrativo: str | None = None
+    genero: str | None = None
+    subgenero: str | None = None
+    medio: str | None = None
+
     # Datos técnicos
-    formatos_disponibles: Optional[List[str]] = None
-    otro_formato: Optional[str] = None
-    resolucion: Optional[str] = None
-    idioma_original: Optional[str] = None
-    subtitulos: Optional[str] = None
-    uso_material: Optional[List[str]] = None
-    otro_uso: Optional[str] = None
-    ficha_tecnica_path: Optional[str] = None
-    ubicacion: Optional[str] = None
-    
+    formatos_disponibles: list[str] | None = None
+    otro_formato: str | None = None
+    resolucion: str | None = None
+    idioma_original: str | None = None
+    subtitulos: str | None = None
+    uso_material: list[str] | None = None
+    otro_uso: str | None = None
+    ficha_tecnica_path: str | None = None
+    ubicacion: str | None = None
+
     # Datos relacionales
-    productora_responsable: Optional[str] = None
-    codigo_repa_productora: Optional[str] = None
-    participo_fomento: Optional[str] = None
-    lineas_fomento: Optional[List[str]] = None
-    otro_fomento: Optional[str] = None
-    registro_obra_nacional: Optional[str] = None
-    vinculos_areas: Optional[List[str]] = None
-    
+    productora_responsable: str | None = None
+    codigo_repa_productora: str | None = None
+    participo_fomento: str | None = None
+    lineas_fomento: list[str] | None = None
+    otro_fomento: str | None = None
+    registro_obra_nacional: str | None = None
+    vinculos_areas: list[str] | None = None
+
     # Derechos
-    autoriza_exhibicion: Optional[str] = None
-    autoriza_investigacion: Optional[str] = None
-    convenio_cesion: Optional[str] = None
-    archivo_convenio_path: Optional[str] = None
-    restricciones: Optional[str] = None
-    
+    autoriza_exhibicion: str | None = None
+    autoriza_investigacion: str | None = None
+    convenio_cesion: str | None = None
+    archivo_convenio_path: str | None = None
+    restricciones: str | None = None
+
     # Equipo técnico
-    equipo_tecnico: List[EquipoTecnicoOut] = []
-    
+    equipo_tecnico: list[EquipoTecnicoOut] = []
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class ObraAudiovisualList(BaseModel):
     """Schema resumido para listados de obras"""
+
     id: int
-    codigo_agam: Optional[str] = None
+    codigo_agam: str | None = None
     titulo: str
-    anio_estreno: Optional[int] = None
-    genero: Optional[str] = None
-    extension: Optional[str] = None
-    
+    anio_estreno: int | None = None
+    genero: str | None = None
+    extension: str | None = None
+
     model_config = ConfigDict(from_attributes=True)

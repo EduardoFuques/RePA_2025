@@ -1,14 +1,19 @@
 import time
+
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import QueuePool
-from sqlalchemy.exc import OperationalError, InterfaceError
 
 from src.config import (
-    DATABASE_URL, 
-    DB_POOL_SIZE, DB_MAX_OVERFLOW, DB_POOL_TIMEOUT, 
-    DB_POOL_RECYCLE, DB_CONNECT_TIMEOUT, DB_STATEMENT_TIMEOUT,
-    IS_TESTING
+    DATABASE_URL,
+    DB_CONNECT_TIMEOUT,
+    DB_MAX_OVERFLOW,
+    DB_POOL_RECYCLE,
+    DB_POOL_SIZE,
+    DB_POOL_TIMEOUT,
+    DB_STATEMENT_TIMEOUT,
+    IS_TESTING,
 )
 from src.logger import logger
 
@@ -23,28 +28,55 @@ engine = create_engine(
     pool_pre_ping=True,
     connect_args={
         "connect_timeout": DB_CONNECT_TIMEOUT,
-        "options": f"-c statement_timeout={DB_STATEMENT_TIMEOUT}"
-    }
+        "options": f"-c statement_timeout={DB_STATEMENT_TIMEOUT}",
+    },
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
 
 # Crear tablas en la base de datos
 def init_db():
     # Crear todas las tablas definidas en los modelos
     Base.metadata.create_all(bind=engine)
 
+    # Aplicar migraciones incrementales para columnas nuevas
+    _apply_incremental_migrations()
+
+
+def _apply_incremental_migrations():
+    """Agrega columnas nuevas si no existen (para bases de datos existentes)"""
+    with engine.connect() as conn:
+        # Verificar y agregar redes_sociales a personas_fisicas
+        result = conn.execute(
+            text("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'personas_fisicas' AND column_name = 'redes_sociales'
+        """)
+        )
+        if not result.fetchone():
+            logger.info("Agregando columna redes_sociales a personas_fisicas...")
+            conn.execute(
+                text("""
+                ALTER TABLE personas_fisicas
+                ADD COLUMN redes_sociales JSON
+            """)
+            )
+            conn.commit()
+            logger.info("Columna redes_sociales agregada exitosamente")
+
+
 # Dependencia para obtener sesión con retry logic
 def get_db(max_retries: int = 3, delay: float = 0.5):
     """
     Genera una sesión de base de datos con retry automático.
-    
+
     Si la conexión falla por errores transitorios (conexión perdida, timeout),
     reintenta hasta max_retries veces con backoff exponencial.
     """
     last_exception = None
     current_delay = delay
-    
+
     for attempt in range(max_retries + 1):
         try:
             db = SessionLocal()
@@ -66,5 +98,7 @@ def get_db(max_retries: int = 3, delay: float = 0.5):
                 current_delay *= 2  # Backoff exponencial
             else:
                 if not IS_TESTING:
-                    logger.error(f"DB connection failed after {max_retries} retries: {str(e)}")
+                    logger.error(
+                        f"DB connection failed after {max_retries} retries: {str(e)}"
+                    )
                 raise last_exception

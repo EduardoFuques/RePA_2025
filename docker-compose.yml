@@ -43,6 +43,12 @@ services:
     # Puerto NO expuesto externamente - solo accesible dentro de la red Docker
     expose:
       - "80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health/live"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
