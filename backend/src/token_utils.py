@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import jwt
 from fastapi import HTTPException, status
-from jose import jwt
 
 from src.config import ALGORITHM, SECRET_KEY
 
@@ -28,7 +28,7 @@ def decode_access_token(token: str):
             detail="Token expirado",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except jwt.JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido",
@@ -55,7 +55,7 @@ def decode_refresh_token(token: str):
             detail="Token expirado",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except jwt.JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido",

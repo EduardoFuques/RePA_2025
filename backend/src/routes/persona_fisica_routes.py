@@ -6,6 +6,7 @@ y seleccionar subperfiles según su rol en el sector audiovisual.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from src.crud_helpers import (
@@ -36,6 +37,7 @@ from src.schemas.persona_fisica_schemas import (
     ObraSubperfilOut,
     PersonaFisicaCreate,
     PersonaFisicaOut,
+    PersonaFisicaSearchOut,
     PersonaFisicaUpdate,
     TecnicoArtisticoCreate,
     TecnicoArtisticoOut,
@@ -105,6 +107,42 @@ async def delete_my_persona_fisica(
     persona = get_user_record(db, PersonaFisica, current_user["id"], MSG_NOT_FOUND)
     delete_record(db, persona)
     return None
+
+
+# === BÚSQUEDA DE PERSONAS REGISTRADAS ===
+
+
+@persona_fisica_router.get("/search", response_model=list[PersonaFisicaSearchOut])
+async def search_personas_fisicas(
+    q: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Buscar personas físicas registradas en el RePA por nombre, apellido o DNI.
+    Retorna resultados parciales (máximo 10) para uso en buscador de integrantes.
+    """
+    if not q or len(q.strip()) < 2:
+        return []
+
+    term = f"%{q.strip()}%"
+    # Strip dots from search term for DNI matching (e.g. "38778" should match "38.778.767")
+    term_no_dots = f"%{q.strip().replace('.', '')}%"
+    results = (
+        db.query(PersonaFisica)
+        .filter(
+            PersonaFisica.borrador == False,  # noqa: E712
+            (
+                PersonaFisica.nombre.ilike(term)
+                | PersonaFisica.apellido.ilike(term)
+                | PersonaFisica.dni.ilike(term)
+                | func.replace(PersonaFisica.dni, ".", "").ilike(term_no_dots)
+            ),
+        )
+        .limit(10)
+        .all()
+    )
+    return results
 
 
 # === SUBPERFIL PRODUCTOR ===

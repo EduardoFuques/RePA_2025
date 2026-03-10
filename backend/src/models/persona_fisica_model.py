@@ -121,7 +121,7 @@ class SubperfilProductor(Base):
     # Datos de la obra
     titulo_obra = Column(String(255), nullable=False)
     anio = Column(Integer, nullable=True)
-    rol = Column(String(100), nullable=True)
+    rol = Column(String(500), nullable=True)
 
     persona_fisica = relationship("PersonaFisica", backref="obras_productor")
 
@@ -138,7 +138,7 @@ class SubperfilDirector(Base):
 
     titulo_obra = Column(String(255), nullable=False)
     anio = Column(Integer, nullable=True)
-    rol = Column(String(100), nullable=True)
+    rol = Column(String(500), nullable=True)
 
     persona_fisica = relationship("PersonaFisica", backref="obras_director")
 
@@ -155,7 +155,7 @@ class SubperfilGuionista(Base):
 
     titulo_obra = Column(String(255), nullable=False)
     anio = Column(Integer, nullable=True)
-    rol = Column(String(100), nullable=True)
+    rol = Column(String(500), nullable=True)
 
     persona_fisica = relationship("PersonaFisica", backref="obras_guionista")
 
@@ -172,7 +172,7 @@ class SubperfilDocumentalista(Base):
 
     titulo_obra = Column(String(255), nullable=False)
     anio = Column(Integer, nullable=True)
-    rol = Column(String(100), nullable=True)
+    rol = Column(String(500), nullable=True)
 
     persona_fisica = relationship("PersonaFisica", backref="obras_documentalista")
 
@@ -189,7 +189,7 @@ class SubperfilRealizadorIntegral(Base):
 
     titulo_obra = Column(String(255), nullable=False)
     anio = Column(Integer, nullable=True)
-    rol = Column(String(100), nullable=True)
+    rol = Column(String(500), nullable=True)
 
     persona_fisica = relationship("PersonaFisica", backref="obras_realizador_integral")
 

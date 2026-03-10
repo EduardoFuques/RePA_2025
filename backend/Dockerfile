@@ -1,8 +1,8 @@
-FROM python:3.10-slim
+FROM python:3.13-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir --upgrade pip wheel
 
 WORKDIR /code
 
@@ -13,4 +13,4 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 COPY ./src /code/src
 
 ENTRYPOINT ["uvicorn"]
-CMD ["src.main:app", "--reload", "--host", "0.0.0.0", "--port", "80"]
+CMD ["src.main:app", "--host", "0.0.0.0", "--port", "80"]

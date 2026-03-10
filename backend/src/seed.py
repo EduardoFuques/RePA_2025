@@ -23,10 +23,10 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Usuarios de prueba para desarrollo
 TEST_USERS = [
-    {"email": "admin@repa.gob.ar", "password": "admin123", "role": "admin"},
-    {"email": "usuario1@repa.gob.ar", "password": "test123", "role": "user"},
-    {"email": "usuario2@repa.gob.ar", "password": "test123", "role": "user"},
-    {"email": "usuario3@repa.gob.ar", "password": "test123", "role": "user"},
+    {"email": "admin@repa.gob.ar", "password": "Admin1234", "role": "admin"},
+    {"email": "usuario1@repa.gob.ar", "password": "Test1234", "role": "user"},
+    {"email": "usuario2@repa.gob.ar", "password": "Test1234", "role": "user"},
+    {"email": "usuario3@repa.gob.ar", "password": "Test1234", "role": "user"},
 ]
 
 # Datos de prueba para Persona Física
@@ -316,8 +316,8 @@ TEST_ASOCIACION = {
 # Datos de prueba para ESA (Estudiantes del Audiovisual) - usuarios adicionales
 # Nota: ESA es para estudiantes que NO están en RePA, así que creamos usuarios extra
 TEST_ESA_USERS = [
-    {"email": "estudiante1@esa.repa.gob.ar", "password": "test123", "role": "user"},
-    {"email": "estudiante2@esa.repa.gob.ar", "password": "test123", "role": "user"},
+    {"email": "estudiante1@esa.repa.gob.ar", "password": "Test1234", "role": "user"},
+    {"email": "estudiante2@esa.repa.gob.ar", "password": "Test1234", "role": "user"},
 ]
 
 TEST_ESA = {

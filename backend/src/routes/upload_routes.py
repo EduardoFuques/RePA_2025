@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from ..database import get_db
+from ..logger import logger
 from ..utils import get_current_user
 
 upload_router = APIRouter(prefix="/upload", tags=["upload"])
@@ -16,6 +17,49 @@ files_router = APIRouter(prefix="/files", tags=["files"])
 
 # Directorio base para uploads
 UPLOAD_BASE_DIR = "/app/uploads"
+
+
+# Magic bytes para validación de contenido real de archivos
+_MAGIC_BYTES = {
+    ".pdf": b"%PDF",
+    ".png": b"\x89PNG",
+    ".jpg": b"\xff\xd8\xff",
+    ".jpeg": b"\xff\xd8\xff",
+    # .doc/.docx usan formatos compuestos; se valida al menos que sea ZIP (docx) o OLE (doc)
+    ".docx": b"PK",
+    ".doc": b"\xd0\xcf\x11\xe0",
+}
+
+
+def _validate_magic_bytes(content: bytes, extension: str) -> bool:
+    """Valida que los primeros bytes del archivo coincidan con el tipo declarado."""
+    expected = _MAGIC_BYTES.get(extension.lower())
+    if expected is None:
+        return True  # Sin firma conocida, no podemos validar
+    return content[: len(expected)] == expected
+
+
+def _sanitize_filename(name: str) -> str:
+    """Sanitiza un nombre de archivo para uso seguro en headers Content-Disposition."""
+    import re
+
+    # Extraer solo el nombre del archivo (sin path)
+    basename = os.path.basename(name)
+    # Eliminar caracteres peligrosos para headers HTTP
+    return re.sub(r'[\\"\r\n]', "_", basename)
+
+
+def _safe_path(base_dir: str, *parts: str) -> str:
+    """
+    Construye una ruta segura dentro de base_dir.
+    Lanza HTTPException 403 si la ruta resuelta intenta escapar del directorio base
+    (protección contra path traversal / directory traversal).
+    """
+    resolved_base = os.path.realpath(base_dir)
+    candidate = os.path.realpath(os.path.join(base_dir, *parts))
+    if not candidate.startswith(resolved_base + os.sep) and candidate != resolved_base:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    return candidate
 
 
 def get_user_upload_dir(user_id: str) -> str:
@@ -39,8 +83,8 @@ async def upload_dni(
     """
     Subir el archivo DNI del usuario
     """
-    # Validar tipo de archivo
-    if not file.content_type or not file.content_type.startswith("application/"):
+    # Validar tipo de archivo (solo PDF permitido)
+    if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="El archivo debe ser un PDF")
 
     # Validar tamaño (máximo 5MB)
@@ -49,6 +93,13 @@ async def upload_dni(
     if len(file_content) > max_size:
         raise HTTPException(
             status_code=400, detail="El archivo no puede superar los 5MB"
+        )
+
+    # Validar contenido real del archivo (magic bytes)
+    if not _validate_magic_bytes(file_content, ".pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="El contenido del archivo no corresponde a un PDF válido",
         )
 
     # Reiniciar el puntero del archivo
@@ -66,7 +117,7 @@ async def upload_dni(
     unique_filename = (
         f"dni_{uuid.uuid4().hex}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     )
-    file_path = os.path.join(user_dir, unique_filename)
+    file_path = _safe_path(user_dir, unique_filename)
 
     # Guardar archivo
     try:
@@ -106,6 +157,22 @@ ALLOWED_DOC_TYPES = {
     "cv_institucional": {
         "extensions": {".pdf", ".doc", ".docx"},
         "max_size": 10 * 1024 * 1024,
+    },
+    "acta_constitucion": {
+        "extensions": {".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"},
+        "max_size": 5 * 1024 * 1024,
+    },
+    "declaracion_objetivos": {
+        "extensions": {".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"},
+        "max_size": 5 * 1024 * 1024,
+    },
+    "certificado_alumno": {
+        "extensions": {".pdf", ".jpg", ".jpeg", ".png"},
+        "max_size": 5 * 1024 * 1024,
+    },
+    "dni_esa": {
+        "extensions": {".pdf", ".jpg", ".jpeg", ".png"},
+        "max_size": 5 * 1024 * 1024,
     },
 }
 
@@ -152,6 +219,13 @@ async def upload_document(
             status_code=400, detail=f"El archivo no puede superar los {max_mb}MB"
         )
 
+    # Validar contenido real del archivo (magic bytes)
+    if not _validate_magic_bytes(file_content, file_extension):
+        raise HTTPException(
+            status_code=400,
+            detail=f"El contenido del archivo no corresponde al tipo {file_extension}",
+        )
+
     await file.seek(0)
 
     # Crear directorio del usuario
@@ -160,7 +234,7 @@ async def upload_document(
 
     # Generar nombre único
     unique_filename = f"{doc_type}_{uuid.uuid4().hex}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{file_extension}"
-    file_path = os.path.join(user_dir, unique_filename)
+    file_path = _safe_path(user_dir, unique_filename)
 
     # Guardar archivo
     try:
@@ -193,14 +267,14 @@ async def get_document(
 
     user_id = current_user["id"]
 
-    # Validar que el archivo pertenezca al usuario
+    # Validar que el archivo pertenezca al usuario y proteger contra path traversal
     if "/" in filepath:
         file_user_id = filepath.split("/")[0]
         if file_user_id != user_id:
             raise HTTPException(status_code=403, detail="No autorizado")
-        file_path = os.path.join(UPLOAD_BASE_DIR, filepath)
+        file_path = _safe_path(UPLOAD_BASE_DIR, filepath)
     else:
-        file_path = os.path.join(get_user_upload_dir(user_id), filepath)
+        file_path = _safe_path(get_user_upload_dir(user_id), filepath)
 
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
@@ -222,7 +296,7 @@ async def delete_dni(
     Eliminar un archivo DNI del usuario
     """
     user_id = current_user["id"]
-    file_path = os.path.join(get_user_upload_dir(user_id), filename)
+    file_path = _safe_path(get_user_upload_dir(user_id), filename)
 
     # Validar que el archivo exista
     if not os.path.exists(file_path):
@@ -250,14 +324,14 @@ async def get_dni(
 
     # Si filename incluye una barra, asumimos que es la ruta completa
     if "/" in filename:
-        # Validar que el archivo pertenezca al usuario
+        # Validar que el archivo pertenezca al usuario y proteger contra path traversal
         file_user_id = filename.split("/")[0]
         if file_user_id != user_id:
             raise HTTPException(status_code=403, detail="No autorizado")
-        file_path = os.path.join(UPLOAD_BASE_DIR, filename)
+        file_path = _safe_path(UPLOAD_BASE_DIR, filename)
     else:
         # Es solo el nombre del archivo
-        file_path = os.path.join(get_user_upload_dir(user_id), filename)
+        file_path = _safe_path(get_user_upload_dir(user_id), filename)
 
     # Validar que el archivo exista
     if not os.path.exists(file_path):
@@ -282,9 +356,7 @@ async def get_my_dni(
     """
     from ..models.persona_fisica_model import PersonaFisica
 
-    print(
-        f"[DEBUG] get_my_dni - user_id: {current_user['id']}, email: {current_user.get('email', 'N/A')}"
-    )
+    logger.debug(f"get_my_dni - user_id: {current_user['id']}")
 
     # Buscar el DNI en la base de datos
     persona = (
@@ -294,23 +366,20 @@ async def get_my_dni(
     )
 
     if not persona or not persona.dni_adjunto_path:
-        print(f"[DEBUG] No DNI found for user {current_user['id']}")
+        logger.debug(f"No DNI found for user {current_user['id']}")
         raise HTTPException(status_code=404, detail="No hay DNI adjunto")
 
-    print(f"[DEBUG] DNI path from DB: {persona.dni_adjunto_path}")
+    logger.debug(f"DNI path from DB: {persona.dni_adjunto_path}")
 
     # Construir la ruta completa incluyendo el user_id
     file_path = os.path.join(
         UPLOAD_BASE_DIR, current_user["id"], persona.dni_adjunto_path
     )
-    print(f"[DEBUG] Full file path: {file_path}")
 
     # Validar que el archivo exista
     if not os.path.exists(file_path):
-        print(f"[DEBUG] File not found at: {file_path}")
+        logger.debug(f"File not found at: {file_path}")
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
-
-    print(f"[DEBUG] Serving file: {file_path}")
 
     # Devolver archivo
     from fastapi.responses import FileResponse
@@ -332,9 +401,9 @@ async def view_file(filepath: str, current_user: dict = Depends(get_current_user
 
     filepath = urllib.parse.unquote(filepath)
 
-    # Buscar en el directorio del usuario autenticado
+    # Buscar en el directorio del usuario autenticado (con protección path traversal)
     user_dir = os.path.join(UPLOAD_BASE_DIR, current_user["id"])
-    file_path = os.path.join(user_dir, filepath)
+    file_path = _safe_path(user_dir, filepath)
 
     if os.path.exists(file_path):
         # Determinar media type
@@ -354,7 +423,9 @@ async def view_file(filepath: str, current_user: dict = Depends(get_current_user
         return FileResponse(
             path=file_path,
             media_type=media_type,
-            headers={"Content-Disposition": f'inline; filename="{filepath}"'},
+            headers={
+                "Content-Disposition": f'inline; filename="{_sanitize_filename(filepath)}"'
+            },
         )
 
     raise HTTPException(status_code=404, detail="Archivo no encontrado")
@@ -369,9 +440,9 @@ async def download_file(filepath: str, current_user: dict = Depends(get_current_
 
     filepath = urllib.parse.unquote(filepath)
 
-    # Buscar en el directorio del usuario autenticado
+    # Buscar en el directorio del usuario autenticado (con protección path traversal)
     user_dir = os.path.join(UPLOAD_BASE_DIR, current_user["id"])
-    file_path = os.path.join(user_dir, filepath)
+    file_path = _safe_path(user_dir, filepath)
 
     if os.path.exists(file_path):
         # Determinar media type
@@ -391,7 +462,9 @@ async def download_file(filepath: str, current_user: dict = Depends(get_current_
         return FileResponse(
             path=file_path,
             media_type=media_type,
-            headers={"Content-Disposition": f'attachment; filename="{filepath}"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{_sanitize_filename(filepath)}"'
+            },
         )
 
     raise HTTPException(status_code=404, detail="Archivo no encontrado")

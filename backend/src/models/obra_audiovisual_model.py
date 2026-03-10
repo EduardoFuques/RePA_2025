@@ -1,5 +1,5 @@
 # models/obra_audiovisual_model.py
-from sqlalchemy import JSON, Column, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from src.database import Base
@@ -22,7 +22,7 @@ class ObraAudiovisual(Base):
     codigo_agam = Column(
         String(50), unique=True, nullable=True
     )  # Código asignado por AGAM
-    titulo = Column(String(255), nullable=False)
+    titulo = Column(String(255), nullable=True)
     anio_estreno = Column(Integer, nullable=True)
     anio_ingreso = Column(Integer, nullable=True)  # Año de ingreso al AGAM
     duracion_minutos = Column(Integer, nullable=True)
@@ -70,6 +70,11 @@ class ObraAudiovisual(Base):
     convenio_cesion = Column(String(10), nullable=True)  # si, no
     archivo_convenio_path = Column(String(500), nullable=True)
     restricciones = Column(Text, nullable=True)
+
+    # === ESTADO ===
+    borrador = Column(
+        Boolean, default=True, nullable=False
+    )  # True = draft, False = submitted
 
     # Relación con el usuario
     user = relationship("User", back_populates="obras_audiovisuales")
