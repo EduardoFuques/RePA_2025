@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres
+    image: postgres:17-alpine
     restart: unless-stopped
     shm_size: 128mb
     environment:
@@ -25,6 +25,8 @@ services:
     build: ./backend
     image: repa-backend:${BACKEND_VERSION:-latest}
     restart: unless-stopped
+    # --reload solo para desarrollo local (el Dockerfile base NO incluye --reload)
+    command: ["src.main:app", "--reload", "--host", "0.0.0.0", "--port", "80"]
     volumes:
       - type: bind
         source: ./backend/src

@@ -68,6 +68,10 @@ class AsociacionCreate(BaseModel):
     descripcion_articulacion: str | None = None
     info_adicional_integrantes: str | None = None
 
+    # Documentación
+    acta_constitucion_path: str | None = None
+    declaracion_objetivos_path: str | None = None
+
     # Consentimiento
     consentimiento: bool = False
     borrador: bool = False
@@ -113,6 +117,11 @@ class AsociacionUpdate(BaseModel):
     articulo_iaavim: str | None = None
     descripcion_articulacion: str | None = None
     info_adicional_integrantes: str | None = None
+
+    # Documentación
+    acta_constitucion_path: str | None = None
+    declaracion_objetivos_path: str | None = None
+
     consentimiento: bool | None = None
     declaracion_inicial: bool | None = None
     borrador: bool | None = None

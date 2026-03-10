@@ -5,9 +5,9 @@ Rutas de usuarios: registro, login, recuperación de contraseña y gestión de p
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
-from jose import jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
@@ -15,8 +15,18 @@ from src.audit import audit_log
 from src.database import get_db
 from src.models.user_models import Role, TokenRecovery, User
 from src.rate_limiter import limiter
-from src.schemas.user_schemas import UserCreate, UserFormsMetadata, UserOut, UserUpdate
-from src.token_utils import create_access_token, decode_access_token
+from src.schemas.user_schemas import (
+    PasswordConfirm,
+    UserCreate,
+    UserFormsMetadata,
+    UserOut,
+    UserUpdate,
+)
+from src.token_utils import (
+    create_access_token,
+    create_refresh_token,
+    decode_access_token,
+)
 from src.utils import (
     get_current_user,
     get_password_hash,
@@ -100,6 +110,7 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
     registration_token = create_access_token(
         data={"sub": new_user_id, "roles": ["unverified"]},
         expires_delta=1440,  # 24 horas en minutos
+        type="verify",
     )
 
     # Guardar token de recuperación
@@ -134,18 +145,21 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
     # TODO: Implementar envío de email en producción
     # verification_url = f"{URL_SITE}/users/confirm/{registration_token}"
 
-    # En desarrollo, retornar el token para poder verificar manualmente
-    # En producción, esto debe eliminarse y enviar el email
-    return {
+    response = {
         "id": new_user.id,
         "email": new_user.email,
         "is_active": new_user.is_active,
         "created_at": new_user.created_at,
         "last_login": new_user.last_login,
         "roles": [{"id": role.id, "rol": role.rol} for role in new_user.roles],
-        "verification_token": registration_token,  # Solo para desarrollo
         "message": "Registro exitoso. En producción recibirás un email de verificación.",
     }
+    # Solo exponer el token en entornos no productivos para pruebas manuales
+    from src.config import IS_PRODUCTION
+
+    if not IS_PRODUCTION:
+        response["verification_token"] = registration_token
+    return response
 
 
 # 2. Endpoint de Verificación
@@ -154,7 +168,10 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
     status_code=status.HTTP_201_CREATED,
     description="Verificar el token de registro",
 )
-async def confirm_registration(token: str, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def confirm_registration(
+    request: Request, token: str, db: Session = Depends(get_db)
+):
     """
     Verificar el token de registro y activar el usuario.
     Args:
@@ -173,8 +190,8 @@ async def confirm_registration(token: str, db: Session = Depends(get_db)):
         # Verificar token
         payload = decode_access_token(token)
 
-        # Validaciones críticas
-        if payload.get("type") != "access" or "unverified" not in payload.get(
+        # Validaciones críticas: debe ser token de verificación con rol unverified
+        if payload.get("type") != "verify" or "unverified" not in payload.get(
             "roles", []
         ):
             raise HTTPException(status_code=400, detail="Token inválido")
@@ -196,7 +213,7 @@ async def confirm_registration(token: str, db: Session = Depends(get_db)):
 
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=400, detail="Token expirado")
-    except jwt.JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=400, detail="Token inválido")
 
 
@@ -259,15 +276,11 @@ def login(
         },
         expires_delta=30,  # 30 minutos
     )
-    # Generar refresh token (7 días)
-    refresh_token = create_access_token(
+    # Generar refresh token (7 días) — contiene solo sub y type para minimizar exposición de datos
+    refresh_token = create_refresh_token(
         data={
             "sub": user.id,
-            "email": user.email,
-            "roles": [{"id": role.id, "rol": role.rol} for role in user.roles],
-            "type": "refresh",
-        },
-        expires_delta=(60 * 24 * 7),  # 7 días en minutos
+        }
     )
 
     # Registrar login en audit trail
@@ -291,10 +304,12 @@ def login(
 # Generar el Token de Recover Password
 @user_router.put(
     "/recovery_passwd",
-    response_model=UserUpdate,
     description="Generar el Token de Recover Password",
 )
-async def recovery_passwd_user(user_in: UserUpdate, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+async def recovery_passwd_user(
+    request: Request, user_in: UserUpdate, db: Session = Depends(get_db)
+):
     """
     Generar el Token de Recover Password.
     Generar una password aleatoria y enviarla al correo del usuario.
@@ -305,27 +320,34 @@ async def recovery_passwd_user(user_in: UserUpdate, db: Session = Depends(get_db
         dict: Token de acceso y refresh token
         URL: dirección de recovery password
     """
+    # Respuesta genérica para no revelar si el email existe en el sistema
+    generic_response = {
+        "detail": "Si el email está registrado, recibirás instrucciones para restablecer tu contraseña."
+    }
+
     user = db.query(User).filter(User.email == user_in.email).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Usuario no existe"
-        )
+        return generic_response
+
     validar_password(user_in.password)
     hashed_password = get_password_hash(user_in.password)
-    # Generar token de registro (24h de validez)
+    # Generar token de recuperación (24h de validez)
+    # NOTA: el hash de la nueva contraseña se almacena solo en TokenRecovery, nunca en el JWT
     registration_token = create_access_token(
-        data={"sub": user.id, "new_password": hashed_password},
+        data={"sub": user.id},
         expires_delta=1440,  # 24 horas en minutos
+        type="recover",
     )
 
-    # Guardar token de recuperación
+    # Guardar token de recuperación (la nueva contraseña hasheada solo vive en la DB)
     recovery_record = TokenRecovery(
         user_id=user.id,
         token_payload=registration_token,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=1440),
+        new_password=hashed_password,
     )
 
-    # Guardar el nuevo usuario y el token de recuperación en la base de datos
+    # Guardar el token de recuperación en la base de datos
     try:
         db.add(recovery_record)
         db.commit()
@@ -338,11 +360,11 @@ async def recovery_passwd_user(user_in: UserUpdate, db: Session = Depends(get_db
     # TODO: Implementar envío de email en producción
     # verification_url = f"{URL_SITE}/users/recovery/{registration_token}"
 
-    return user  # Retorna el usuario
+    return generic_response
 
 
 # Recuperar la contraseña del usuario
-@user_router.get(
+@user_router.post(
     "/recovery/{token}",
     response_model=UserOut,
     description="Recuperar la contraseña del usuario",
@@ -355,6 +377,8 @@ async def recovery_passwd(token: str, db: Session = Depends(get_db)):
     """
     # Verificar token
     payload = decode_access_token(token)
+    if payload.get("type") != "recover":
+        raise HTTPException(status_code=400, detail="Token inválido")
     user_id = payload.get("sub")
     # Buscar el usuario en la base de datos
     user = db.query(User).filter(User.id == user_id).first()
@@ -362,12 +386,25 @@ async def recovery_passwd(token: str, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Usuario no existe"
         )
+    # Buscar la nueva contraseña en el registro de recuperación (nunca en el JWT)
+    recovery_record = (
+        db.query(TokenRecovery)
+        .filter(
+            TokenRecovery.token_payload == token,
+            TokenRecovery.is_active.is_(True),
+        )
+        .first()
+    )
+    if not recovery_record or not recovery_record.new_password:
+        raise HTTPException(status_code=400, detail="Token inválido o expirado")
     # Actualizar la contraseña del usuario
-    user.hashed_password = payload.get("new_password")
+    user.hashed_password = recovery_record.new_password
     db.commit()
     db.refresh(user)
-    # Eliminar el token de recuperación
-    db.query(TokenRecovery).filter(TokenRecovery.user_id == user_id).delete()
+    # Invalidar el token de recuperación
+    db.query(TokenRecovery).filter(TokenRecovery.token_payload == token).update(
+        {"is_active": False}
+    )
     db.commit()
 
     return user
@@ -458,7 +495,7 @@ async def update_user(
     Actualizar los datos del usuario actual.
     """
     # Buscar el usuario en la base de datos
-    user = db.query(User).filter(User.id == current_user["sub"]).first()
+    user = db.query(User).filter(User.id == current_user["id"]).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -483,12 +520,17 @@ async def update_user(
 
 
 # Eliminar usuario
-@user_router.delete("/me", description="Eliminar el usuario actual")
+@user_router.delete(
+    "/me", description="Desactivar el usuario actual (requiere contraseña)"
+)
 async def delete_user(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+    confirm: PasswordConfirm,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
-    Cambiar estado de is_active True/False.
+    Desactivar la cuenta del usuario actual.
+    Requiere la contraseña actual como confirmación de seguridad.
     """
     # Buscar el usuario en la base de datos
     user = db.query(User).filter(User.id == current_user["id"]).first()
@@ -497,12 +539,16 @@ async def delete_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Usuario no encontrado",
         )
-    if user.is_active:
-        user.is_active = False
-    else:
-        user.is_active = True
+
+    # Verificar contraseña actual antes de desactivar
+    if not pwd_context.verify(confirm.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contraseña incorrecta",
+        )
+
+    user.is_active = False
     # Guardar los cambios
     db.commit()
     db.refresh(user)
-    # return {"message": "Usuario eliminado"}
     return user

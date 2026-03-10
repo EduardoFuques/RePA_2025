@@ -1,5 +1,5 @@
+import jwt
 from fastapi import Request
-from jose import JWTError, jwt
 
 from src.config import ALGORITHM, SECRET_KEY
 from src.logger import logger
@@ -54,7 +54,7 @@ async def log_requests(request: Request, call_next):
             # Si el token ha expirado, se registra y se marca el usuario como desconocido
             logger.warning("Token expirado")
             log_dict["user"] = "Expired token"
-        except JWTError as e:
+        except jwt.InvalidTokenError as e:
             # Si ocurre un error al decodificar, se registra y se marca el usuario como desconocido
             logger.warning(f"Error decodificando token: {e}")
             log_dict["user"] = "Invalid token"

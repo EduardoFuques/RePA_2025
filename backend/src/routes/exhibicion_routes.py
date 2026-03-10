@@ -51,6 +51,40 @@ async def create_sala(
     return db_sala
 
 
+@exhibicion_router.get("/salas/me", response_model=SalaOut)
+async def get_my_sala(
+    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Obtener la primera Sala del usuario actual"""
+    sala = db.query(Sala).filter(Sala.user_id == current_user["id"]).first()
+    if not sala:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Sala no encontrada"
+        )
+    return sala
+
+
+@exhibicion_router.put("/salas/me", response_model=SalaOut)
+async def update_my_sala(
+    data: SalaUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Actualizar la primera Sala del usuario actual"""
+    sala = db.query(Sala).filter(Sala.user_id == current_user["id"]).first()
+    if not sala:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Sala no encontrada"
+        )
+
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(sala, key, value)
+
+    db.commit()
+    db.refresh(sala)
+    return sala
+
+
 @exhibicion_router.get("/salas", response_model=list[SalaOut])
 async def list_salas(
     current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
@@ -169,6 +203,30 @@ async def get_my_exhibicion(
     return exhibicion
 
 
+@exhibicion_router.put("/me", response_model=ExhibicionOut)
+async def update_my_exhibicion(
+    data: ExhibicionUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Actualizar la Exhibición del usuario actual"""
+    exhibicion = (
+        db.query(Exhibicion).filter(Exhibicion.user_id == current_user["id"]).first()
+    )
+    if not exhibicion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró exhibición para este usuario",
+        )
+
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(exhibicion, key, value)
+
+    db.commit()
+    db.refresh(exhibicion)
+    return exhibicion
+
+
 @exhibicion_router.get("/{exhibicion_id}", response_model=ExhibicionOut)
 async def get_exhibicion(
     exhibicion_id: int,
@@ -259,6 +317,40 @@ async def create_festival(
     db.commit()
     db.refresh(db_festival)
     return db_festival
+
+
+@exhibicion_router.get("/festivales/me", response_model=FestivalOut)
+async def get_my_festival(
+    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Obtener el Festival del usuario actual"""
+    festival = db.query(Festival).filter(Festival.user_id == current_user["id"]).first()
+    if not festival:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Festival no encontrado"
+        )
+    return festival
+
+
+@exhibicion_router.put("/festivales/me", response_model=FestivalOut)
+async def update_my_festival(
+    data: FestivalUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Actualizar el Festival del usuario actual"""
+    festival = db.query(Festival).filter(Festival.user_id == current_user["id"]).first()
+    if not festival:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Festival no encontrado"
+        )
+
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(festival, key, value)
+
+    db.commit()
+    db.refresh(festival)
+    return festival
 
 
 @exhibicion_router.get("/festivales", response_model=list[FestivalOut])
@@ -355,6 +447,72 @@ async def create_cinemateca(
     db.commit()
     db.refresh(db_cinemateca)
     return db_cinemateca
+
+
+@exhibicion_router.get("/cinemateca/me", response_model=CinematecaOut)
+async def get_my_cinemateca(
+    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Obtener el registro de Cinemateca del usuario actual (primera obra del usuario)"""
+    from src.models.obra_audiovisual_model import ObraAudiovisual
+
+    # Obtener la primera obra del usuario
+    obra = (
+        db.query(ObraAudiovisual)
+        .filter(ObraAudiovisual.user_id == current_user["id"])
+        .first()
+    )
+    if not obra:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró obra para este usuario",
+        )
+
+    # Obtener el registro de cinemateca para esa obra
+    cinemateca = db.query(Cinemateca).filter(Cinemateca.obra_id == obra.id).first()
+    if not cinemateca:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró registro de cinemateca para este usuario",
+        )
+    return cinemateca
+
+
+@exhibicion_router.put("/cinemateca/me", response_model=CinematecaOut)
+async def update_my_cinemateca(
+    data: CinematecaUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Actualizar el registro de Cinemateca del usuario actual"""
+    from src.models.obra_audiovisual_model import ObraAudiovisual
+
+    # Obtener la primera obra del usuario
+    obra = (
+        db.query(ObraAudiovisual)
+        .filter(ObraAudiovisual.user_id == current_user["id"])
+        .first()
+    )
+    if not obra:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró obra para este usuario",
+        )
+
+    # Obtener el registro de cinemateca para esa obra
+    cinemateca = db.query(Cinemateca).filter(Cinemateca.obra_id == obra.id).first()
+    if not cinemateca:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró registro de cinemateca para este usuario",
+        )
+
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(cinemateca, key, value)
+
+    db.commit()
+    db.refresh(cinemateca)
+    return cinemateca
 
 
 @exhibicion_router.get("/cinemateca", response_model=list[CinematecaOut])

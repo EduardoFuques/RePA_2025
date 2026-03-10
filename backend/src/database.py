@@ -65,6 +65,24 @@ def _apply_incremental_migrations():
             conn.commit()
             logger.info("Columna redes_sociales agregada exitosamente")
 
+        # Verificar y agregar new_password a token_recovery (security fix)
+        result = conn.execute(
+            text("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'token_recovery' AND column_name = 'new_password'
+        """)
+        )
+        if not result.fetchone():
+            logger.info("Agregando columna new_password a token_recovery...")
+            conn.execute(
+                text("""
+                ALTER TABLE token_recovery
+                ADD COLUMN new_password VARCHAR
+            """)
+            )
+            conn.commit()
+            logger.info("Columna new_password agregada exitosamente")
+
 
 # Dependencia para obtener sesión con retry logic
 def get_db(max_retries: int = 3, delay: float = 0.5):

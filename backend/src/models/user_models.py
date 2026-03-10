@@ -16,6 +16,7 @@ class TokenRecovery(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
+    new_password = Column(String, nullable=True)
 
 
 # Modelo asociativa para la relación muchos a muchos entre usuarios y roles
@@ -66,3 +67,7 @@ class User(Base):
 
     # Comisión de Filmaciones
     rodajes = relationship("Rodaje", back_populates="user")  # 1:N
+
+    # Fomento
+    tramites_fomento = relationship("TramiteFomento", back_populates="user")  # 1:N
+    evaluadores = relationship("Evaluador", back_populates="user")  # 1:N

@@ -42,6 +42,11 @@ class UserUpdate(BaseModel):
     password: str | None = None  # Nueva contraseña (se hasheará)
 
 
+# Esquema para confirmar acción con contraseña
+class PasswordConfirm(BaseModel):
+    password: str
+
+
 # Esquema para actualizar roles de usuario
 class UserRolePatch(BaseModel):
     add: list[int] = []

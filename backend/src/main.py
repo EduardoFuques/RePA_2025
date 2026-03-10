@@ -7,7 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.config import API_ROOT_PATH, CORS_ORIGINS
+from src.config import API_ROOT_PATH, CORS_ORIGINS, IS_PRODUCTION
 from src.database import get_db, init_db
 from src.logger import logger
 from src.middlewarelogg import log_requests
@@ -16,6 +16,7 @@ from src.routes.admin_routes import admin_router
 from src.routes.asociacion_routes import asociacion_router
 from src.routes.esa_routes import esa_router
 from src.routes.exhibicion_routes import exhibicion_router
+from src.routes.fomento_routes import fomento_router
 from src.routes.obra_audiovisual_routes import obra_audiovisual_router
 from src.routes.persona_fisica_routes import persona_fisica_router
 from src.routes.persona_juridica_routes import persona_juridica_router
@@ -40,6 +41,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="API RePA - Registro Provincial del Audiovisual",
     root_path=API_ROOT_PATH,
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
     description="""
 ## Sistema de Registro del Sector Audiovisual de Misiones
 
@@ -73,7 +77,7 @@ Los endpoints sensibles tienen límites de solicitudes:
 - **IAAviM** - Instituto de Artes Audiovisuales de Misiones
 - **Email**: sistemas@iaavim.gob.ar
     """,
-    version="1.2.0",
+    version="1.5.9",
     contact={
         "name": "IAAviM - Sistemas",
         "url": "https://iaavim.gob.ar",
@@ -163,6 +167,7 @@ app.include_router(
     tags=["Exhibiciones, Salas, Festivales, Cinemateca"],
 )
 app.include_router(rodaje_router, prefix="/rodajes", tags=["Comisión de Filmaciones"])
+app.include_router(fomento_router, tags=["Fomento"])
 
 # Rutas de Administración
 app.include_router(admin_router, prefix="/admin_user", tags=["Administrator User"])

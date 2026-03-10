@@ -5,8 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # === EQUIPO TÉCNICO ===
 class EquipoTecnicoBase(BaseModel):
-    rol: str = Field(..., min_length=1, max_length=100)
-    nombre: str = Field(..., min_length=1, max_length=200)
+    rol: str | None = Field(None, max_length=100)
+    nombre: str | None = Field(None, max_length=200)
     en_repa: str | None = None
     codigo_repa: str | None = None
 
@@ -27,7 +27,7 @@ class ObraAudiovisualCreate(BaseModel):
     """Schema para crear una Obra Audiovisual (AGAM)"""
 
     # Identificación
-    titulo: str = Field(..., min_length=1, max_length=255)
+    titulo: str | None = Field(None, max_length=255)
     anio_estreno: int | None = None
     anio_ingreso: int | None = None
     duracion_minutos: int | None = None
@@ -65,6 +65,9 @@ class ObraAudiovisualCreate(BaseModel):
 
     # Equipo técnico (opcional en creación, se puede agregar después)
     equipo_tecnico: list[EquipoTecnicoCreate] | None = None
+
+    # Estado
+    borrador: bool = True
 
 
 class ObraAudiovisualUpdate(BaseModel):
@@ -106,6 +109,9 @@ class ObraAudiovisualUpdate(BaseModel):
     autoriza_investigacion: str | None = None
     convenio_cesion: str | None = None
     restricciones: str | None = None
+
+    # Estado
+    borrador: bool | None = None
 
 
 class ObraAudiovisualOut(BaseModel):
@@ -156,6 +162,9 @@ class ObraAudiovisualOut(BaseModel):
 
     # Equipo técnico
     equipo_tecnico: list[EquipoTecnicoOut] = []
+
+    # Estado
+    borrador: bool
 
     model_config = ConfigDict(from_attributes=True)
 

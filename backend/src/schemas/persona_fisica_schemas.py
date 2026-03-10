@@ -344,3 +344,15 @@ class InvestigadorOut(InvestigadorBase):
     persona_fisica_id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PersonaFisicaSearchOut(BaseModel):
+    """Schema reducido para resultados de búsqueda (buscador de integrantes)"""
+
+    id: int
+    nombre: str | None = None
+    apellido: str | None = None
+    dni: str | None = None
+    email: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)

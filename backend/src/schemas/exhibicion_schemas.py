@@ -61,12 +61,12 @@ class SalaOut(BaseModel):
 
     id: int
     user_id: str
-    nombre: str
-    tipo_sala: str
+    nombre: str | None = None
+    tipo_sala: str | None = None
     otro_tipo: str | None = None
-    domicilio: str
-    localidad: str
-    distrito: str
+    domicilio: str | None = None
+    localidad: str | None = None
+    distrito: str | None = None
     capacidad: int | None = None
     tiene_proyector_digital: bool
     tiene_proyector_35mm: bool
@@ -91,11 +91,11 @@ class ExhibicionCreate(BaseModel):
     obra_id: int | None = None
     sala_id: int | None = None
 
-    titulo_obra: str = Field(..., min_length=1, max_length=255)
-    fecha_exhibicion: date
+    titulo_obra: str | None = Field(None, max_length=255)
+    fecha_exhibicion: date | None = None
     cantidad_funciones: int = 1
 
-    tipo_exhibicion: str = Field(..., min_length=1, max_length=50)
+    tipo_exhibicion: str | None = Field(None, max_length=50)
     nombre_evento: str | None = Field(None, max_length=255)
 
     espectadores_total: int | None = None
@@ -142,10 +142,10 @@ class ExhibicionOut(BaseModel):
     user_id: str
     obra_id: int | None = None
     sala_id: int | None = None
-    titulo_obra: str
-    fecha_exhibicion: date
-    cantidad_funciones: int
-    tipo_exhibicion: str
+    titulo_obra: str | None = None
+    fecha_exhibicion: date | None = None
+    cantidad_funciones: int = 1
+    tipo_exhibicion: str | None = None
     nombre_evento: str | None = None
     espectadores_total: int | None = None
     espectadores_pagos: int | None = None
@@ -164,13 +164,13 @@ class ExhibicionOut(BaseModel):
 class FestivalCreate(BaseModel):
     """Schema para crear un Festival"""
 
-    nombre: str = Field(..., min_length=1, max_length=255)
+    nombre: str | None = Field(None, max_length=255)
     edicion: int | None = None
-    fecha_inicio: date
+    fecha_inicio: date | None = None
     fecha_fin: date | None = None
 
-    localidad: str = Field(..., min_length=1, max_length=100)
-    distrito: str = Field(..., min_length=1, max_length=50)
+    localidad: str | None = Field(None, max_length=100)
+    distrito: str | None = Field(None, max_length=50)
     sedes: list[str] | None = None
 
     tipo_festival: str | None = Field(None, max_length=50)
@@ -227,12 +227,12 @@ class FestivalOut(BaseModel):
 
     id: int
     user_id: str
-    nombre: str
+    nombre: str | None = None
     edicion: int | None = None
-    fecha_inicio: date
+    fecha_inicio: date | None = None
     fecha_fin: date | None = None
-    localidad: str
-    distrito: str
+    localidad: str | None = None
+    distrito: str | None = None
     sedes: list[str] | None = None
     tipo_festival: str | None = None
     categorias: list[str] | None = None
@@ -257,17 +257,17 @@ class FestivalOut(BaseModel):
 class CinematecaCreate(BaseModel):
     """Schema para crear un registro de Cinemateca"""
 
-    obra_id: int
+    obra_id: int | None = None
 
-    tipo_soporte: str = Field(..., min_length=1, max_length=50)
+    tipo_soporte: str | None = Field(None, max_length=50)
     otro_soporte: str | None = Field(None, max_length=100)
     cantidad_copias: int = 1
 
-    estado_conservacion: str = Field(..., min_length=1, max_length=30)
+    estado_conservacion: str | None = Field(None, max_length=30)
     requiere_restauracion: bool = False
     observaciones_estado: str | None = None
 
-    ubicacion_fisica: str = Field(..., min_length=1, max_length=255)
+    ubicacion_fisica: str | None = Field(None, max_length=255)
     estanteria: str | None = Field(None, max_length=50)
     caja: str | None = Field(None, max_length=50)
 
@@ -308,14 +308,14 @@ class CinematecaOut(BaseModel):
     """Schema de salida para Cinemateca"""
 
     id: int
-    obra_id: int
-    tipo_soporte: str
+    obra_id: int | None = None
+    tipo_soporte: str | None = None
     otro_soporte: str | None = None
-    cantidad_copias: int
-    estado_conservacion: str
-    requiere_restauracion: bool
+    cantidad_copias: int = 1
+    estado_conservacion: str | None = None
+    requiere_restauracion: bool = False
     observaciones_estado: str | None = None
-    ubicacion_fisica: str
+    ubicacion_fisica: str | None = None
     estanteria: str | None = None
     caja: str | None = None
     digitalizado: bool

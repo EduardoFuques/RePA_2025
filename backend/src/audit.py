@@ -52,12 +52,11 @@ def audit_log(
     user_agent = None
 
     if request:
-        # Obtener IP considerando proxy reverso
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            ip_address = forwarded.split(",")[0].strip()
-        else:
-            ip_address = request.client.host if request.client else None
+        # Obtener IP del cliente usando la misma lógica que el rate limiter
+        # (solo confía en X-Forwarded-For si viene de un proxy confiable)
+        from src.rate_limiter import get_client_ip
+
+        ip_address = get_client_ip(request)
 
         user_agent = request.headers.get("User-Agent", "")[:500]
 

@@ -63,6 +63,12 @@ class PersonaJuridicaCreate(BaseModel):
     otros_registros: str | None = None
     cuales_registros: str | None = None
 
+    # Documentación (paths)
+    estatuto_path: str | None = None
+    constancia_cuit_path: str | None = None
+    acta_autoridades_path: str | None = None
+    cv_institucional_path: str | None = None
+
     # Consentimiento
     consentimiento: bool = False
     borrador: bool = False
@@ -103,6 +109,13 @@ class PersonaJuridicaUpdate(BaseModel):
     descripcion_apoyo: str | None = None
     otros_registros: str | None = None
     cuales_registros: str | None = None
+
+    # Documentación (paths)
+    estatuto_path: str | None = None
+    constancia_cuit_path: str | None = None
+    acta_autoridades_path: str | None = None
+    cv_institucional_path: str | None = None
+
     consentimiento: bool | None = None
     declaracion_inicial: bool | None = None
     borrador: bool | None = None

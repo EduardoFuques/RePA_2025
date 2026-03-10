@@ -48,6 +48,13 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # JWT / Autenticación
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"  # Fijo para mayor seguridad
+
+_DEFAULT_SECRET = "your-secret-key-change-in-production"
+if IS_PRODUCTION and (not SECRET_KEY or SECRET_KEY == _DEFAULT_SECRET):
+    raise RuntimeError(
+        "SECRET_KEY no configurada o usa el valor por defecto. "
+        'Generar una clave segura con: python -c "import secrets; print(secrets.token_hex(32))"'
+    )
 ACCESS_TOKEN_EXPIRE = int(os.getenv("ACCESS_TOKEN_EXPIRE", "30"))
 REFRESH_TOKEN_EXPIRE = int(os.getenv("REFRESH_TOKEN_EXPIRE", "10080"))
 

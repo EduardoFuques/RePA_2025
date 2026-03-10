@@ -57,6 +57,51 @@ async def create_obra(
     return db_obra
 
 
+@obra_audiovisual_router.get("/me", response_model=ObraAudiovisualOut)
+async def get_my_obra(
+    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Obtener la primera Obra Audiovisual del usuario actual (para formulario single-record)"""
+    obra = (
+        db.query(ObraAudiovisual)
+        .filter(ObraAudiovisual.user_id == current_user["id"])
+        .first()
+    )
+    if not obra:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró obra audiovisual para este usuario",
+        )
+    return obra
+
+
+@obra_audiovisual_router.put("/me", response_model=ObraAudiovisualOut)
+async def update_my_obra(
+    data: ObraAudiovisualUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Actualizar la primera Obra Audiovisual del usuario actual"""
+    obra = (
+        db.query(ObraAudiovisual)
+        .filter(ObraAudiovisual.user_id == current_user["id"])
+        .first()
+    )
+    if not obra:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró obra audiovisual para este usuario",
+        )
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(obra, key, value)
+
+    db.commit()
+    db.refresh(obra)
+    return obra
+
+
 @obra_audiovisual_router.get("/", response_model=list[ObraAudiovisualList])
 async def list_obras(
     current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
