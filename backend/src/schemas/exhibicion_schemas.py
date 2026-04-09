@@ -27,6 +27,12 @@ class SalaCreate(BaseModel):
     telefono: str | None = Field(None, max_length=30)
     email: EmailStr | None = None
     web: str | None = Field(None, max_length=500)
+
+    responsable_legal: dict | None = None
+    programador: dict | None = None
+    responsable_tecnico: dict | None = None
+    afiliaciones: dict | None = None
+    consentimiento: bool = False
     borrador: bool = False
 
 
@@ -52,6 +58,12 @@ class SalaUpdate(BaseModel):
     telefono: str | None = Field(None, max_length=30)
     email: EmailStr | None = None
     web: str | None = Field(None, max_length=500)
+
+    responsable_legal: dict | None = None
+    programador: dict | None = None
+    responsable_tecnico: dict | None = None
+    afiliaciones: dict | None = None
+    consentimiento: bool | None = None
     activo: bool | None = None
     borrador: bool | None = None
 
@@ -77,9 +89,15 @@ class SalaOut(BaseModel):
     telefono: str | None = None
     email: str | None = None
     web: str | None = None
+    responsable_legal: dict | None = None
+    programador: dict | None = None
+    responsable_tecnico: dict | None = None
+    afiliaciones: dict | None = None
+    consentimiento: bool = False
     activo: bool
     borrador: bool
     created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -156,6 +174,7 @@ class ExhibicionOut(BaseModel):
     observaciones: str | None = None
     borrador: bool
     created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -186,8 +205,16 @@ class FestivalCreate(BaseModel):
     telefono: str | None = Field(None, max_length=30)
     web: str | None = Field(None, max_length=500)
 
+    periodicidad: str | None = Field(None, max_length=50)
+    anio_inicio: int | None = None
+    responsable: dict | None = None
+    curaduria: bool = False
+    calendario_oficial: bool = False
+
     apoyo_iaavim: bool = False
     tipo_apoyo: str | None = Field(None, max_length=255)
+    consentimiento: bool = False
+    desea_recibir_info: bool = False
     borrador: bool = False
 
 
@@ -216,8 +243,16 @@ class FestivalUpdate(BaseModel):
     telefono: str | None = Field(None, max_length=30)
     web: str | None = Field(None, max_length=500)
 
+    periodicidad: str | None = Field(None, max_length=50)
+    anio_inicio: int | None = None
+    responsable: dict | None = None
+    curaduria: bool | None = None
+    calendario_oficial: bool | None = None
+
     apoyo_iaavim: bool | None = None
     tipo_apoyo: str | None = Field(None, max_length=255)
+    consentimiento: bool | None = None
+    desea_recibir_info: bool | None = None
     activo: bool | None = None
     borrador: bool | None = None
 
@@ -244,11 +279,19 @@ class FestivalOut(BaseModel):
     email: str | None = None
     telefono: str | None = None
     web: str | None = None
+    periodicidad: str | None = None
+    anio_inicio: int | None = None
+    responsable: dict | None = None
+    curaduria: bool = False
+    calendario_oficial: bool = False
     apoyo_iaavim: bool
     tipo_apoyo: str | None = None
+    consentimiento: bool = False
+    desea_recibir_info: bool = False
     activo: bool
     borrador: bool
     created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -327,5 +370,6 @@ class CinematecaOut(BaseModel):
     fecha_ingreso: date | None = None
     borrador: bool
     created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)

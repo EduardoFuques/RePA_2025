@@ -28,6 +28,12 @@ _MAGIC_BYTES = {
     # .doc/.docx usan formatos compuestos; se valida al menos que sea ZIP (docx) o OLE (doc)
     ".docx": b"PK",
     ".doc": b"\xd0\xcf\x11\xe0",
+    # .xls usa formato OLE2 (mismo magic que .doc)
+    ".xls": b"\xd0\xcf\x11\xe0",
+    # .xlsx usa formato Open XML (ZIP)
+    ".xlsx": b"PK",
+    # .zip
+    ".zip": b"PK",
 }
 
 
@@ -140,7 +146,17 @@ async def upload_dni(
     )
 
 
-ALLOWED_DOC_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"}
+ALLOWED_DOC_EXTENSIONS = {
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".zip",
+}
 ALLOWED_DOC_TYPES = {
     "estatuto": {
         "extensions": {".pdf", ".jpg", ".jpeg", ".png"},
@@ -174,6 +190,43 @@ ALLOWED_DOC_TYPES = {
         "extensions": {".pdf", ".jpg", ".jpeg", ".png"},
         "max_size": 5 * 1024 * 1024,
     },
+    # Fomento - Trámite
+    "carpeta_dossier": {
+        "extensions": {".pdf", ".doc", ".docx"},
+        "max_size": 10 * 1024 * 1024,
+    },
+    "presupuesto_detallado": {
+        "extensions": {".pdf", ".doc", ".docx", ".xls", ".xlsx"},
+        "max_size": 10 * 1024 * 1024,
+    },
+    "plan_financiamiento": {
+        "extensions": {".pdf", ".doc", ".docx", ".xls", ".xlsx"},
+        "max_size": 10 * 1024 * 1024,
+    },
+    "anexos_tecnicos": {
+        "extensions": {".pdf", ".doc", ".docx", ".zip"},
+        "max_size": 15 * 1024 * 1024,
+    },
+    # Fomento - Otros documentos
+    "otro_fomento": {
+        "extensions": {
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx",
+            ".zip",
+            ".jpg",
+            ".jpeg",
+            ".png",
+        },
+        "max_size": 10 * 1024 * 1024,
+    },
+    # Fomento - Evaluador
+    "cv_evaluador": {
+        "extensions": {".pdf", ".doc", ".docx"},
+        "max_size": 10 * 1024 * 1024,
+    },
 }
 
 MIME_MAP = {
@@ -183,6 +236,9 @@ MIME_MAP = {
     ".png": "image/png",
     ".doc": "application/msword",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".zip": "application/zip",
 }
 
 

@@ -3,6 +3,208 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# === EVENTO DE FOMENTO ===
+
+
+class EventoFomentoCreate(BaseModel):
+    """Schema para crear un Evento/Convocatoria de Fomento"""
+
+    nombre: str = Field(..., max_length=255)
+    anio_edicion: int
+    tipo: str = Field(..., max_length=50)
+    estado: str = Field(default="borrador", max_length=30)
+    fecha_apertura: datetime | None = None
+    fecha_cierre: datetime | None = None
+    bases_condiciones_path: str | None = Field(None, max_length=500)
+    presupuesto_global: int | None = None
+    observaciones: str | None = None
+
+
+class EventoFomentoUpdate(BaseModel):
+    """Schema para actualizar un Evento/Convocatoria"""
+
+    nombre: str | None = Field(None, max_length=255)
+    anio_edicion: int | None = None
+    tipo: str | None = Field(None, max_length=50)
+    estado: str | None = Field(None, max_length=30)
+    fecha_apertura: datetime | None = None
+    fecha_cierre: datetime | None = None
+    bases_condiciones_path: str | None = Field(None, max_length=500)
+    presupuesto_global: int | None = None
+    observaciones: str | None = None
+
+
+class LineaFomentoOut(BaseModel):
+    """Schema de salida para Línea (embebido en EventoOut)"""
+
+    id: int
+    evento_id: int
+    nombre: str
+    vigente: bool
+    tope_por_proyecto: int | None = None
+    moneda_tope: str | None = None
+    cupo: int | None = None
+    requiere_evaluacion: bool
+    tipo_comite: str | None = None
+    documentacion_requerida: list[dict] | None = None
+    campos_especificos: list[dict] | None = None
+    observaciones: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EventoFomentoOut(BaseModel):
+    """Schema de salida para Evento/Convocatoria"""
+
+    id: int
+    nombre: str
+    anio_edicion: int
+    tipo: str
+    estado: str
+    fecha_apertura: datetime | None = None
+    fecha_cierre: datetime | None = None
+    bases_condiciones_path: str | None = None
+    presupuesto_global: int | None = None
+    observaciones: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    lineas: list[LineaFomentoOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# === LÍNEA DE FOMENTO ===
+
+
+class LineaFomentoCreate(BaseModel):
+    """Schema para crear una Línea de Fomento"""
+
+    nombre: str = Field(..., max_length=255)
+    vigente: bool = True
+    tope_por_proyecto: int | None = None
+    moneda_tope: str | None = Field(None, max_length=10)
+    cupo: int | None = None
+    requiere_evaluacion: bool = True
+    tipo_comite: str | None = Field(None, max_length=50)
+    documentacion_requerida: list[dict] | None = None
+    campos_especificos: list[dict] | None = None
+    observaciones: str | None = None
+
+
+class LineaFomentoUpdate(BaseModel):
+    """Schema para actualizar una Línea"""
+
+    nombre: str | None = Field(None, max_length=255)
+    vigente: bool | None = None
+    tope_por_proyecto: int | None = None
+    moneda_tope: str | None = Field(None, max_length=10)
+    cupo: int | None = None
+    requiere_evaluacion: bool | None = None
+    tipo_comite: str | None = Field(None, max_length=50)
+    documentacion_requerida: list[dict] | None = None
+    campos_especificos: list[dict] | None = None
+    observaciones: str | None = None
+
+
+# === COMITÉ DE FOMENTO ===
+
+
+class ComiteFomentoCreate(BaseModel):
+    """Schema para crear un Comité de evaluación"""
+
+    evento_id: int
+    linea_id: int | None = None
+    tipo: str = Field(..., max_length=50)  # tecnico, deliberativo
+    nombre: str | None = Field(None, max_length=255)
+    integrantes: list[dict] | None = None  # [{evaluador_id, rol}]
+    resolucion_designacion_path: str | None = Field(None, max_length=500)
+    observaciones: str | None = None
+    activo: bool = True
+
+
+class ComiteFomentoUpdate(BaseModel):
+    """Schema para actualizar un Comité"""
+
+    linea_id: int | None = None
+    tipo: str | None = Field(None, max_length=50)
+    nombre: str | None = Field(None, max_length=255)
+    integrantes: list[dict] | None = None
+    resolucion_designacion_path: str | None = Field(None, max_length=500)
+    observaciones: str | None = None
+    activo: bool | None = None
+
+
+class ComiteFomentoOut(BaseModel):
+    """Schema de salida para Comité"""
+
+    id: int
+    evento_id: int
+    linea_id: int | None = None
+    tipo: str
+    nombre: str | None = None
+    integrantes: list[dict] | None = None
+    resolucion_designacion_path: str | None = None
+    observaciones: str | None = None
+    activo: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# === DICTAMEN DE FOMENTO ===
+
+
+class DictamenFomentoCreate(BaseModel):
+    """Schema para crear un Dictamen"""
+
+    tramite_id: int
+    comite_id: int | None = None
+    evaluador_id: int
+    tipo_dictamen: str = Field(..., max_length=50)  # tecnico, deliberativo, consultoria
+    fecha: datetime | None = None
+    observaciones: str | None = None
+    puntaje: int | None = None
+    archivo_pdf_path: str | None = Field(None, max_length=500)
+    devolucion_presentante: bool = False
+    devolucion_archivo_path: str | None = Field(None, max_length=500)
+
+
+class DictamenFomentoUpdate(BaseModel):
+    """Schema para actualizar un Dictamen"""
+
+    comite_id: int | None = None
+    tipo_dictamen: str | None = Field(None, max_length=50)
+    fecha: datetime | None = None
+    observaciones: str | None = None
+    puntaje: int | None = None
+    archivo_pdf_path: str | None = Field(None, max_length=500)
+    devolucion_presentante: bool | None = None
+    devolucion_archivo_path: str | None = Field(None, max_length=500)
+
+
+class DictamenFomentoOut(BaseModel):
+    """Schema de salida para Dictamen"""
+
+    id: int
+    tramite_id: int
+    comite_id: int | None = None
+    evaluador_id: int
+    tipo_dictamen: str
+    fecha: datetime | None = None
+    observaciones: str | None = None
+    puntaje: int | None = None
+    archivo_pdf_path: str | None = None
+    devolucion_presentante: bool
+    devolucion_archivo_path: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # === TRÁMITE DE FOMENTO ===
 
 
@@ -41,10 +243,19 @@ class TramiteFomentoCreate(BaseModel):
     otros_aportes_no_iaavim: list[dict] | None = None
     aportes_en_especie: str | None = None
 
+    monto_estimado_reintegro: int | None = None
+    gastos_elegibles: str | None = None
+    montos_invertidos_provincia: int | None = None
+    distritos_rodaje: list[str] | None = None
+    fechas_rodaje: dict | None = None
+    postulante_linea_nacional: str | None = Field(None, max_length=255)
+    postulante_linea_misionera: str | None = Field(None, max_length=255)
+
     carpeta_dossier_path: str | None = Field(None, max_length=500)
     presupuesto_detallado_path: str | None = Field(None, max_length=500)
     plan_financiamiento_path: str | None = Field(None, max_length=500)
     anexos_tecnicos_path: str | None = Field(None, max_length=500)
+    otros_documentos: list[dict] | None = None
 
     estado_tramite: str | None = Field(None, max_length=50)
     fecha_ingreso: datetime | None = None
@@ -113,10 +324,19 @@ class TramiteFomentoUpdate(BaseModel):
     otros_aportes_no_iaavim: list[dict] | None = None
     aportes_en_especie: str | None = None
 
+    monto_estimado_reintegro: int | None = None
+    gastos_elegibles: str | None = None
+    montos_invertidos_provincia: int | None = None
+    distritos_rodaje: list[str] | None = None
+    fechas_rodaje: dict | None = None
+    postulante_linea_nacional: str | None = Field(None, max_length=255)
+    postulante_linea_misionera: str | None = Field(None, max_length=255)
+
     carpeta_dossier_path: str | None = Field(None, max_length=500)
     presupuesto_detallado_path: str | None = Field(None, max_length=500)
     plan_financiamiento_path: str | None = Field(None, max_length=500)
     anexos_tecnicos_path: str | None = Field(None, max_length=500)
+    otros_documentos: list[dict] | None = None
 
     estado_tramite: str | None = Field(None, max_length=50)
     fecha_ingreso: datetime | None = None
@@ -187,10 +407,19 @@ class TramiteFomentoOut(BaseModel):
     otros_aportes_no_iaavim: list[dict] | None = None
     aportes_en_especie: str | None = None
 
+    monto_estimado_reintegro: int | None = None
+    gastos_elegibles: str | None = None
+    montos_invertidos_provincia: int | None = None
+    distritos_rodaje: list[str] | None = None
+    fechas_rodaje: dict | None = None
+    postulante_linea_nacional: str | None = None
+    postulante_linea_misionera: str | None = None
+
     carpeta_dossier_path: str | None = None
     presupuesto_detallado_path: str | None = None
     plan_financiamiento_path: str | None = None
     anexos_tecnicos_path: str | None = None
+    otros_documentos: list[dict] | None = None
 
     estado_tramite: str | None = None
     fecha_ingreso: datetime | None = None
@@ -249,6 +478,7 @@ class EvaluadorCreate(BaseModel):
     areas_especializacion: list[str] | None = None
     otra_area_especializacion: str | None = Field(None, max_length=255)
     participacion_jurados: str | None = None
+    cv_path: str | None = Field(None, max_length=500)
     especialidades: list[str] | None = None
 
     # Roles y participación
@@ -290,6 +520,7 @@ class EvaluadorUpdate(BaseModel):
     areas_especializacion: list[str] | None = None
     otra_area_especializacion: str | None = Field(None, max_length=255)
     participacion_jurados: str | None = None
+    cv_path: str | None = Field(None, max_length=500)
     especialidades: list[str] | None = None
 
     # Roles y participación
@@ -334,6 +565,7 @@ class EvaluadorOut(BaseModel):
     areas_especializacion: list[str] | None = None
     otra_area_especializacion: str | None = None
     participacion_jurados: str | None = None
+    cv_path: str | None = None
     especialidades: list[str] | None = None
 
     # Roles y participación
@@ -357,5 +589,153 @@ class EvaluadorOut(BaseModel):
     borrador: bool
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# === SEMILLERO DE PRODUCTORES ===
+
+# -- Cohorte --
+
+
+class CohorteSemilleroCreate(BaseModel):
+    """Schema para crear una Cohorte del Semillero"""
+
+    nombre: str = Field(..., max_length=255)
+    anio_edicion: int
+    fecha_inicio: datetime | None = None
+    fecha_fin: datetime | None = None
+    descripcion: str | None = None
+    cupo: int | None = None
+    estado: str = Field("planificada", max_length=50)
+    observaciones: str | None = None
+
+
+class CohorteSemilleroUpdate(BaseModel):
+    """Schema para actualizar una Cohorte"""
+
+    nombre: str | None = Field(None, max_length=255)
+    anio_edicion: int | None = None
+    fecha_inicio: datetime | None = None
+    fecha_fin: datetime | None = None
+    descripcion: str | None = None
+    cupo: int | None = None
+    estado: str | None = Field(None, max_length=50)
+    observaciones: str | None = None
+
+
+class CohorteSemilleroOut(BaseModel):
+    """Schema de salida para Cohorte"""
+
+    id: int
+    nombre: str
+    anio_edicion: int
+    fecha_inicio: datetime | None = None
+    fecha_fin: datetime | None = None
+    descripcion: str | None = None
+    cupo: int | None = None
+    estado: str
+    observaciones: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# -- Participante --
+
+
+class ParticipanteSemilleroCreate(BaseModel):
+    """Schema para crear un Participante del Semillero"""
+
+    cohorte_id: int
+    codigo_repa: str | None = Field(None, max_length=50)
+    nombre_completo: str | None = Field(None, max_length=255)
+    distrito: str | None = Field(None, max_length=100)
+    tramites_vinculados: list[int] | None = None
+    formacion_previa: str | None = None
+    proyectos_en_desarrollo: str | None = None
+    participacion_capacitaciones_iaavim: str | None = Field(None, max_length=20)
+    diagnostico_inicial: str | None = None
+    objetivos: str | None = None
+    estado: str = Field("activo", max_length=50)
+
+
+class ParticipanteSemilleroUpdate(BaseModel):
+    """Schema para actualizar un Participante"""
+
+    codigo_repa: str | None = Field(None, max_length=50)
+    nombre_completo: str | None = Field(None, max_length=255)
+    distrito: str | None = Field(None, max_length=100)
+    tramites_vinculados: list[int] | None = None
+    formacion_previa: str | None = None
+    proyectos_en_desarrollo: str | None = None
+    participacion_capacitaciones_iaavim: str | None = Field(None, max_length=20)
+    diagnostico_inicial: str | None = None
+    objetivos: str | None = None
+    estado: str | None = Field(None, max_length=50)
+    resultados_cualitativos: str | None = None
+    resultados_cuantificables: dict | None = None
+
+
+class ParticipanteSemilleroOut(BaseModel):
+    """Schema de salida para Participante"""
+
+    id: int
+    cohorte_id: int
+    codigo_repa: str | None = None
+    nombre_completo: str | None = None
+    distrito: str | None = None
+    tramites_vinculados: list[int] | None = None
+    formacion_previa: str | None = None
+    proyectos_en_desarrollo: str | None = None
+    participacion_capacitaciones_iaavim: str | None = None
+    diagnostico_inicial: str | None = None
+    objetivos: str | None = None
+    estado: str
+    resultados_cualitativos: str | None = None
+    resultados_cuantificables: dict | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# -- Acompañamiento --
+
+
+class AcompanamientoSemilleroCreate(BaseModel):
+    """Schema para crear un Acompañamiento"""
+
+    participante_id: int
+    tipo: str = Field(..., max_length=50)
+    fecha: datetime | None = None
+    responsable: str | None = Field(None, max_length=255)
+    observaciones: str | None = None
+    adjuntos: list[dict] | None = None
+
+
+class AcompanamientoSemilleroUpdate(BaseModel):
+    """Schema para actualizar un Acompañamiento"""
+
+    tipo: str | None = Field(None, max_length=50)
+    fecha: datetime | None = None
+    responsable: str | None = Field(None, max_length=255)
+    observaciones: str | None = None
+    adjuntos: list[dict] | None = None
+
+
+class AcompanamientoSemilleroOut(BaseModel):
+    """Schema de salida para Acompañamiento"""
+
+    id: int
+    participante_id: int
+    tipo: str
+    fecha: datetime | None = None
+    responsable: str | None = None
+    observaciones: str | None = None
+    adjuntos: list[dict] | None = None
+    created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

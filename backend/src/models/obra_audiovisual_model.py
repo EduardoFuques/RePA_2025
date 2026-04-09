@@ -1,6 +1,16 @@
 # models/obra_audiovisual_model.py
-from sqlalchemy import JSON, Boolean, Column, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from src.database import Base
 
@@ -75,6 +85,10 @@ class ObraAudiovisual(Base):
     borrador = Column(
         Boolean, default=True, nullable=False
     )  # True = draft, False = submitted
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     # Relación con el usuario
     user = relationship("User", back_populates="obras_audiovisuales")

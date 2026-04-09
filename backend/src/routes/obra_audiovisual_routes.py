@@ -114,6 +114,19 @@ async def list_obras(
     )
 
 
+@obra_audiovisual_router.get("/search", response_model=list[ObraAudiovisualList])
+async def search_obras(
+    q: str = "",
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Buscar obras AGAM por título (todas las obras no-borrador del sistema)"""
+    query = db.query(ObraAudiovisual).filter(ObraAudiovisual.borrador == False)  # noqa: E712
+    if q.strip():
+        query = query.filter(ObraAudiovisual.titulo.ilike(f"%{q.strip()}%"))
+    return query.order_by(ObraAudiovisual.titulo).limit(20).all()
+
+
 @obra_audiovisual_router.get("/{obra_id}", response_model=ObraAudiovisualOut)
 async def get_obra(
     obra_id: int,

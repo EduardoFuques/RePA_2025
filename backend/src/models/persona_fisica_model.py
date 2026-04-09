@@ -95,6 +95,7 @@ class PersonaFisica(Base):
     portfolio_link = Column(String(500), nullable=True)
     redes_sociales = Column(JSON, nullable=True)  # Array de URLs de redes sociales
     dni_adjunto_path = Column(String(500), nullable=True)
+    constancia_rentas_path = Column(String(500), nullable=True)
 
     # === METADATOS ===
     declaracion_inicial = Column(Boolean, nullable=False, default=False)

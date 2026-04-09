@@ -1,5 +1,7 @@
 # schemas/obra_audiovisual_schemas.py
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -165,6 +167,8 @@ class ObraAudiovisualOut(BaseModel):
 
     # Estado
     borrador: bool
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

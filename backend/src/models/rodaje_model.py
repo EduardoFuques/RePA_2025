@@ -1,6 +1,4 @@
 # models/rodaje_model.py
-from datetime import datetime, timezone
-
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -13,6 +11,7 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from src.database import Base
 
@@ -105,11 +104,9 @@ class Rodaje(Base):
 
     # === METADATOS ===
     borrador = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     # Relación con el usuario

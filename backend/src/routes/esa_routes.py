@@ -77,8 +77,24 @@ async def create_estudiante_esa(
 async def get_my_estudiante_esa(
     current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    """Obtener el registro de Estudiante ESA del usuario actual"""
-    return get_user_record(db, EstudianteESA, current_user["id"], MSG_NOT_FOUND)
+    """Obtener el registro de Estudiante ESA del usuario actual.
+
+    Verifica la vigencia automáticamente: si fecha_vencimiento ya pasó,
+    marca el registro como activo=False (baja momentánea).
+    """
+    estudiante = get_user_record(db, EstudianteESA, current_user["id"], MSG_NOT_FOUND)
+
+    # Runtime vigencia check
+    if (
+        estudiante.activo
+        and estudiante.fecha_vencimiento
+        and estudiante.fecha_vencimiento < datetime.now(timezone.utc)
+    ):
+        estudiante.activo = False
+        db.commit()
+        db.refresh(estudiante)
+
+    return estudiante
 
 
 @esa_router.put("/me", response_model=EstudianteESAOut)
