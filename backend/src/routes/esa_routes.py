@@ -84,12 +84,12 @@ async def get_my_estudiante_esa(
     """
     estudiante = get_user_record(db, EstudianteESA, current_user["id"], MSG_NOT_FOUND)
 
-    # Runtime vigencia check
-    if (
-        estudiante.activo
-        and estudiante.fecha_vencimiento
-        and estudiante.fecha_vencimiento < datetime.now(timezone.utc)
-    ):
+    # Runtime vigencia check (fecha_vencimiento may be naive)
+    now_utc = datetime.now(timezone.utc)
+    venc = estudiante.fecha_vencimiento
+    if venc and venc.tzinfo is None:
+        venc = venc.replace(tzinfo=timezone.utc)
+    if estudiante.activo and venc and venc < now_utc:
         estudiante.activo = False
         db.commit()
         db.refresh(estudiante)
