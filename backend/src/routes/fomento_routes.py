@@ -138,9 +138,7 @@ async def update_evento(
     return evento
 
 
-@fomento_router.delete(
-    "/eventos/{evento_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@fomento_router.delete("/eventos/{evento_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_evento(
     evento_id: int,
     current_user: dict = Depends(get_current_user),
@@ -186,20 +184,14 @@ async def create_linea(
     return db_linea
 
 
-@fomento_router.get(
-    "/eventos/{evento_id}/lineas", response_model=list[LineaFomentoOut]
-)
+@fomento_router.get("/eventos/{evento_id}/lineas", response_model=list[LineaFomentoOut])
 async def list_lineas(
     evento_id: int,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Listar Líneas de un Evento"""
-    return (
-        db.query(LineaFomento)
-        .filter(LineaFomento.evento_id == evento_id)
-        .all()
-    )
+    return db.query(LineaFomento).filter(LineaFomento.evento_id == evento_id).all()
 
 
 @fomento_router.put("/lineas/{linea_id}", response_model=LineaFomentoOut)
@@ -493,7 +485,7 @@ async def list_all_evaluadores(
     check_admin_role(current_user)
     return (
         db.query(Evaluador)
-        .filter(Evaluador.borrador == False)
+        .filter(not Evaluador.borrador)
         .order_by(Evaluador.nombre_completo)
         .all()
     )
@@ -592,11 +584,7 @@ async def create_comite(
 ):
     """Crear un Comité de evaluación (solo admin)"""
     check_admin_role(current_user)
-    evento = (
-        db.query(EventoFomento)
-        .filter(EventoFomento.id == data.evento_id)
-        .first()
-    )
+    evento = db.query(EventoFomento).filter(EventoFomento.id == data.evento_id).first()
     if not evento:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Evento no encontrado"
@@ -630,9 +618,7 @@ async def get_comite(
 ):
     """Obtener un Comité por ID (solo admin)"""
     check_admin_role(current_user)
-    comite = (
-        db.query(ComiteFomento).filter(ComiteFomento.id == comite_id).first()
-    )
+    comite = db.query(ComiteFomento).filter(ComiteFomento.id == comite_id).first()
     if not comite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Comité no encontrado"
@@ -649,9 +635,7 @@ async def update_comite(
 ):
     """Actualizar un Comité (solo admin)"""
     check_admin_role(current_user)
-    comite = (
-        db.query(ComiteFomento).filter(ComiteFomento.id == comite_id).first()
-    )
+    comite = db.query(ComiteFomento).filter(ComiteFomento.id == comite_id).first()
     if not comite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Comité no encontrado"
@@ -663,9 +647,7 @@ async def update_comite(
     return comite
 
 
-@fomento_router.delete(
-    "/comites/{comite_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@fomento_router.delete("/comites/{comite_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_comite(
     comite_id: int,
     current_user: dict = Depends(get_current_user),
@@ -673,9 +655,7 @@ async def delete_comite(
 ):
     """Eliminar un Comité (solo admin)"""
     check_admin_role(current_user)
-    comite = (
-        db.query(ComiteFomento).filter(ComiteFomento.id == comite_id).first()
-    )
+    comite = db.query(ComiteFomento).filter(ComiteFomento.id == comite_id).first()
     if not comite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Comité no encontrado"
@@ -701,17 +681,13 @@ async def create_dictamen(
     """Crear un Dictamen (solo admin)"""
     check_admin_role(current_user)
     tramite = (
-        db.query(TramiteFomento)
-        .filter(TramiteFomento.id == data.tramite_id)
-        .first()
+        db.query(TramiteFomento).filter(TramiteFomento.id == data.tramite_id).first()
     )
     if not tramite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Trámite no encontrado"
         )
-    evaluador = (
-        db.query(Evaluador).filter(Evaluador.id == data.evaluador_id).first()
-    )
+    evaluador = db.query(Evaluador).filter(Evaluador.id == data.evaluador_id).first()
     if not evaluador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Evaluador no encontrado"
@@ -750,19 +726,15 @@ async def get_dictamenes_by_tramite(
     db: Session = Depends(get_db),
 ):
     """Obtener dictámenes de un trámite (admin ve todos, ciudadano ve devolucionados)"""
-    query = db.query(DictamenFomento).filter(
-        DictamenFomento.tramite_id == tramite_id
-    )
+    query = db.query(DictamenFomento).filter(DictamenFomento.tramite_id == tramite_id)
     from src.utils import has_user_role
 
     if not has_user_role(current_user, ["admin"]):
-        query = query.filter(DictamenFomento.devolucion_presentante == True)
+        query = query.filter(DictamenFomento.devolucion_presentante)
     return query.order_by(DictamenFomento.fecha.desc()).all()
 
 
-@fomento_router.get(
-    "/dictamenes/{dictamen_id}", response_model=DictamenFomentoOut
-)
+@fomento_router.get("/dictamenes/{dictamen_id}", response_model=DictamenFomentoOut)
 async def get_dictamen(
     dictamen_id: int,
     current_user: dict = Depends(get_current_user),
@@ -771,9 +743,7 @@ async def get_dictamen(
     """Obtener un Dictamen por ID (solo admin)"""
     check_admin_role(current_user)
     dictamen = (
-        db.query(DictamenFomento)
-        .filter(DictamenFomento.id == dictamen_id)
-        .first()
+        db.query(DictamenFomento).filter(DictamenFomento.id == dictamen_id).first()
     )
     if not dictamen:
         raise HTTPException(
@@ -783,9 +753,7 @@ async def get_dictamen(
     return dictamen
 
 
-@fomento_router.put(
-    "/dictamenes/{dictamen_id}", response_model=DictamenFomentoOut
-)
+@fomento_router.put("/dictamenes/{dictamen_id}", response_model=DictamenFomentoOut)
 async def update_dictamen(
     dictamen_id: int,
     data: DictamenFomentoUpdate,
@@ -795,9 +763,7 @@ async def update_dictamen(
     """Actualizar un Dictamen (solo admin)"""
     check_admin_role(current_user)
     dictamen = (
-        db.query(DictamenFomento)
-        .filter(DictamenFomento.id == dictamen_id)
-        .first()
+        db.query(DictamenFomento).filter(DictamenFomento.id == dictamen_id).first()
     )
     if not dictamen:
         raise HTTPException(
@@ -822,9 +788,7 @@ async def delete_dictamen(
     """Eliminar un Dictamen (solo admin)"""
     check_admin_role(current_user)
     dictamen = (
-        db.query(DictamenFomento)
-        .filter(DictamenFomento.id == dictamen_id)
-        .first()
+        db.query(DictamenFomento).filter(DictamenFomento.id == dictamen_id).first()
     )
     if not dictamen:
         raise HTTPException(
@@ -866,9 +830,7 @@ async def list_cohortes(
     """Listar Cohortes (solo admin)"""
     check_admin_role(current_user)
     return (
-        db.query(CohorteSemillero)
-        .order_by(CohorteSemillero.anio_edicion.desc())
-        .all()
+        db.query(CohorteSemillero).order_by(CohorteSemillero.anio_edicion.desc()).all()
     )
 
 
@@ -881,9 +843,7 @@ async def get_cohorte(
     """Obtener una Cohorte por ID (solo admin)"""
     check_admin_role(current_user)
     cohorte = (
-        db.query(CohorteSemillero)
-        .filter(CohorteSemillero.id == cohorte_id)
-        .first()
+        db.query(CohorteSemillero).filter(CohorteSemillero.id == cohorte_id).first()
     )
     if not cohorte:
         raise HTTPException(
@@ -902,9 +862,7 @@ async def update_cohorte(
     """Actualizar una Cohorte (solo admin)"""
     check_admin_role(current_user)
     cohorte = (
-        db.query(CohorteSemillero)
-        .filter(CohorteSemillero.id == cohorte_id)
-        .first()
+        db.query(CohorteSemillero).filter(CohorteSemillero.id == cohorte_id).first()
     )
     if not cohorte:
         raise HTTPException(
@@ -917,9 +875,7 @@ async def update_cohorte(
     return cohorte
 
 
-@fomento_router.delete(
-    "/cohortes/{cohorte_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@fomento_router.delete("/cohortes/{cohorte_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_cohorte(
     cohorte_id: int,
     current_user: dict = Depends(get_current_user),
@@ -928,9 +884,7 @@ async def delete_cohorte(
     """Eliminar una Cohorte (solo admin)"""
     check_admin_role(current_user)
     cohorte = (
-        db.query(CohorteSemillero)
-        .filter(CohorteSemillero.id == cohorte_id)
-        .first()
+        db.query(CohorteSemillero).filter(CohorteSemillero.id == cohorte_id).first()
     )
     if not cohorte:
         raise HTTPException(
@@ -958,9 +912,7 @@ async def create_participante(
     """Agregar participante a una Cohorte (solo admin)"""
     check_admin_role(current_user)
     cohorte = (
-        db.query(CohorteSemillero)
-        .filter(CohorteSemillero.id == cohorte_id)
-        .first()
+        db.query(CohorteSemillero).filter(CohorteSemillero.id == cohorte_id).first()
     )
     if not cohorte:
         raise HTTPException(

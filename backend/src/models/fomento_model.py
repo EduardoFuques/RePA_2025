@@ -15,7 +15,6 @@ from sqlalchemy.orm import relationship
 
 from src.database import Base
 
-
 # === CATÁLOGOS: EVENTOS Y LÍNEAS ===
 
 
@@ -64,9 +63,7 @@ class LineaFomento(Base):
     __tablename__ = "lineas_fomento"
 
     id = Column(Integer, primary_key=True, index=True)
-    evento_id = Column(
-        Integer, ForeignKey("eventos_fomento.id"), nullable=False
-    )
+    evento_id = Column(Integer, ForeignKey("eventos_fomento.id"), nullable=False)
     nombre = Column(String(255), nullable=False)
     vigente = Column(Boolean, default=True, nullable=False)
     tope_por_proyecto = Column(Integer, nullable=True)
@@ -421,9 +418,7 @@ class ParticipanteSemillero(Base):
     __tablename__ = "participantes_semillero"
 
     id = Column(Integer, primary_key=True, index=True)
-    cohorte_id = Column(
-        Integer, ForeignKey("cohortes_semillero.id"), nullable=False
-    )
+    cohorte_id = Column(Integer, ForeignKey("cohortes_semillero.id"), nullable=False)
     codigo_repa = Column(String(50), nullable=True)
     nombre_completo = Column(String(255), nullable=True)
     distrito = Column(String(100), nullable=True)

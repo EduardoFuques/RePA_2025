@@ -78,7 +78,7 @@ async def get_my_estudiante_esa(
     current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """Obtener el registro de Estudiante ESA del usuario actual.
-    
+
     Verifica la vigencia automáticamente: si fecha_vencimiento ya pasó,
     marca el registro como activo=False (baja momentánea).
     """

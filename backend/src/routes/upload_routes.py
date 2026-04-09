@@ -146,7 +146,17 @@ async def upload_dni(
     )
 
 
-ALLOWED_DOC_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx", ".xls", ".xlsx", ".zip"}
+ALLOWED_DOC_EXTENSIONS = {
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".zip",
+}
 ALLOWED_DOC_TYPES = {
     "estatuto": {
         "extensions": {".pdf", ".jpg", ".jpeg", ".png"},
@@ -199,7 +209,17 @@ ALLOWED_DOC_TYPES = {
     },
     # Fomento - Otros documentos
     "otro_fomento": {
-        "extensions": {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".jpg", ".jpeg", ".png"},
+        "extensions": {
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx",
+            ".zip",
+            ".jpg",
+            ".jpeg",
+            ".png",
+        },
         "max_size": 10 * 1024 * 1024,
     },
     # Fomento - Evaluador

@@ -54,16 +54,24 @@ class Sala(Base):
     web = Column(String(500), nullable=True)
 
     # === RESPONSABLE LEGAL ===
-    responsable_legal = Column(JSON, nullable=True)  # {nombre, apellido, dni, cuil, email, telefono}
+    responsable_legal = Column(
+        JSON, nullable=True
+    )  # {nombre, apellido, dni, cuil, email, telefono}
 
     # === PROGRAMADOR ===
-    programador = Column(JSON, nullable=True)  # {tieneProgramador, datos: [{nombre, email, telefono}]}
+    programador = Column(
+        JSON, nullable=True
+    )  # {tieneProgramador, datos: [{nombre, email, telefono}]}
 
     # === RESPONSABLE TÉCNICO ===
-    responsable_tecnico = Column(JSON, nullable=True)  # {nombre, distrito, email, telefono}
+    responsable_tecnico = Column(
+        JSON, nullable=True
+    )  # {nombre, distrito, email, telefono}
 
     # === AFILIACIONES Y REDES ===
-    afiliaciones = Column(JSON, nullable=True)  # {integraRed, redesDescripcion, esSedeFestival, nombreFestival, tieneConvenio}
+    afiliaciones = Column(
+        JSON, nullable=True
+    )  # {integraRed, redesDescripcion, esSedeFestival, nombreFestival, tieneConvenio}
 
     # === CONSENTIMIENTO ===
     consentimiento = Column(Boolean, default=False)
@@ -177,7 +185,9 @@ class Festival(Base):
     # === DATOS ADICIONALES ===
     periodicidad = Column(String(50), nullable=True)  # anual, bianual, etc.
     anio_inicio = Column(Integer, nullable=True)
-    responsable = Column(JSON, nullable=True)  # {tipo: [], nombreRazon, dniCuit, email, telefono}
+    responsable = Column(
+        JSON, nullable=True
+    )  # {tipo: [], nombreRazon, dniCuit, email, telefono}
     curaduria = Column(Boolean, default=False)
     calendario_oficial = Column(Boolean, default=False)
 
