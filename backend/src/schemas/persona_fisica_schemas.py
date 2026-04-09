@@ -167,6 +167,7 @@ class PersonaFisicaCreate(BaseModel):
     portfolio_link: str | None = None
     redes_sociales: list[str] | None = None
     dni_adjunto_path: str | None = None
+    constancia_rentas_path: str | None = None
     borrador: bool = False
 
 
@@ -227,6 +228,7 @@ class PersonaFisicaUpdate(BaseModel):
     portfolio_link: str | None = None
     redes_sociales: list[str] | None = None
     dni_adjunto_path: str | None = None
+    constancia_rentas_path: str | None = None
     declaracion_inicial: bool | None = None
     borrador: bool | None = None
 
@@ -291,6 +293,7 @@ class PersonaFisicaOut(BaseModel):
     portfolio_link: str | None = None
     redes_sociales: list[str] | None = None
     dni_adjunto_path: str | None = None
+    constancia_rentas_path: str | None = None
     declaracion_inicial: bool
     borrador: bool = False
 
