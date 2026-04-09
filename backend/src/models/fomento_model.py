@@ -16,6 +16,86 @@ from sqlalchemy.orm import relationship
 from src.database import Base
 
 
+# === CATÁLOGOS: EVENTOS Y LÍNEAS ===
+
+
+class EventoFomento(Base):
+    """
+    Evento / Convocatoria de Fomento.
+    Estructura madre que agrupa líneas, proyectos y evaluaciones.
+    """
+
+    __tablename__ = "eventos_fomento"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(255), nullable=False)
+    anio_edicion = Column(Integer, nullable=False)
+    tipo = Column(String(50), nullable=False)  # competitiva, especial
+    estado = Column(String(30), nullable=False, default="borrador")
+    # borrador, activo, cerrado
+    fecha_apertura = Column(DateTime, nullable=True)
+    fecha_cierre = Column(DateTime, nullable=True)
+    bases_condiciones_path = Column(String(500), nullable=True)
+    presupuesto_global = Column(Integer, nullable=True)
+    observaciones = Column(Text, nullable=True)
+
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    # Relaciones
+    lineas = relationship(
+        "LineaFomento", back_populates="evento", cascade="all, delete-orphan"
+    )
+
+
+class LineaFomento(Base):
+    """
+    Línea de fomento dentro de un evento/convocatoria.
+    Define requisitos, topes y campos específicos.
+    """
+
+    __tablename__ = "lineas_fomento"
+
+    id = Column(Integer, primary_key=True, index=True)
+    evento_id = Column(
+        Integer, ForeignKey("eventos_fomento.id"), nullable=False
+    )
+    nombre = Column(String(255), nullable=False)
+    vigente = Column(Boolean, default=True, nullable=False)
+    tope_por_proyecto = Column(Integer, nullable=True)
+    moneda_tope = Column(String(10), nullable=True)  # ARS, USD
+    cupo = Column(Integer, nullable=True)
+    requiere_evaluacion = Column(Boolean, default=True)
+    tipo_comite = Column(String(50), nullable=True)  # tecnico, deliberativo
+    documentacion_requerida = Column(JSON, nullable=True)  # checklist
+    campos_especificos = Column(JSON, nullable=True)
+    # Lista de {etiqueta, tipo_dato, obligatorio, ayuda, orden}
+    observaciones = Column(Text, nullable=True)
+
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    # Relaciones
+    evento = relationship("EventoFomento", back_populates="lineas")
+
+
+# === TRÁMITES Y EVALUADORES ===
+
+
 class TramiteFomento(Base):
     """
     Modelo para Trámites de Fomento.
@@ -73,11 +153,23 @@ class TramiteFomento(Base):
     )  # Lista de {organismo, programa, monto, moneda}
     aportes_en_especie = Column(Text, nullable=True)
 
+    # === CASH REBATE ===
+    monto_estimado_reintegro = Column(Integer, nullable=True)
+    gastos_elegibles = Column(Text, nullable=True)
+    montos_invertidos_provincia = Column(Integer, nullable=True)
+    distritos_rodaje = Column(JSON, nullable=True)  # Lista de distritos
+    fechas_rodaje = Column(JSON, nullable=True)  # {fecha_inicio, fecha_fin}
+    postulante_linea_nacional = Column(String(255), nullable=True)
+    postulante_linea_misionera = Column(String(255), nullable=True)
+
     # === ADJUNTOS ===
     carpeta_dossier_path = Column(String(500), nullable=True)
     presupuesto_detallado_path = Column(String(500), nullable=True)
     plan_financiamiento_path = Column(String(500), nullable=True)
     anexos_tecnicos_path = Column(String(500), nullable=True)
+
+    # === OTROS DOCUMENTOS ===
+    otros_documentos = Column(JSON, nullable=True)  # Lista de {tipo, descripcion, path}
 
     # === ESTADO Y FECHAS ===
     estado_tramite = Column(String(50), nullable=True)
@@ -130,13 +222,90 @@ class TramiteFomento(Base):
 
     # === ESTADO ===
     borrador = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
     updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
 
     # Relación con usuario
     user = relationship("User", back_populates="tramites_fomento")
+
+
+# === COMITÉS Y DICTÁMENES ===
+
+
+class ComiteFomento(Base):
+    """
+    Modelo para Comités de evaluación de fomento.
+    Agrupan evaluadores asignados a un evento/línea para emitir dictámenes.
+    """
+
+    __tablename__ = "comites_fomento"
+
+    id = Column(Integer, primary_key=True, index=True)
+    evento_id = Column(Integer, ForeignKey("eventos_fomento.id"), nullable=False)
+    linea_id = Column(Integer, ForeignKey("lineas_fomento.id"), nullable=True)
+    tipo = Column(String(50), nullable=False)  # tecnico, deliberativo
+    nombre = Column(String(255), nullable=True)
+    integrantes = Column(JSON, nullable=True)  # Lista de {evaluador_id, rol}
+    resolucion_designacion_path = Column(String(500), nullable=True)
+    observaciones = Column(Text, nullable=True)
+    activo = Column(Boolean, default=True, nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    evento = relationship("EventoFomento")
+    linea = relationship("LineaFomento")
+    dictamenes = relationship(
+        "DictamenFomento", back_populates="comite", cascade="all, delete-orphan"
+    )
+
+
+class DictamenFomento(Base):
+    """
+    Modelo para Dictámenes emitidos por evaluadores sobre trámites de fomento.
+    """
+
+    __tablename__ = "dictamenes_fomento"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tramite_id = Column(Integer, ForeignKey("tramites_fomento.id"), nullable=False)
+    comite_id = Column(Integer, ForeignKey("comites_fomento.id"), nullable=True)
+    evaluador_id = Column(Integer, ForeignKey("evaluadores.id"), nullable=False)
+    tipo_dictamen = Column(
+        String(50), nullable=False
+    )  # tecnico, deliberativo, consultoria
+    fecha = Column(DateTime, nullable=True)
+    observaciones = Column(Text, nullable=True)
+    puntaje = Column(Integer, nullable=True)
+    archivo_pdf_path = Column(String(500), nullable=True)
+    devolucion_presentante = Column(Boolean, default=False)
+    devolucion_archivo_path = Column(String(500), nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    tramite = relationship("TramiteFomento")
+    comite = relationship("ComiteFomento", back_populates="dictamenes")
+    evaluador = relationship("Evaluador")
 
 
 class Evaluador(Base):
@@ -164,6 +333,7 @@ class Evaluador(Base):
     areas_especializacion = Column(JSON, nullable=True)  # Lista de áreas
     otra_area_especializacion = Column(String(255), nullable=True)
     participacion_jurados = Column(Text, nullable=True)
+    cv_path = Column(String(500), nullable=True)
     especialidades = Column(JSON, nullable=True)  # Lista de especialidades
 
     # === ROLES Y PARTICIPACIÓN ===
@@ -202,3 +372,120 @@ class Evaluador(Base):
 
     # Relación con usuario
     user = relationship("User", back_populates="evaluadores")
+
+
+# === SEMILLERO DE PRODUCTORES ===
+
+
+class CohorteSemillero(Base):
+    """
+    Modelo para Cohortes del Semillero de Productores.
+    Cada cohorte agrupa participantes en un período determinado.
+    """
+
+    __tablename__ = "cohortes_semillero"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(255), nullable=False)
+    anio_edicion = Column(Integer, nullable=False)
+    fecha_inicio = Column(DateTime, nullable=True)
+    fecha_fin = Column(DateTime, nullable=True)
+    descripcion = Column(Text, nullable=True)
+    cupo = Column(Integer, nullable=True)
+    estado = Column(String(50), nullable=False, default="planificada")
+    # planificada, inscripcion_abierta, en_curso, finalizada
+    observaciones = Column(Text, nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    participantes = relationship(
+        "ParticipanteSemillero",
+        back_populates="cohorte",
+        cascade="all, delete-orphan",
+    )
+
+
+class ParticipanteSemillero(Base):
+    """
+    Modelo para Participantes del Semillero.
+    Vincula un código RePA a una cohorte con diagnóstico y objetivos.
+    """
+
+    __tablename__ = "participantes_semillero"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cohorte_id = Column(
+        Integer, ForeignKey("cohortes_semillero.id"), nullable=False
+    )
+    codigo_repa = Column(String(50), nullable=True)
+    nombre_completo = Column(String(255), nullable=True)
+    distrito = Column(String(100), nullable=True)
+    tramites_vinculados = Column(JSON, nullable=True)  # Lista de IDs de trámites
+    formacion_previa = Column(Text, nullable=True)
+    proyectos_en_desarrollo = Column(Text, nullable=True)
+    participacion_capacitaciones_iaavim = Column(String(20), nullable=True)  # si, no
+    diagnostico_inicial = Column(Text, nullable=True)
+    objetivos = Column(Text, nullable=True)
+
+    # Cierre
+    estado = Column(String(50), nullable=False, default="activo")
+    # activo, egresado, abandono, continua
+    resultados_cualitativos = Column(Text, nullable=True)
+    resultados_cuantificables = Column(JSON, nullable=True)
+
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    cohorte = relationship("CohorteSemillero", back_populates="participantes")
+    acompanamientos = relationship(
+        "AcompanamientoSemillero",
+        back_populates="participante",
+        cascade="all, delete-orphan",
+    )
+
+
+class AcompanamientoSemillero(Base):
+    """
+    Modelo para Acompañamientos dentro del Semillero.
+    Registra actividades de tutoría, clínica, pitch, etc.
+    """
+
+    __tablename__ = "acompanamientos_semillero"
+
+    id = Column(Integer, primary_key=True, index=True)
+    participante_id = Column(
+        Integer, ForeignKey("participantes_semillero.id"), nullable=False
+    )
+    tipo = Column(String(50), nullable=False)
+    # tutoria, desarrollo_carpeta, clinica, pitch, asesoria, otros
+    fecha = Column(DateTime, nullable=True)
+    responsable = Column(String(255), nullable=True)
+    observaciones = Column(Text, nullable=True)
+    adjuntos = Column(JSON, nullable=True)  # Lista de {nombre, path}
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    participante = relationship(
+        "ParticipanteSemillero", back_populates="acompanamientos"
+    )
