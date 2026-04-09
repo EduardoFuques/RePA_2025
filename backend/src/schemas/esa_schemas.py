@@ -87,24 +87,24 @@ class EstudianteESAOut(BaseModel):
     user_id: str
 
     # Datos personales
-    nombre_completo: str
-    dni: str
-    cuil: str
-    fecha_nacimiento: date
+    nombre_completo: str | None = None
+    dni: str | None = None
+    cuil: str | None = None
+    fecha_nacimiento: date | None = None
     genero: str | None = None
-    email: str
-    telefono: str
+    email: str | None = None
+    telefono: str | None = None
 
     # Localización
-    municipio: str
-    distrito: str
+    municipio: str | None = None
+    distrito: str | None = None
 
     # Formación
-    institucion: str
+    institucion: str | None = None
     otra_institucion: str | None = None
-    carrera: str
+    carrera: str | None = None
     anio_cursado: int | None = None
-    modalidad: str
+    modalidad: str | None = None
 
     # Intereses
     areas_interes: list[str] | None = None

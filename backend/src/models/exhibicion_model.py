@@ -1,6 +1,4 @@
 # models/exhibicion_model.py
-from datetime import datetime, timezone
-
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -14,6 +12,7 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from src.database import Base
 
@@ -54,14 +53,27 @@ class Sala(Base):
     email = Column(String(255), nullable=True)
     web = Column(String(500), nullable=True)
 
+    # === RESPONSABLE LEGAL ===
+    responsable_legal = Column(JSON, nullable=True)  # {nombre, apellido, dni, cuil, email, telefono}
+
+    # === PROGRAMADOR ===
+    programador = Column(JSON, nullable=True)  # {tieneProgramador, datos: [{nombre, email, telefono}]}
+
+    # === RESPONSABLE TÉCNICO ===
+    responsable_tecnico = Column(JSON, nullable=True)  # {nombre, distrito, email, telefono}
+
+    # === AFILIACIONES Y REDES ===
+    afiliaciones = Column(JSON, nullable=True)  # {integraRed, redesDescripcion, esSedeFestival, nombreFestival, tieneConvenio}
+
+    # === CONSENTIMIENTO ===
+    consentimiento = Column(Boolean, default=False)
+
     # === METADATOS ===
     activo = Column(Boolean, default=True)
     borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     # Relación con el usuario
@@ -112,11 +124,9 @@ class Exhibicion(Base):
 
     # === METADATOS ===
     borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     # Relaciones
@@ -164,18 +174,27 @@ class Festival(Base):
     telefono = Column(String(30), nullable=True)
     web = Column(String(500), nullable=True)
 
+    # === DATOS ADICIONALES ===
+    periodicidad = Column(String(50), nullable=True)  # anual, bianual, etc.
+    anio_inicio = Column(Integer, nullable=True)
+    responsable = Column(JSON, nullable=True)  # {tipo: [], nombreRazon, dniCuit, email, telefono}
+    curaduria = Column(Boolean, default=False)
+    calendario_oficial = Column(Boolean, default=False)
+
     # === APOYO INSTITUCIONAL ===
     apoyo_iaavim = Column(Boolean, default=False)
     tipo_apoyo = Column(String(255), nullable=True)
 
+    # === CONSENTIMIENTO ===
+    consentimiento = Column(Boolean, default=False)
+    desea_recibir_info = Column(Boolean, default=False)
+
     # === METADATOS ===
     activo = Column(Boolean, default=True)
     borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     # Relación con el usuario
@@ -225,11 +244,9 @@ class Cinemateca(Base):
     # === METADATOS ===
     fecha_ingreso = Column(Date, nullable=True)
     borrador = Column(Boolean, nullable=False, default=False)  # Para guardado parcial
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     # Relación con la obra

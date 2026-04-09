@@ -134,21 +134,21 @@ class AsociacionOut(BaseModel):
     user_id: str
 
     # Datos básicos y contacto
-    nombre_asociacion: str
+    nombre_asociacion: str | None = None
     anio_creacion: int | None = None
     personeria_juridica: str | None = None
     tipo_personeria: str | None = None
     otra_personeria: str | None = None
     cuit: str | None = None
-    domicilio: str
-    localidad: str
-    distrito: str
+    domicilio: str | None = None
+    localidad: str | None = None
+    distrito: str | None = None
     telefono: str | None = None
-    email: str
+    email: str | None = None
     web: str | None = None
 
     # Representación
-    nombre_referente: str
+    nombre_referente: str | None = None
     rol_referente: str | None = None
     telefono_referente: str | None = None
     email_referente: str | None = None
