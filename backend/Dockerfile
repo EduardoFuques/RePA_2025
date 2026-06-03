@@ -12,5 +12,9 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY ./src /code/src
 
+# Alembic (fuente de verdad del esquema): se aplica `upgrade head` en el arranque
+COPY ./alembic /code/alembic
+COPY ./alembic.ini /code/alembic.ini
+
 ENTRYPOINT ["uvicorn"]
 CMD ["src.main:app", "--host", "0.0.0.0", "--port", "80"]

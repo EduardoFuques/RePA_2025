@@ -7,8 +7,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.config import API_ROOT_PATH, CORS_ORIGINS, IS_PRODUCTION
-from src.database import get_db, init_db
+from src.config import API_ROOT_PATH, CORS_ORIGINS, IS_PRODUCTION, IS_TESTING
+from src.database import create_all_tables, get_db, run_migrations
 from src.logger import logger
 from src.middlewarelogg import log_requests
 from src.rate_limiter import limiter, rate_limit_exceeded_handler
@@ -29,8 +29,12 @@ from src.seed import seed_data
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager para startup y shutdown"""
-    # Startup
-    init_db()
+    # Startup: el esquema se gestiona con Alembic en dev/prod; en tests se usa
+    # create_all (rápido y aislado, gestionado por la suite).
+    if IS_TESTING:
+        create_all_tables()
+    else:
+        run_migrations()
     seed_data()
     logger.info("FastAPI iniciado correctamente...")
     yield
@@ -53,7 +57,7 @@ La API de RePA permite gestionar el registro de:
 - **Personas Jurídicas**: Productoras, cooperativas, empresas audiovisuales
 - **Asociaciones/Colectivos**: Grupos y colectivos audiovisuales
 - **Estudiantes ESA**: Estudiantes del sector audiovisual (registro temporal)
-- **Exhibiciones**: Salas, festivales, cinematecas
+- **Exhibiciones**: Salas, festivales
 - **Obras Audiovisuales (AGAM)**: Registro de obras audiovisuales
 
 ### Autenticación
@@ -77,7 +81,7 @@ Los endpoints sensibles tienen límites de solicitudes:
 - **IAAviM** - Instituto de Artes Audiovisuales de Misiones
 - **Email**: sistemas@iaavim.gob.ar
     """,
-    version="1.7.2",
+    version="1.8.5",
     contact={
         "name": "IAAviM - Sistemas",
         "url": "https://iaavim.gob.ar",
@@ -112,7 +116,7 @@ Los endpoints sensibles tienen límites de solicitudes:
             "description": "Registro de obras audiovisuales producidas en Misiones",
         },
         {
-            "name": "Exhibiciones, Salas, Festivales, Cinemateca",
+            "name": "Exhibiciones, Salas, Festivales",
             "description": "Registro de espacios de exhibición audiovisual",
         },
         {
@@ -164,7 +168,7 @@ app.include_router(esa_router, prefix="/esa", tags=["Estudiantes ESA"])
 app.include_router(
     exhibicion_router,
     prefix="/exhibiciones",
-    tags=["Exhibiciones, Salas, Festivales, Cinemateca"],
+    tags=["Exhibiciones, Salas, Festivales"],
 )
 app.include_router(rodaje_router, prefix="/rodajes", tags=["Comisión de Filmaciones"])
 app.include_router(fomento_router, tags=["Fomento"])
