@@ -3,6 +3,15 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 
+# Esquema para Permisos
+class PermissionOut(BaseModel):
+    id: int
+    code: str
+    descripcion: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # Esquema para Roles
 class RoleBase(BaseModel):
     rol: str
@@ -12,6 +21,31 @@ class RoleOut(RoleBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# Esquema detallado de rol (incluye permisos y metadatos)
+class RoleDetailOut(RoleBase):
+    id: int
+    descripcion: str | None = None
+    is_system: bool = False
+    permissions: list[PermissionOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Esquema para crear un rol
+class RoleCreate(BaseModel):
+    rol: str
+    descripcion: str | None = None
+    # Lista de códigos de permiso (ej. ["users:read", "audit:read"])
+    permissions: list[str] = []
+
+
+# Esquema para actualizar un rol
+class RoleUpdate(BaseModel):
+    rol: str | None = None
+    descripcion: str | None = None
+    permissions: list[str] | None = None
 
 
 # Esquemas de usuario
@@ -77,4 +111,3 @@ class UserFormsMetadata(BaseModel):
     has_sala: bool = False
     has_exhibicion: bool = False
     has_festival: bool = False
-    has_cinemateca: bool = False

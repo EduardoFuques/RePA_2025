@@ -8,7 +8,20 @@ from src.models.audit_model import AuditAction, AuditLog
 
 # Modelos ESA y Exhibiciones
 from src.models.esa_model import EstudianteESA
-from src.models.exhibicion_model import Cinemateca, Exhibicion, Festival, Sala
+from src.models.exhibicion_model import Exhibicion, Festival, Sala
+
+# Modelos de Fomento
+from src.models.fomento_model import (
+    AcompanamientoSemillero,
+    CohorteSemillero,
+    ComiteFomento,
+    DictamenFomento,
+    Evaluador,
+    EventoFomento,
+    LineaFomento,
+    ParticipanteSemillero,
+    TramiteFomento,
+)
 from src.models.obra_audiovisual_model import EquipoTecnicoObra, ObraAudiovisual
 
 # Modelos de formularios RePA
@@ -27,13 +40,22 @@ from src.models.persona_juridica_model import IntegrantePJ, PersonaJuridica
 
 # Comisión de Filmaciones
 from src.models.rodaje_model import Rodaje
-from src.models.user_models import Role, TokenRecovery, User, UserRole
+from src.models.user_models import (
+    Permission,
+    Role,
+    RolePermission,
+    TokenRecovery,
+    User,
+    UserRole,
+)
 
 __all__ = [
     # User & Auth
     "User",
     "Role",
     "UserRole",
+    "Permission",
+    "RolePermission",
     "TokenRecovery",
     # Persona Física
     "PersonaFisica",
@@ -60,9 +82,18 @@ __all__ = [
     "Sala",
     "Exhibicion",
     "Festival",
-    "Cinemateca",
     # Comisión de Filmaciones
     "Rodaje",
+    # Fomento
+    "EventoFomento",
+    "LineaFomento",
+    "TramiteFomento",
+    "ComiteFomento",
+    "DictamenFomento",
+    "Evaluador",
+    "CohorteSemillero",
+    "ParticipanteSemillero",
+    "AcompanamientoSemillero",
     # Audit Trail
     "AuditLog",
     "AuditAction",

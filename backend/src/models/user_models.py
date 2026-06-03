@@ -27,12 +27,35 @@ class UserRole(Base):
     role_id = Column(Integer, ForeignKey("roles.id"))
 
 
+# Tabla asociativa muchos-a-muchos entre roles y permisos
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+    id = Column(Integer, primary_key=True, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"))
+    permission_id = Column(Integer, ForeignKey("permissions.id", ondelete="CASCADE"))
+
+
+# Modelo de Permiso (granularidad recurso:accion, ej. "users:read")
+class Permission(Base):
+    __tablename__ = "permissions"
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String, unique=True, index=True, nullable=False)
+    descripcion = Column(String, nullable=True)
+
+
 # Modelo de Role
 class Role(Base):
     __tablename__ = "roles"
     id = Column(Integer, primary_key=True, index=True)
     rol = Column(String, unique=True, index=True, nullable=False)
-    # Relación inversa definida en User
+    descripcion = Column(String, nullable=True)
+    # Roles del sistema no pueden eliminarse ni renombrarse
+    is_system = Column(Boolean, default=False, nullable=False)
+    # Permisos asociados al rol
+    permissions = relationship(
+        "Permission", secondary="role_permissions", backref="roles"
+    )
+    # Relación inversa con usuarios definida en User
 
 
 # Modelo de User

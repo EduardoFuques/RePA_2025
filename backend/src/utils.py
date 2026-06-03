@@ -4,11 +4,13 @@ from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from src.database import get_db
 from src.logger import logger
-from src.models.user_models import User
+from src.models.user_models import Role, User
+from src.rbac import ALL_PERMISSIONS
 from src.schemas.user_schemas import UserUpdate
 from src.token_utils import decode_access_token
 
@@ -50,7 +52,6 @@ async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)
     """
 
     payload = decode_access_token(token)
-    logger.debug(f"get_current_user - payload: {payload}")
 
     user_data = {
         "id": payload.get("sub"),
@@ -58,7 +59,8 @@ async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)
         "roles": payload.get("roles"),
         "type": payload.get("type"),
     }
-    logger.debug(f"get_current_user - user_data: {user_data}")
+    # No registrar el payload completo para evitar fuga de PII en logs
+    logger.debug(f"get_current_user - user_id: {user_data['id']}")
     return user_data
 
 
@@ -98,20 +100,82 @@ def has_user_role(current_user: dict, required_roles: list[str]) -> bool:
     Returns:
         bool: True si tiene al menos un rol requerido, False en caso contrario
     """
-    logger.debug(f"has_user_role - current_user: {current_user}")
-
     # Extraer los nombres de los roles del usuario en minúsculas
-    user_roles = {role["rol"].lower() for role in current_user.get("roles", [])}
-    logger.debug(f"has_user_role - user_roles: {user_roles}")
-    # Convertir los roles requeridos a minúsculas para comparación insensible a mayúsculas/minúsculas
+    user_roles = {
+        role["rol"].lower() for role in (current_user.get("roles") or [])
+    }
+    # Comparación insensible a mayúsculas/minúsculas
     required_roles_lower = {role.lower() for role in required_roles}
-    logger.debug(f"has_user_role - required_roles_lower: {required_roles_lower}")
 
-    hsa_role = user_roles.isdisjoint(required_roles_lower)
-    logger.debug(f"has_user_role - hsa_role: {hsa_role}")
-
-    # Verificar si hay intersección entre los roles del usuario y los roles requeridos
+    # Verificar si hay intersección entre los roles del usuario y los requeridos
     return not user_roles.isdisjoint(required_roles_lower)
+
+
+def get_user_role_names(current_user: dict) -> set[str]:
+    """Devuelve el conjunto de nombres de rol del usuario (en minúsculas)."""
+    return {role["rol"].lower() for role in (current_user.get("roles") or [])}
+
+
+def get_user_permissions(db: Session, current_user: dict) -> set[str]:
+    """
+    Resuelve el conjunto de permisos efectivos de un usuario a partir de sus roles.
+    El rol 'admin' obtiene todos los permisos del sistema.
+    """
+    role_names = get_user_role_names(current_user)
+    if "admin" in role_names:
+        return set(ALL_PERMISSIONS)
+
+    if not role_names:
+        return set()
+
+    roles = (
+        db.query(Role)
+        .filter(func.lower(Role.rol).in_(role_names))
+        .all()
+    )
+    perms: set[str] = set()
+    for role in roles:
+        perms.update(p.code for p in role.permissions)
+    return perms
+
+
+def require_roles(*roles: str):
+    """
+    Factory de dependencia FastAPI que exige que el usuario tenga al menos
+    uno de los roles indicados. Uso: Depends(require_roles("admin")).
+    """
+
+    async def _checker(current_user: dict = Depends(get_current_user)) -> dict:
+        if not has_user_role(current_user, list(roles)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tiene permisos para realizar esta acción",
+            )
+        return current_user
+
+    return _checker
+
+
+def require_permissions(*codes: str):
+    """
+    Factory de dependencia FastAPI que exige que el usuario posea TODOS los
+    permisos indicados (resueltos desde sus roles). Uso:
+    Depends(require_permissions("users:read")).
+    """
+
+    async def _checker(
+        current_user: dict = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        user_perms = get_user_permissions(db, current_user)
+        if not set(codes).issubset(user_perms):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tiene los permisos requeridos para esta acción",
+            )
+        return current_user
+
+    return _checker
 
 
 # Verifica que el usuario tenga rol de administrador
