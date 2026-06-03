@@ -1,5 +1,5 @@
 # tests/test_exhibiciones.py
-"""Tests para Exhibiciones, Salas, Festivales y Cinemateca"""
+"""Tests para Exhibiciones, Salas y Festivales"""
 import pytest
 
 

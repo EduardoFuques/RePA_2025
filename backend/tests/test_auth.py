@@ -46,10 +46,24 @@ class TestUserRegistration:
 class TestUserLogin:
     """Tests para login de usuarios"""
     
-    def test_login_success(self, client, test_user_data):
+    def test_login_success(self, client, test_user_data, db_session):
         """Test: Login exitoso"""
+        from src.models.user_models import User
+
         # Registrar usuario
         client.post("/users/register", json=test_user_data)
+
+        # Activar el usuario (bypass verificación de email) para que el login
+        # sea determinista sin depender del orden de ejecución de otros tests.
+        db_session.commit()
+        user = (
+            db_session.query(User)
+            .filter(User.email == test_user_data["email"])
+            .first()
+        )
+        if user and not user.is_active:
+            user.is_active = True
+            db_session.commit()
         
         # Login
         response = client.post(

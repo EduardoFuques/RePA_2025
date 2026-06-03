@@ -88,7 +88,7 @@ class TestAdmin:
         if not user:
             pytest.skip("No hay usuarios en la BD")
         
-        response = client.get(f"/admin_user/{user.id}", headers=admin_headers)
+        response = client.get(f"/admin_user/users/{user.id}", headers=admin_headers)
         assert response.status_code == 200
         assert response.json()["id"] == user.id
 
@@ -97,7 +97,7 @@ class TestAdmin:
         if not admin_headers:
             pytest.skip("No se pudo obtener token de admin")
         
-        response = client.get("/admin_user/nonexistent-id", headers=admin_headers)
+        response = client.get("/admin_user/users/nonexistent-id", headers=admin_headers)
         assert response.status_code == 404
 
     def test_update_user_as_admin(self, client: TestClient, admin_headers: dict, db_session):
@@ -113,7 +113,7 @@ class TestAdmin:
             pytest.skip("No hay usuarios para actualizar")
         
         update_data = {"email": f"updated_{user.email}"}
-        response = client.put(f"/admin_user/{user.id}", json=update_data, headers=admin_headers)
+        response = client.put(f"/admin_user/users/{user.id}", json=update_data, headers=admin_headers)
         
         # Puede ser 200 o 400 si el email ya existe
         assert response.status_code in [200, 400]
@@ -130,14 +130,14 @@ class TestAdmin:
         if not user:
             pytest.skip("No hay usuarios para desactivar")
         
-        original_status = user.is_active
-        
-        response = client.delete(f"/admin_user/{user.id}", headers=admin_headers)
+        # Nuevo endpoint explícito e idempotente: PATCH /users/{id}/status
+        nuevo_estado = not user.is_active
+        response = client.patch(
+            f"/admin_user/users/{user.id}/status?is_active={str(nuevo_estado).lower()}",
+            headers=admin_headers,
+        )
         assert response.status_code == 200
-        
-        # Verificar que el estado cambió
-        result = response.json()
-        assert result["is_active"] != original_status
+        assert response.json()["is_active"] == nuevo_estado
 
     def test_update_user_roles(self, client: TestClient, admin_headers: dict, db_session):
         """Test actualizar roles de usuario."""
@@ -154,8 +154,8 @@ class TestAdmin:
             pytest.skip("No hay usuarios o roles para actualizar")
         
         response = client.put(
-            f"/admin_user/{user.id}/roles",
-            json=[role.id],
+            f"/admin_user/users/{user.id}/roles",
+            json={"add": [role.id], "remove": []},
             headers=admin_headers
         )
         
