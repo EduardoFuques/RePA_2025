@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import InterfaceError, OperationalError
@@ -35,53 +36,40 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-# Crear tablas en la base de datos
-def init_db():
-    # Crear todas las tablas definidas en los modelos
+# Raíz del paquete backend (donde viven alembic.ini y alembic/)
+BACKEND_ROOT = Path(__file__).resolve().parent.parent
+
+
+def run_migrations():
+    """
+    Aplica las migraciones Alembic hasta `head`.
+
+    Alembic es la **única fuente de verdad** del esquema en dev/producción.
+    Se invoca de forma programática en el arranque (lifespan).
+    """
+    from alembic.config import Config
+
+    from alembic import command
+
+    cfg = Config(str(BACKEND_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
+    # Evitar que env.py reconfigure el logging de la aplicación
+    cfg.attributes["configure_logger"] = False
+    logger.info("Aplicando migraciones Alembic (upgrade head)...")
+    command.upgrade(cfg, "head")
+    logger.info("Migraciones aplicadas correctamente")
+
+
+def create_all_tables():
+    """
+    Crea todas las tablas vía metadata de los modelos.
+
+    Reservado para el entorno de **tests** (rápido y aislado). En dev/prod el
+    esquema se gestiona exclusivamente con Alembic (`run_migrations`).
+    """
+    import src.models  # noqa: F401  (registry completo de modelos)
+
     Base.metadata.create_all(bind=engine)
-
-    # Aplicar migraciones incrementales para columnas nuevas
-    _apply_incremental_migrations()
-
-
-def _apply_incremental_migrations():
-    """Agrega columnas nuevas si no existen (para bases de datos existentes)"""
-    with engine.connect() as conn:
-        # Verificar y agregar redes_sociales a personas_fisicas
-        result = conn.execute(
-            text("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name = 'personas_fisicas' AND column_name = 'redes_sociales'
-        """)
-        )
-        if not result.fetchone():
-            logger.info("Agregando columna redes_sociales a personas_fisicas...")
-            conn.execute(
-                text("""
-                ALTER TABLE personas_fisicas
-                ADD COLUMN redes_sociales JSON
-            """)
-            )
-            conn.commit()
-            logger.info("Columna redes_sociales agregada exitosamente")
-
-        # Verificar y agregar new_password a token_recovery (security fix)
-        result = conn.execute(
-            text("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name = 'token_recovery' AND column_name = 'new_password'
-        """)
-        )
-        if not result.fetchone():
-            logger.info("Agregando columna new_password a token_recovery...")
-            conn.execute(
-                text("""
-                ALTER TABLE token_recovery
-                ADD COLUMN new_password VARCHAR
-            """)
-            )
-            conn.commit()
-            logger.info("Columna new_password agregada exitosamente")
 
 
 # Dependencia para obtener sesión con retry logic

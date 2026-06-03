@@ -8,12 +8,35 @@ from typing import Any, TypeVar
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 # Type variables para tipado genérico
 ModelType = TypeVar("ModelType")
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
+
+MSG_CONFLICT = (
+    "Ya existe un registro con alguno de los datos únicos proporcionados "
+    "(por ejemplo DNI, CUIL o CUIT)."
+)
+
+
+def _commit_or_conflict(db: Session, conflict_message: str = MSG_CONFLICT) -> None:
+    """
+    Confirma la transacción mapeando violaciones de unicidad/integridad a un
+    error 409 en lugar de propagar un 500.
+
+    Raises:
+        HTTPException 409 si se viola una constraint de la base de datos.
+    """
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=conflict_message
+        )
 
 
 def get_user_record(
@@ -95,7 +118,7 @@ def create_record(
     """
     db_record = model(**data.model_dump(), user_id=user_id, **extra_fields)
     db.add(db_record)
-    db.commit()
+    _commit_or_conflict(db)
     db.refresh(db_record)
     return db_record
 
@@ -116,7 +139,7 @@ def update_record(db: Session, record: ModelType, data: UpdateSchemaType) -> Mod
     for key, value in update_data.items():
         setattr(record, key, value)
 
-    db.commit()
+    _commit_or_conflict(db)
     db.refresh(record)
     return record
 
@@ -205,6 +228,6 @@ def add_child_record(
 
     child_record = child_model(**child_data)
     db.add(child_record)
-    db.commit()
+    _commit_or_conflict(db)
     db.refresh(child_record)
     return child_record

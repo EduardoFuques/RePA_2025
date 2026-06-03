@@ -30,6 +30,7 @@ from src.token_utils import (
 from src.utils import (
     get_current_user,
     get_password_hash,
+    get_user_permissions,
     update_last_login,
     validar_password,
 )
@@ -430,6 +431,19 @@ async def read_users_me(
     return user
 
 
+# Obtener los permisos efectivos del usuario actual
+@user_router.get(
+    "/me/permissions",
+    response_model=list[str],
+    description="Obtener los permisos efectivos del usuario actual",
+)
+async def read_my_permissions(
+    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Devuelve la lista de códigos de permiso efectivos del usuario."""
+    return sorted(get_user_permissions(db, current_user))
+
+
 # Obtener metadata de formularios del usuario
 @user_router.get(
     "/me/forms",
@@ -452,8 +466,6 @@ async def get_user_forms_metadata(
 
     user_id = current_user["id"]
 
-    # Cinemateca no tiene user_id directo, está relacionado con obra_id
-    # Por ahora solo verificamos los modelos con user_id directo
     return UserFormsMetadata(
         has_pf=db.query(PersonaFisica).filter(PersonaFisica.user_id == user_id).first()
         is not None,
@@ -476,7 +488,6 @@ async def get_user_forms_metadata(
         is not None,
         has_festival=db.query(Festival).filter(Festival.user_id == user_id).first()
         is not None,
-        has_cinemateca=False,  # Cinemateca no tiene user_id directo
     )
 
 

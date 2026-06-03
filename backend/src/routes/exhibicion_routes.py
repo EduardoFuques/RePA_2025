@@ -5,18 +5,14 @@ Incluye:
 - **Salas**: Espacios físicos de proyección
 - **Exhibiciones**: Eventos de exhibición audiovisual
 - **Festivales**: Festivales de cine y audiovisual
-- **Cinematecas**: Archivos y espacios de preservación audiovisual
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.database import get_db
-from src.models.exhibicion_model import Cinemateca, Exhibicion, Festival, Sala
+from src.models.exhibicion_model import Exhibicion, Festival, Sala
 from src.schemas.exhibicion_schemas import (
-    CinematecaCreate,
-    CinematecaOut,
-    CinematecaUpdate,
     ExhibicionCreate,
     ExhibicionOut,
     ExhibicionUpdate,
@@ -426,155 +422,5 @@ async def delete_festival(
         )
 
     db.delete(festival)
-    db.commit()
-    return None
-
-
-# === CINEMATECA ===
-
-
-@exhibicion_router.post(
-    "/cinemateca", response_model=CinematecaOut, status_code=status.HTTP_201_CREATED
-)
-async def create_cinemateca(
-    data: CinematecaCreate,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Crear un registro de Cinemateca para una obra"""
-    db_cinemateca = Cinemateca(**data.model_dump())
-    db.add(db_cinemateca)
-    db.commit()
-    db.refresh(db_cinemateca)
-    return db_cinemateca
-
-
-@exhibicion_router.get("/cinemateca/me", response_model=CinematecaOut)
-async def get_my_cinemateca(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
-):
-    """Obtener el registro de Cinemateca del usuario actual (primera obra del usuario)"""
-    from src.models.obra_audiovisual_model import ObraAudiovisual
-
-    # Obtener la primera obra del usuario
-    obra = (
-        db.query(ObraAudiovisual)
-        .filter(ObraAudiovisual.user_id == current_user["id"])
-        .first()
-    )
-    if not obra:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró obra para este usuario",
-        )
-
-    # Obtener el registro de cinemateca para esa obra
-    cinemateca = db.query(Cinemateca).filter(Cinemateca.obra_id == obra.id).first()
-    if not cinemateca:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró registro de cinemateca para este usuario",
-        )
-    return cinemateca
-
-
-@exhibicion_router.put("/cinemateca/me", response_model=CinematecaOut)
-async def update_my_cinemateca(
-    data: CinematecaUpdate,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Actualizar el registro de Cinemateca del usuario actual"""
-    from src.models.obra_audiovisual_model import ObraAudiovisual
-
-    # Obtener la primera obra del usuario
-    obra = (
-        db.query(ObraAudiovisual)
-        .filter(ObraAudiovisual.user_id == current_user["id"])
-        .first()
-    )
-    if not obra:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró obra para este usuario",
-        )
-
-    # Obtener el registro de cinemateca para esa obra
-    cinemateca = db.query(Cinemateca).filter(Cinemateca.obra_id == obra.id).first()
-    if not cinemateca:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró registro de cinemateca para este usuario",
-        )
-
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(cinemateca, key, value)
-
-    db.commit()
-    db.refresh(cinemateca)
-    return cinemateca
-
-
-@exhibicion_router.get("/cinemateca", response_model=list[CinematecaOut])
-async def list_cinemateca(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
-):
-    """Listar todos los registros de Cinemateca"""
-    return db.query(Cinemateca).all()
-
-
-@exhibicion_router.get("/cinemateca/{cinemateca_id}", response_model=CinematecaOut)
-async def get_cinemateca(
-    cinemateca_id: int,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Obtener un registro de Cinemateca por ID"""
-    cinemateca = db.query(Cinemateca).filter(Cinemateca.id == cinemateca_id).first()
-    if not cinemateca:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado"
-        )
-    return cinemateca
-
-
-@exhibicion_router.put("/cinemateca/{cinemateca_id}", response_model=CinematecaOut)
-async def update_cinemateca(
-    cinemateca_id: int,
-    data: CinematecaUpdate,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Actualizar un registro de Cinemateca"""
-    cinemateca = db.query(Cinemateca).filter(Cinemateca.id == cinemateca_id).first()
-    if not cinemateca:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado"
-        )
-
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(cinemateca, key, value)
-
-    db.commit()
-    db.refresh(cinemateca)
-    return cinemateca
-
-
-@exhibicion_router.delete(
-    "/cinemateca/{cinemateca_id}", status_code=status.HTTP_204_NO_CONTENT
-)
-async def delete_cinemateca(
-    cinemateca_id: int,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Eliminar un registro de Cinemateca"""
-    cinemateca = db.query(Cinemateca).filter(Cinemateca.id == cinemateca_id).first()
-    if not cinemateca:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado"
-        )
-
-    db.delete(cinemateca)
     db.commit()
     return None

@@ -20,7 +20,12 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-if config.config_file_name is not None:
+# Cuando Alembic se invoca de forma programática desde la app (lifespan), se
+# pasa configure_logger=False para no pisar la configuración de logging propia.
+if (
+    config.config_file_name is not None
+    and config.attributes.get("configure_logger", True)
+):
     fileConfig(config.config_file_name)
 
 # Importar los modelos para autogenerate

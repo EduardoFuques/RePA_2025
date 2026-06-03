@@ -61,6 +61,10 @@ class EstudianteESA(Base):
     participo_proyecto = Column(Boolean, nullable=True)
     descripcion_experiencia = Column(Text, nullable=True)
 
+    # === DOCUMENTACIÓN ADJUNTA ===
+    certificado_alumno_path = Column(String(500), nullable=True)
+    copia_dni_path = Column(String(500), nullable=True)
+
     # === DECLARACIONES ===
     estudiante_activo = Column(Boolean, nullable=False, default=False)
     leyo_reglamento = Column(Boolean, nullable=False, default=False)

@@ -3,25 +3,24 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from fastapi import HTTPException, status
 
-from src.config import ALGORITHM, SECRET_KEY
-
-ACCESS_TOKEN_EXPIRE = 30  # minutos
-REFRESH_TOKEN_EXPIRE = 7  # días
+from src.config import ACCESS_TOKEN_EXPIRE, ALGORITHM, REFRESH_TOKEN_EXPIRE, SECRET_KEY
 
 
-# Decodificar el token de acceso
-def decode_access_token(token: str):
+def _decode(token: str, expected_type: str | None = None) -> dict:
     """
-    Decodifica el token de acceso.
+    Decodifica y valida un JWT.
+
     Args:
-        token (str): Token de acceso.
+        token (str): Token JWT.
+        expected_type (str | None): Si se indica, valida que el claim "type"
+            del token coincida (ej. "access", "refresh", "recover", "verify").
     Returns:
-        dict: Datos del token decodificados.
+        dict: Payload decodificado.
+    Raises:
+        HTTPException 401: token expirado, inválido o de tipo incorrecto.
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        # print(f"Decode_Access_Token:Payload decodificado: {payload}") # Debug
-        return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -35,32 +34,23 @@ def decode_access_token(token: str):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if expected_type is not None and payload.get("type") != expected_type:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Tipo de token inválido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return payload
 
-# Decodificar el token de acceso
-def decode_refresh_token(token: str):
-    """
-    Decodifica el token de acceso.
-    Args:
-        token (str): Token de acceso.
-    Returns:
-        dict: Datos del token decodificados.
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        # print(f"Decode_Access_Token:Payload decodificado: {payload}") # Debug
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token expirado",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+
+def decode_access_token(token: str) -> dict:
+    """Decodifica un token de acceso (sin forzar el tipo, por compatibilidad)."""
+    return _decode(token)
+
+
+def decode_refresh_token(token: str) -> dict:
+    """Decodifica un token de refresco, validando que sea de tipo "refresh"."""
+    return _decode(token, expected_type="refresh")
 
 
 # Generar un token de acceso
@@ -84,6 +74,7 @@ def create_access_token(
         expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE)
     else:
         expires_delta = timedelta(minutes=expires_delta)
+    # ACCESS_TOKEN_EXPIRE y REFRESH_TOKEN_EXPIRE provienen de la configuración
 
     expire = datetime.now(timezone.utc) + (expires_delta)
     # Se añade el tipo de token para distinguirlo en el refresh endpoint
@@ -103,7 +94,8 @@ def create_refresh_token(
         El token JWT codificado.
     """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (timedelta(days=REFRESH_TOKEN_EXPIRE))
+    # REFRESH_TOKEN_EXPIRE está expresado en minutos en la configuración
+    expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE)
     to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt

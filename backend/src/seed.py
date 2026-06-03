@@ -11,13 +11,15 @@ from passlib.context import CryptContext
 from sqlalchemy.exc import IntegrityError
 
 from src.config import IS_PRODUCTION
-from src.database import SessionLocal, init_db
+from src.database import SessionLocal
 from src.document_generator import generate_test_documents
+from src.logger import logger
 from src.models.asociacion_model import Asociacion
 from src.models.esa_model import EstudianteESA
 from src.models.persona_fisica_model import PersonaFisica
 from src.models.persona_juridica_model import PersonaJuridica
-from src.models.user_models import Role, User, UserRole
+from src.models.user_models import Permission, Role, User, UserRole
+from src.rbac import PERMISSIONS, SYSTEM_ROLES
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -373,29 +375,54 @@ TEST_ESA = {
 }
 
 
+def sync_rbac(db):
+    """
+    Sincroniza el catálogo de permisos y los roles del sistema desde src.rbac.
+    Idempotente: se ejecuta tanto en producción como en desarrollo.
+    """
+    # 1) Upsert de permisos
+    existing_perms = {p.code: p for p in db.query(Permission).all()}
+    for code, descripcion in PERMISSIONS.items():
+        perm = existing_perms.get(code)
+        if perm is None:
+            perm = Permission(code=code, descripcion=descripcion)
+            db.add(perm)
+            existing_perms[code] = perm
+        else:
+            perm.descripcion = descripcion
+    db.commit()
+
+    # Refrescar mapa de permisos por código
+    perms_by_code = {p.code: p for p in db.query(Permission).all()}
+
+    # 2) Upsert de roles del sistema con sus permisos
+    for nombre, definicion in SYSTEM_ROLES.items():
+        role = db.query(Role).filter(Role.rol == nombre).first()
+        if role is None:
+            role = Role(rol=nombre)
+            db.add(role)
+        role.descripcion = definicion["descripcion"]
+        role.is_system = True
+        role.permissions = [
+            perms_by_code[c] for c in definicion["permissions"] if c in perms_by_code
+        ]
+    db.commit()
+    logger.info("RBAC sincronizado: permisos y roles del sistema")
+
+
 def seed_data():
     """
-    Carga datos de prueba en la base de datos.
+    Carga datos en la base de datos. Asume que el esquema ya existe
+    (gestionado por Alembic en dev/prod o por create_all en tests).
 
-    IMPORTANTE: No se ejecuta si ENVIRONMENT=production.
-    Solo crea roles básicos en producción.
+    IMPORTANTE: Los datos de prueba NO se cargan si ENVIRONMENT=production;
+    en producción solo se sincroniza el RBAC (permisos + roles del sistema).
     """
-    # Inicializa las tablas
-    init_db()
-
     if IS_PRODUCTION:
-        # En producción, solo crear roles si no existen
+        # En producción, sincronizar RBAC (permisos + roles del sistema)
         db = SessionLocal()
         try:
-            if not db.query(Role).first():
-                roles = [Role(rol="admin"), Role(rol="user")]
-                db.add_all(roles)
-                db.commit()
-                print("✓ Roles creados en producción: admin, user")
-            else:
-                print(
-                    "- Roles ya existen, seed de datos de prueba omitido (producción)"
-                )
+            sync_rbac(db)
         finally:
             db.close()
         return  # No cargar datos de prueba en producción
@@ -403,12 +430,8 @@ def seed_data():
     # Desarrollo: cargar todos los datos de prueba
     db = SessionLocal()
     try:
-        # Seed de roles
-        if not db.query(Role).first():
-            roles = [Role(rol="admin"), Role(rol="user")]
-            db.add_all(roles)
-            db.commit()
-            print("✓ Roles creados: admin, user")
+        # Sincronizar RBAC (permisos + roles del sistema)
+        sync_rbac(db)
 
         # Seed de usuarios de prueba
         admin_role = db.query(Role).filter(Role.rol == "admin").first()
