@@ -105,6 +105,7 @@ class InvestigadorBase(BaseModel):
 class ConsentimientoBase(BaseModel):
     acepta_terminos: bool = False
     portfolio_link: str | None = None
+    sitio_web: str | None = None
 
 
 # === SCHEMA PRINCIPAL ===
@@ -165,6 +166,7 @@ class PersonaFisicaCreate(BaseModel):
     # Consentimiento
     acepta_terminos: bool = False
     portfolio_link: str | None = None
+    sitio_web: str | None = None
     redes_sociales: list[str] | None = None
     dni_adjunto_path: str | None = None
     constancia_rentas_path: str | None = None
@@ -226,6 +228,7 @@ class PersonaFisicaUpdate(BaseModel):
     # Consentimiento
     acepta_terminos: bool | None = None
     portfolio_link: str | None = None
+    sitio_web: str | None = None
     redes_sociales: list[str] | None = None
     dni_adjunto_path: str | None = None
     constancia_rentas_path: str | None = None
@@ -291,6 +294,7 @@ class PersonaFisicaOut(BaseModel):
     # Consentimiento
     acepta_terminos: bool
     portfolio_link: str | None = None
+    sitio_web: str | None = None
     redes_sociales: list[str] | None = None
     dni_adjunto_path: str | None = None
     constancia_rentas_path: str | None = None

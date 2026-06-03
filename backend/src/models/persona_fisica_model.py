@@ -93,6 +93,7 @@ class PersonaFisica(Base):
     # === CONSENTIMIENTO ===
     acepta_terminos = Column(Boolean, nullable=False, default=False)
     portfolio_link = Column(String(500), nullable=True)
+    sitio_web = Column(String(500), nullable=True)
     redes_sociales = Column(JSON, nullable=True)  # Array de URLs de redes sociales
     dni_adjunto_path = Column(String(500), nullable=True)
     constancia_rentas_path = Column(String(500), nullable=True)
