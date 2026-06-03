@@ -485,7 +485,7 @@ async def list_all_evaluadores(
     check_admin_role(current_user)
     return (
         db.query(Evaluador)
-        .filter(not Evaluador.borrador)
+        .filter(Evaluador.borrador.is_(False))
         .order_by(Evaluador.nombre_completo)
         .all()
     )
