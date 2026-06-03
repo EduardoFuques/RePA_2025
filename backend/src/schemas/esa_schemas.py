@@ -33,6 +33,10 @@ class EstudianteESACreate(BaseModel):
     participo_proyecto: bool | None = None
     descripcion_experiencia: str | None = None
 
+    # Documentación adjunta
+    certificado_alumno_path: str | None = Field(None, max_length=500)
+    copia_dni_path: str | None = Field(None, max_length=500)
+
     # Declaraciones
     estudiante_activo: bool = False
     leyo_reglamento: bool = False
@@ -70,6 +74,10 @@ class EstudianteESAUpdate(BaseModel):
     otra_area: str | None = None
     participo_proyecto: bool | None = None
     descripcion_experiencia: str | None = None
+
+    # Documentación adjunta
+    certificado_alumno_path: str | None = Field(None, max_length=500)
+    copia_dni_path: str | None = Field(None, max_length=500)
 
     # Declaraciones
     estudiante_activo: bool | None = None
@@ -111,6 +119,10 @@ class EstudianteESAOut(BaseModel):
     otra_area: str | None = None
     participo_proyecto: bool | None = None
     descripcion_experiencia: str | None = None
+
+    # Documentación adjunta
+    certificado_alumno_path: str | None = None
+    copia_dni_path: str | None = None
 
     # Declaraciones
     estudiante_activo: bool
