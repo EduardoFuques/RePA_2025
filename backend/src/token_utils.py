@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 import jwt
 from fastapi import HTTPException, status
@@ -93,7 +94,7 @@ def create_access_token(
 
     expire = datetime.now(timezone.utc) + (expires_delta)
     # Se añade el tipo de token para distinguirlo en el refresh endpoint
-    to_encode.update({"exp": expire, "type": type})
+    to_encode.update({"exp": expire, "type": type, "jti": str(uuid4())})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -111,6 +112,6 @@ def create_refresh_token(
     to_encode = data.copy()
     # REFRESH_TOKEN_EXPIRE está expresado en minutos en la configuración
     expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE)
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update({"exp": expire, "type": "refresh", "jti": str(uuid4())})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
