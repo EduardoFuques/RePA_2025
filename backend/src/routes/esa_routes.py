@@ -12,10 +12,12 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from src.crud_helpers import (
+    apply_update_fields,
     check_duplicate_record,
+    commit_or_conflict,
     delete_record,
     get_user_record,
-    update_record,
+    integrity_as_conflict,
 )
 from src.database import get_db
 from src.models.esa_model import EstudianteESA
@@ -24,6 +26,8 @@ from src.schemas.esa_schemas import (
     EstudianteESAOut,
     EstudianteESAUpdate,
 )
+from src.services import lifecycle_service
+from src.services.repa_code_service import generar_codigo_repa
 from src.utils import get_current_user
 
 esa_router = APIRouter()
@@ -68,7 +72,12 @@ async def create_estudiante_esa(
         fecha_vencimiento=fecha_vencimiento,
     )
     db.add(db_estudiante)
-    db.commit()
+    with integrity_as_conflict(db):
+        db.flush()
+        lifecycle_service.procesar_envio_si_corresponde(
+            db, db_estudiante, data.model_dump()
+        )
+    commit_or_conflict(db)
     db.refresh(db_estudiante)
     return db_estudiante
 
@@ -103,21 +112,36 @@ async def update_my_estudiante_esa(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Actualizar el registro de Estudiante ESA del usuario actual"""
+    """Actualizar el registro de Estudiante ESA del usuario actual.
+
+    Al enviar el formulario (borrador: false por primera vez) emite el
+    código RePA propio del estudiante."""
     estudiante = get_user_record(db, EstudianteESA, current_user["id"], MSG_NOT_FOUND)
-    return update_record(db, estudiante, data)
+    update_data = apply_update_fields(estudiante, data)
+    with integrity_as_conflict(db):
+        lifecycle_service.procesar_envio_si_corresponde(db, estudiante, update_data)
+    commit_or_conflict(db)
+    db.refresh(estudiante)
+    return estudiante
 
 
 @esa_router.post("/me/renovar", response_model=EstudianteESAOut)
 async def renovar_estudiante_esa(
     current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    """Renovar el registro de Estudiante ESA por un año más"""
+    """Renovar el registro de Estudiante ESA por un año más.
+
+    A diferencia de PF/PJ (código permanente), el código RePA de ESA vence
+    junto con el registro: cada renovación emite un código NUEVO, no extiende
+    el existente. Solo tiene sentido llamar a este endpoint si el estudiante
+    ya envió el formulario alguna vez (si nunca lo hizo, no tiene código que
+    renovar — usa el PUT /me para el primer envío)."""
     estudiante = get_user_record(db, EstudianteESA, current_user["id"], MSG_NOT_FOUND)
 
     # Renovar por un año desde hoy
     estudiante.fecha_vencimiento = datetime.now(timezone.utc) + timedelta(days=365)
     estudiante.activo = True
+    estudiante.codigo_repa = generar_codigo_repa(db, EstudianteESA.REPA_TIPO)
 
     db.commit()
     db.refresh(estudiante)

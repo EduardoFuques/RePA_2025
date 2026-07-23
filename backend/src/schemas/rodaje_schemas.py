@@ -67,7 +67,7 @@ class RodajeCreate(BaseModel):
     tiene_autorizaciones_privados: bool = False
     tiene_fotos_locaciones: bool = False
     tiene_permisos_especiales: bool = False
-    documentos_adjuntos: list[str] | None = None
+    documentos_adjuntos: list[dict] | None = None
 
     # 7. Impacto y cierre (Finalización)
     fecha_real_finalizacion: date | None = None
@@ -78,9 +78,10 @@ class RodajeCreate(BaseModel):
     compromisos_comunitarios: str | None = None
     informe_rodaje: str | None = Field(None, max_length=500)
 
-    # 8. Seguimiento (solo admin puede modificar algunos)
-    estado_tramite: str | None = Field(default="recibido", max_length=30)
-    observaciones_internas: str | None = None
+    # NOTA: los campos de seguimiento (estado_tramite, inspector, pagos,
+    # observaciones internas, etc.) NO están acá a propósito — solo pueden
+    # modificarse vía RodajeAdminUpdate en las rutas admin. Un solicitante
+    # no debe poder autoaprobar su permiso de filmación.
 
     # Metadatos
     borrador: bool = False
@@ -137,7 +138,7 @@ class RodajeUpdate(BaseModel):
     tiene_autorizaciones_privados: bool | None = None
     tiene_fotos_locaciones: bool | None = None
     tiene_permisos_especiales: bool | None = None
-    documentos_adjuntos: list[str] | None = None
+    documentos_adjuntos: list[dict] | None = None
 
     # 7. Impacto y cierre (Finalización)
     fecha_real_finalizacion: date | None = None
@@ -148,7 +149,20 @@ class RodajeUpdate(BaseModel):
     compromisos_comunitarios: str | None = None
     informe_rodaje: str | None = Field(None, max_length=500)
 
-    # 8. Seguimiento
+    # NOTA: sin campos de seguimiento — ver nota en RodajeCreate.
+
+    # Metadatos
+    borrador: bool | None = None
+
+
+class RodajeAdminUpdate(RodajeUpdate):
+    """Schema para actualización admin de un Rodaje.
+
+    Extiende el schema de usuario con los campos de seguimiento
+    administrativo. Solo se usa en las rutas /admin/* (rodajes:manage).
+    """
+
+    # 8. Seguimiento (solo admin)
     estado_tramite: str | None = Field(None, max_length=30)
     fecha_evaluacion: date | None = None
     fecha_emision_permiso: date | None = None
@@ -157,9 +171,6 @@ class RodajeUpdate(BaseModel):
     inspector_asignado: str | None = Field(None, max_length=200)
     informe_inspeccion: str | None = None
     observaciones_internas: str | None = None
-
-    # Metadatos
-    borrador: bool | None = None
 
 
 # === RODAJE OUT ===

@@ -14,18 +14,27 @@ _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Variable global para el engine (se configura en el fixture de sesión)
 _engine = None
 _TestingSessionLocal = None
-_postgres_url = None
+
+# El contenedor se levanta a NIVEL DE MÓDULO, no en un fixture: pytest importa
+# conftest.py antes de recolectar los módulos de test, así DATABASE_URL ya
+# apunta al contenedor cuando cualquier test importe src.* a nivel de módulo.
+# (Con el fixture de sesión, un `from src...` top-level en un test file
+# fijaba la URL del .env — host "db" — y toda la suite fallaba en cadena.)
+_postgres_container = PostgresContainer("postgres:17-alpine")
+_postgres_container.start()
+_postgres_url = _postgres_container.get_connection_url()
+os.environ["DATABASE_URL"] = _postgres_url
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Apaga el contenedor al terminar la sesión de tests."""
+    _postgres_container.stop()
 
 
 @pytest.fixture(scope="session", autouse=True)
 def postgres_container():
-    """Levanta un contenedor PostgreSQL para toda la sesión de tests"""
-    global _postgres_url
-    with PostgresContainer("postgres:17-alpine") as postgres:
-        _postgres_url = postgres.get_connection_url()
-        # Configurar variable de entorno ANTES de importar la app
-        os.environ["DATABASE_URL"] = _postgres_url
-        yield postgres
+    """Contenedor PostgreSQL de la sesión (ya iniciado a nivel de módulo)."""
+    yield _postgres_container
 
 
 @pytest.fixture(scope="session")

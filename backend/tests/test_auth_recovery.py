@@ -48,19 +48,25 @@ class TestRecoveryPassword:
         user, _headers, old_password = cuenta
         new_password = "NuevaClave1"
 
-        # 1) Solicitar recuperación
+        # 1) Solicitar recuperación — SOLO con el email; la contraseña nueva
+        #    se fija recién en el paso 3, con el token en mano.
         resp = client.put(
             "/users/recovery_passwd",
-            json={"email": user.email, "password": new_password},
+            json={"email": user.email},
         )
         assert resp.status_code == 200
 
         # 2) Recuperar el token generado (en producción llegaría por email)
         record = _token_recovery_de(db_session, user.id)
         assert record is not None
+        # La contraseña nueva NO se persiste en el paso 1
+        assert record.new_password is None
 
-        # 3) Aplicar el reset con el token
-        reset = client.post(f"/users/recovery/{record.token_payload}")
+        # 3) Aplicar el reset con el token + la contraseña nueva
+        reset = client.post(
+            f"/users/recovery/{record.token_payload}",
+            json={"password": new_password},
+        )
         assert reset.status_code == 200, reset.text
 
         # 4) La contraseña nueva funciona y la vieja ya no
@@ -79,31 +85,47 @@ class TestRecoveryPassword:
         # No debe revelar si el email existe: responde 200 genérico
         resp = client.put(
             "/users/recovery_passwd",
-            json={
-                "email": f"nadie_{uuid.uuid4().hex[:8]}@example.com",
-                "password": "NuevaClave1",
-            },
+            json={"email": f"nadie_{uuid.uuid4().hex[:8]}@example.com"},
         )
         assert resp.status_code == 200
 
-    def test_password_debil_es_400(self, client, cuenta):
+    def test_password_debil_es_400(self, client, cuenta, db_session):
+        # La validación de contraseña ocurre en el paso 2 (con token)
         user, _headers, _password = cuenta
-        resp = client.put(
-            "/users/recovery_passwd",
-            json={"email": user.email, "password": "debil"},
+        client.put("/users/recovery_passwd", json={"email": user.email})
+        record = _token_recovery_de(db_session, user.id)
+        assert record is not None
+        resp = client.post(
+            f"/users/recovery/{record.token_payload}",
+            json={"password": "debil"},
+        )
+        assert resp.status_code == 400
+
+    def test_reset_sin_password_es_400(self, client, cuenta, db_session):
+        user, _headers, _password = cuenta
+        client.put("/users/recovery_passwd", json={"email": user.email})
+        record = _token_recovery_de(db_session, user.id)
+        resp = client.post(
+            f"/users/recovery/{record.token_payload}", json={}
         )
         assert resp.status_code == 400
 
     def test_token_invalido_es_401(self, client):
-        resp = client.post("/users/recovery/token-que-no-es-jwt")
+        resp = client.post(
+            "/users/recovery/token-que-no-es-jwt",
+            json={"password": "NuevaClave1"},
+        )
         assert resp.status_code == 401
 
-    def test_token_tipo_incorrecto_es_400(self, client, cuenta):
+    def test_token_tipo_incorrecto_es_401(self, client, cuenta):
         # Un access_token válido no sirve como token de recover (type != 'recover')
         _user, headers, _password = cuenta
         access_token = headers["Authorization"].split(" ", 1)[1]
-        resp = client.post(f"/users/recovery/{access_token}")
-        assert resp.status_code == 400
+        resp = client.post(
+            f"/users/recovery/{access_token}",
+            json={"password": "NuevaClave1"},
+        )
+        assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------

@@ -7,8 +7,11 @@ from passlib.context import CryptContext
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from src.config import REPA_GATING_ENABLED
 from src.database import get_db
 from src.logger import logger
+from src.models.persona_fisica_model import PersonaFisica
+from src.models.registro_lifecycle import EstadoRegistro
 from src.models.user_models import Role, User
 from src.rbac import ALL_PERMISSIONS
 from src.schemas.user_schemas import UserUpdate
@@ -46,17 +49,34 @@ def update_last_login(
 
 
 # Validar el usuario
-async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)):
+async def get_current_user(
+    request: Request,
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
     """
     Valida el token de acceso y retorna los datos del usuario.
+
+    Revalida contra la base en cada request: el JWT es stateless y, sin este
+    chequeo, un usuario desactivado (o al que se le quitó un rol) seguiría
+    operando con su token vigente hasta que expire. Los roles se toman de la
+    DB, no del token, para que un cambio de roles surta efecto inmediato.
     """
 
     payload = decode_access_token(token)
 
+    db_user = db.query(User).filter(User.id == payload.get("sub")).first()
+    if not db_user or not db_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario inactivo o inexistente",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     user_data = {
-        "id": payload.get("sub"),
-        "email": payload.get("email"),
-        "roles": payload.get("roles"),
+        "id": db_user.id,
+        "email": db_user.email,
+        "roles": [{"id": r.id, "rol": r.rol} for r in db_user.roles],
         "type": payload.get("type"),
     }
     # No registrar el payload completo para evitar fuga de PII en logs
@@ -101,9 +121,7 @@ def has_user_role(current_user: dict, required_roles: list[str]) -> bool:
         bool: True si tiene al menos un rol requerido, False en caso contrario
     """
     # Extraer los nombres de los roles del usuario en minúsculas
-    user_roles = {
-        role["rol"].lower() for role in (current_user.get("roles") or [])
-    }
+    user_roles = {role["rol"].lower() for role in (current_user.get("roles") or [])}
     # Comparación insensible a mayúsculas/minúsculas
     required_roles_lower = {role.lower() for role in required_roles}
 
@@ -128,11 +146,7 @@ def get_user_permissions(db: Session, current_user: dict) -> set[str]:
     if not role_names:
         return set()
 
-    roles = (
-        db.query(Role)
-        .filter(func.lower(Role.rol).in_(role_names))
-        .all()
-    )
+    roles = db.query(Role).filter(func.lower(Role.rol).in_(role_names)).all()
     perms: set[str] = set()
     for role in roles:
         perms.update(p.code for p in role.permissions)
@@ -178,16 +192,74 @@ def require_permissions(*codes: str):
     return _checker
 
 
-# Verifica que el usuario tenga rol de administrador
-def check_admin_role(current_user: dict):
+async def require_pf_aprobado(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Dependencia de gating del Padrón RePA.
+
+    Exige que el usuario tenga su Persona Física (PF) enviada (con código RePA
+    emitido) para poder crear el resto de los registros (PJ, AS, AGAM, Sala,
+    Festival, Exhibición). ESA queda fuera (pista cerrada).
+
+    NOTA: antes exigía específicamente estado ``aprobado``. El código RePA
+    ahora se emite en el envío del formulario, no en la aprobación admin (el
+    circuito de aprobación es post-lanzamiento) — exigir "aprobado" acá
+    dejaría a todo el mundo bloqueado indefinidamente. Alcanza con que la PF
+    haya salido de "borrador" (tiene código emitido).
+
+    Controlada por ``REPA_GATING_ENABLED`` (default OFF): mientras esté desactivada, la
+    dependencia es transparente. Se activará junto con el onboarding del frontend.
     """
-    Verifica que el usuario tenga rol de administrador.
-    Lanza HTTPException 403 si no tiene permisos.
-    """
-    if not has_user_role(current_user, ["admin"]):
+    if not REPA_GATING_ENABLED:
+        return current_user
+
+    pf = (
+        db.query(PersonaFisica)
+        .filter(PersonaFisica.user_id == current_user["id"])
+        .first()
+    )
+    if pf is None or pf.estado == EstadoRegistro.borrador.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tiene permisos de administrador para realizar esta acción",
+            detail=(
+                "Necesitás enviar tu Persona Física (PF) en el Padrón RePA "
+                "antes de registrar esta entidad."
+            ),
+        )
+    return current_user
+
+
+# Verifica que el usuario tenga rol de administrador
+def check_any_permission(db: Session, current_user: dict, *codes: str):
+    """
+    Verifica que el usuario posea AL MENOS UNO de los permisos indicados
+    (el rol admin los tiene todos). Variante "OR" de check_permissions, para
+    endpoints compartidos por más de un rol de gestión (p. ej. comités y
+    dictámenes de fomento, operados tanto por gestor_fomento como por
+    evaluador). Lanza HTTPException 403 si no tiene ninguno.
+    """
+    user_perms = get_user_permissions(db, current_user)
+    if not user_perms.intersection(codes):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene los permisos requeridos para esta acción",
+        )
+
+
+def check_permissions(db: Session, current_user: dict, *codes: str):
+    """
+    Verifica que el usuario posea TODOS los permisos indicados (el rol admin
+    los tiene todos). Variante imperativa de require_permissions para rutas
+    que ya reciben current_user/db — permite que roles como gestor_fomento
+    o evaluador operen endpoints de gestión sin necesitar el rol admin.
+    Lanza HTTPException 403 si falta alguno.
+    """
+    user_perms = get_user_permissions(db, current_user)
+    if not set(codes).issubset(user_perms):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene los permisos requeridos para esta acción",
         )
 
 

@@ -5,18 +5,21 @@ Permite registrar, gestionar y monitorear los rodajes audiovisuales
 realizados en la provincia de Misiones.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from src.audit import audit_log
 from src.database import get_db
+from src.models.audit_model import AuditAction
 from src.models.rodaje_model import Rodaje
 from src.schemas.rodaje_schemas import (
+    RodajeAdminUpdate,
     RodajeCreate,
     RodajeListOut,
     RodajeOut,
     RodajeUpdate,
 )
-from src.utils import check_admin_role, get_current_user
+from src.utils import check_permissions, get_current_user
 
 rodaje_router = APIRouter()
 
@@ -38,6 +41,7 @@ MSG_NOT_FOUND = "No se encontró el registro de rodaje"
 )
 async def create_rodaje(
     data: RodajeCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -57,6 +61,19 @@ async def create_rodaje(
 
     rodaje = Rodaje(**rodaje_data, user_id=current_user["id"])
     db.add(rodaje)
+    db.flush()
+    audit_log(
+        db=db,
+        action=AuditAction.CREATE,
+        user_id=current_user["id"],
+        resource_type="Rodaje",
+        resource_id=str(rodaje.id),
+        details={
+            "titulo_produccion": data.titulo_produccion,
+            "borrador": data.borrador,
+        },
+        request=request,
+    )
     db.commit()
     db.refresh(rodaje)
     return rodaje
@@ -104,6 +121,7 @@ async def get_my_rodaje(
 async def update_my_rodaje(
     rodaje_id: int,
     data: RodajeUpdate,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -129,6 +147,15 @@ async def update_my_rodaje(
     for key, value in update_data.items():
         setattr(rodaje, key, value)
 
+    audit_log(
+        db=db,
+        action=AuditAction.UPDATE,
+        user_id=current_user["id"],
+        resource_type="Rodaje",
+        resource_id=str(rodaje.id),
+        details={"campos": sorted(update_data.keys())},
+        request=request,
+    )
     db.commit()
     db.refresh(rodaje)
     return rodaje
@@ -141,6 +168,7 @@ async def update_my_rodaje(
 )
 async def delete_my_rodaje(
     rodaje_id: int,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -161,7 +189,17 @@ async def delete_my_rodaje(
             detail="Solo se pueden eliminar rodajes en estado borrador",
         )
 
+    titulo = rodaje.titulo_produccion
     db.delete(rodaje)
+    audit_log(
+        db=db,
+        action=AuditAction.DELETE,
+        user_id=current_user["id"],
+        resource_type="Rodaje",
+        resource_id=str(rodaje_id),
+        details={"titulo_produccion": titulo},
+        request=request,
+    )
     db.commit()
     return None
 
@@ -187,7 +225,7 @@ async def admin_get_all_rodajes(
     - estado: recibido, en_evaluacion, aprobado, condicionado, denegado, finalizado
     - anio: Año de rodaje
     """
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "rodajes:manage")
 
     query = db.query(Rodaje)
 
@@ -210,7 +248,7 @@ async def admin_get_rodaje(
     db: Session = Depends(get_db),
 ):
     """[Admin] Obtener cualquier rodaje por ID"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "rodajes:manage")
 
     rodaje = db.query(Rodaje).filter(Rodaje.id == rodaje_id).first()
     if not rodaje:
@@ -226,21 +264,19 @@ async def admin_get_rodaje(
 )
 async def admin_update_rodaje(
     rodaje_id: int,
-    data: RodajeUpdate,
+    data: RodajeAdminUpdate,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     [Admin] Actualizar cualquier rodaje.
 
-    Permite modificar campos de seguimiento como:
-    - estado_tramite
-    - fecha_evaluacion
-    - fecha_emision_permiso
-    - inspector_asignado
-    - observaciones_internas
+    Único punto de entrada para los campos de seguimiento (estado_tramite,
+    fecha_evaluacion, fecha_emision_permiso, inspector_asignado, pagos,
+    observaciones_internas). Todo cambio queda auditado.
     """
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "rodajes:manage")
 
     rodaje = db.query(Rodaje).filter(Rodaje.id == rodaje_id).first()
     if not rodaje:
@@ -255,9 +291,29 @@ async def admin_update_rodaje(
             for loc in update_data["locaciones"]
         ]
 
+    cambios_estado = {
+        k: {"antes": getattr(rodaje, k), "despues": v}
+        for k, v in update_data.items()
+        if k in ("estado_tramite", "inspector_asignado", "fecha_emision_permiso")
+        and getattr(rodaje, k) != v
+    }
     for key, value in update_data.items():
         setattr(rodaje, key, value)
 
+    audit_log(
+        db=db,
+        action=AuditAction.UPDATE,
+        user_id=current_user["id"],
+        resource_type="Rodaje",
+        resource_id=str(rodaje.id),
+        details={
+            "admin": True,
+            "titular": rodaje.user_id,
+            "campos": sorted(update_data.keys()),
+            **({"cambios_clave": cambios_estado} if cambios_estado else {}),
+        },
+        request=request,
+    )
     db.commit()
     db.refresh(rodaje)
     return rodaje
@@ -270,17 +326,28 @@ async def admin_update_rodaje(
 )
 async def admin_delete_rodaje(
     rodaje_id: int,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """[Admin] Eliminar cualquier rodaje"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "rodajes:manage")
 
     rodaje = db.query(Rodaje).filter(Rodaje.id == rodaje_id).first()
     if not rodaje:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=MSG_NOT_FOUND)
 
+    titulo, titular = rodaje.titulo_produccion, rodaje.user_id
     db.delete(rodaje)
+    audit_log(
+        db=db,
+        action=AuditAction.DELETE,
+        user_id=current_user["id"],
+        resource_type="Rodaje",
+        resource_id=str(rodaje_id),
+        details={"admin": True, "titular": titular, "titulo_produccion": titulo},
+        request=request,
+    )
     db.commit()
     return None
 
@@ -299,7 +366,7 @@ async def admin_stats_rodajes(
 
     Retorna conteos por estado, tipo de producción y año.
     """
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "rodajes:manage")
 
     query = db.query(Rodaje)
     if anio:

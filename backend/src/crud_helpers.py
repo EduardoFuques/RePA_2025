@@ -4,6 +4,7 @@ Funciones helper reutilizables para operaciones CRUD.
 Reduce código duplicado en los routers de formularios (PF, PJ, Asociación, etc.)
 """
 
+from contextlib import contextmanager
 from typing import Any, TypeVar
 
 from fastapi import HTTPException, status
@@ -123,6 +124,77 @@ def create_record(
     return db_record
 
 
+@contextmanager
+def integrity_as_conflict(db: Session, conflict_message: str = MSG_CONFLICT):
+    """
+    Context manager: cualquier `db.flush()` (o `db.commit()`) que ocurra
+    dentro del bloque y viole una constraint de unicidad/integridad se
+    mapea a 409 en vez de propagar un 500. Pensado para envolver los
+    `db.flush()` intermedios de `lifecycle_service.procesar_envio_si_corresponde`
+    (que corren ANTES del commit final) — sin esto, un DNI/CUIT duplicado
+    detectado ahí escapa como IntegrityError crudo.
+    """
+    try:
+        yield
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=conflict_message
+        )
+
+
+def apply_update_fields(record: ModelType, data: UpdateSchemaType) -> dict:
+    """
+    Aplica vía setattr los campos presentes en `data` sobre `record`, SIN
+    commitear. Devuelve el dict aplicado para que el caller pueda
+    inspeccionarlo antes de guardar (p. ej. detectar una transición de
+    ``borrador`` a enviado y disparar `lifecycle_service.procesar_envio_si_corresponde`)
+    y decidir side-effects adicionales antes de `commit_or_conflict`.
+
+    Es lo que hace `update_record` por dentro; se expone aparte para los
+    modelos registrables (PF/PJ/AS/ESA/AGAM) que necesitan ese hook.
+    """
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(record, key, value)
+    return update_data
+
+
+def commit_or_conflict(db: Session, conflict_message: str = MSG_CONFLICT) -> None:
+    """Versión pública de `_commit_or_conflict`, para callers que aplican
+    lógica extra entre `apply_update_fields` y el commit."""
+    _commit_or_conflict(db, conflict_message)
+
+
+def create_registrable_record(
+    db: Session,
+    model: type[ModelType],
+    data: CreateSchemaType,
+    user_id: str,
+    on_flush=None,
+    **extra_fields,
+) -> ModelType:
+    """
+    Como `create_record`, pero hace `flush` antes de commitear y, si se pasa
+    `on_flush(record, data_dict)`, le da la chance de reaccionar — pensado
+    para `lifecycle_service.procesar_envio_si_corresponde`, por si un
+    registro se crea directamente con `borrador: false` (sin pasar antes por
+    un PUT de borrador), caso poco común pero posible (clientes que no usan
+    el flujo multi-paso del frontend, o el propio create con default False).
+
+    Sin `on_flush`, se comporta igual que `create_record`.
+    """
+    db_record = model(**data.model_dump(), user_id=user_id, **extra_fields)
+    db.add(db_record)
+    with integrity_as_conflict(db):
+        db.flush()
+        if on_flush:
+            on_flush(db_record, data.model_dump())
+    _commit_or_conflict(db)
+    db.refresh(db_record)
+    return db_record
+
+
 def update_record(db: Session, record: ModelType, data: UpdateSchemaType) -> ModelType:
     """
     Actualiza un registro existente con los datos proporcionados.
@@ -135,10 +207,7 @@ def update_record(db: Session, record: ModelType, data: UpdateSchemaType) -> Mod
     Returns:
         Instancia del modelo actualizado
     """
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(record, key, value)
-
+    apply_update_fields(record, data)
     _commit_or_conflict(db)
     db.refresh(record)
     return record

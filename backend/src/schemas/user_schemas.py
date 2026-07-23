@@ -87,6 +87,14 @@ class UserRolePatch(BaseModel):
     remove: list[int] = []
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
 # Esquema para Recuperacion de Usuario
 class TokenData(BaseModel):
     user_id: str

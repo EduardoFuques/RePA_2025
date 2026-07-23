@@ -60,8 +60,10 @@ def audit_log(
 
         user_agent = request.headers.get("User-Agent", "")[:500]
 
-    # Serializar details a JSON
-    details_json = json.dumps(details, ensure_ascii=False) if details else None
+    # Serializar details a JSON (default=str cubre date/datetime/Decimal)
+    details_json = (
+        json.dumps(details, ensure_ascii=False, default=str) if details else None
+    )
 
     audit_entry = AuditLog(
         user_id=user_id,
@@ -73,10 +75,13 @@ def audit_log(
         user_agent=user_agent,
     )
 
+    # IMPORTANTE: no commitea — el caller es dueño de la transacción y debe
+    # hacer db.commit(). Así audit_log puede llamarse DENTRO de una operación
+    # de dominio sin persistir trabajo parcial ajeno, y la entrada de
+    # auditoría queda atómica con el cambio que registra.
     try:
         db.add(audit_entry)
-        db.commit()
-        db.refresh(audit_entry)
+        db.flush()
 
         logger.info(
             f"Audit: {action} - User: {user_id} - Resource: {resource_type}/{resource_id}"
@@ -85,7 +90,6 @@ def audit_log(
         return audit_entry
     except Exception as e:
         logger.error(f"Error registrando audit log: {e}")
-        db.rollback()
         raise
 
 

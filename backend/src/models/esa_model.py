@@ -16,9 +16,10 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from src.database import Base
+from src.models.registro_lifecycle import RegistroLifecycleMixin
 
 
-class EstudianteESA(Base):
+class EstudianteESA(RegistroLifecycleMixin, Base):
     """
     Modelo para Estudiantes del Audiovisual (ESA).
     Registro independiente del RePA para estudiantes en formación.
@@ -26,6 +27,9 @@ class EstudianteESA(Base):
     """
 
     __tablename__ = "estudiantes_esa"
+
+    # Tipo de entidad para la emisión del código RePA.
+    REPA_TIPO = "ESA"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
@@ -82,5 +86,5 @@ class EstudianteESA(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    # Relación con el usuario
-    user = relationship("User", back_populates="estudiante_esa")
+    # Relación con el usuario (user_id; revisado_por es otra FK a users)
+    user = relationship("User", back_populates="estudiante_esa", foreign_keys=[user_id])

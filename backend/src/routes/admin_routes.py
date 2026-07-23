@@ -13,12 +13,13 @@ anidados (`/users/{id}`, `/roles/{id}`) para evitar colisiones de routing.
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from src.audit import audit_log
 from src.database import get_db
-from src.models.audit_model import AuditLog
+from src.models.audit_model import AuditAction, AuditLog
 from src.models.user_models import Permission, Role, User
 from src.rbac import SYSTEM_ROLE_NAMES
 from src.schemas.user_schemas import (
@@ -75,9 +76,7 @@ async def list_permissions(
 # ============================================================
 # ROLES
 # ============================================================
-@admin_router.get(
-    "/roles", response_model=list[RoleDetailOut], summary="Listar roles"
-)
+@admin_router.get("/roles", response_model=list[RoleDetailOut], summary="Listar roles")
 async def list_roles(
     db: Session = Depends(get_db),
     _: dict = Depends(require_permissions("roles:read")),
@@ -94,8 +93,9 @@ async def list_roles(
 )
 async def create_role(
     data: RoleCreate,
+    request: Request,
     db: Session = Depends(get_db),
-    _: dict = Depends(require_permissions("roles:manage")),
+    current_user: dict = Depends(require_permissions("roles:manage")),
 ):
     """Crear un nuevo rol con permisos granulares."""
     nombre = data.rol.strip()
@@ -104,9 +104,7 @@ async def create_role(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El nombre del rol es obligatorio",
         )
-    existing = (
-        db.query(Role).filter(func.lower(Role.rol) == nombre.lower()).first()
-    )
+    existing = db.query(Role).filter(func.lower(Role.rol) == nombre.lower()).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -117,6 +115,16 @@ async def create_role(
     db.add(role)
     db.commit()
     db.refresh(role)
+    audit_log(
+        db=db,
+        action=AuditAction.CREATE,
+        user_id=current_user["id"],
+        resource_type="Role",
+        resource_id=str(role.id),
+        details={"rol": role.rol, "permissions": data.permissions},
+        request=request,
+    )
+    db.commit()
     return role
 
 
@@ -126,8 +134,9 @@ async def create_role(
 async def update_role(
     role_id: int,
     data: RoleUpdate,
+    request: Request,
     db: Session = Depends(get_db),
-    _: dict = Depends(require_permissions("roles:manage")),
+    current_user: dict = Depends(require_permissions("roles:manage")),
 ):
     """Actualizar un rol. Los roles del sistema no pueden renombrarse."""
     role = db.query(Role).filter(Role.id == role_id).first()
@@ -162,6 +171,16 @@ async def update_role(
 
     db.commit()
     db.refresh(role)
+    audit_log(
+        db=db,
+        action=AuditAction.UPDATE,
+        user_id=current_user["id"],
+        resource_type="Role",
+        resource_id=str(role.id),
+        details={"rol": role.rol},
+        request=request,
+    )
+    db.commit()
     return role
 
 
@@ -172,8 +191,9 @@ async def update_role(
 )
 async def delete_role(
     role_id: int,
+    request: Request,
     db: Session = Depends(get_db),
-    _: dict = Depends(require_permissions("roles:manage")),
+    current_user: dict = Depends(require_permissions("roles:manage")),
 ):
     """Eliminar un rol. Los roles del sistema no pueden eliminarse."""
     role = db.query(Role).filter(Role.id == role_id).first()
@@ -186,7 +206,18 @@ async def delete_role(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No se puede eliminar un rol del sistema",
         )
+    rol_nombre = role.rol
     db.delete(role)
+    db.commit()
+    audit_log(
+        db=db,
+        action=AuditAction.DELETE,
+        user_id=current_user["id"],
+        resource_type="Role",
+        resource_id=str(role_id),
+        details={"rol": rol_nombre},
+        request=request,
+    )
     db.commit()
     return None
 
@@ -245,9 +276,7 @@ async def update_user(
 
     if user_in.email and user_in.email != user.email:
         # Validar unicidad de email para evitar IntegrityError 500
-        verify_email_unique(
-            db, user_in, {"id": user.id, "email": user.email}
-        )
+        verify_email_unique(db, user_in, {"id": user.id, "email": user.email})
         user.email = user_in.email
     if user_in.password:
         validar_password(user_in.password)
@@ -266,6 +295,7 @@ async def update_user(
 async def update_user_roles(
     user_id: str,
     patch: UserRolePatch,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_permissions("roles:manage")),
 ):
@@ -290,10 +320,23 @@ async def update_user_roles(
 
     current_role_ids -= set(patch.remove)
 
-    # Auto-protección: el admin no puede quitarse su propio rol admin
-    admin_role = (
-        db.query(Role).filter(func.lower(Role.rol) == "admin").first()
+    admin_role = db.query(Role).filter(func.lower(Role.rol) == "admin").first()
+    admin_afectado = admin_role and admin_role.id in (
+        set(patch.add) | set(patch.remove)
     )
+
+    # Solo un admin puede otorgar o quitar el rol admin. El permiso
+    # roles:manage alcanza para los demás roles, pero no para escalar
+    # a (o degradar de) administrador.
+    if admin_afectado:
+        current_roles = {r["rol"].lower() for r in (current_user.get("roles") or [])}
+        if "admin" not in current_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo un administrador puede otorgar o quitar el rol admin",
+            )
+
+    # Auto-protección: el admin no puede quitarse su propio rol admin
     if (
         admin_role
         and user.id == current_user["id"]
@@ -304,9 +347,41 @@ async def update_user_roles(
             detail="No puede quitarse a sí mismo el rol de administrador",
         )
 
+    # Protección de último admin: no dejar el sistema sin ningún
+    # administrador activo.
+    if (
+        admin_role
+        and admin_role.id in set(patch.remove)
+        and admin_role.id not in set(patch.add)
+    ):
+        otros_admins_activos = (
+            db.query(User)
+            .filter(
+                User.id != user.id,
+                User.is_active.is_(True),
+                User.roles.any(Role.id == admin_role.id),
+            )
+            .count()
+        )
+        if otros_admins_activos == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se puede quitar el rol admin al último administrador activo",
+            )
+
     user.roles = db.query(Role).filter(Role.id.in_(current_role_ids)).all()
     db.commit()
     db.refresh(user)
+    audit_log(
+        db=db,
+        action=AuditAction.ROLE_CHANGE,
+        user_id=current_user["id"],
+        resource_type="User",
+        resource_id=user.id,
+        details={"add": list(patch.add), "remove": list(patch.remove)},
+        request=request,
+    )
+    db.commit()
     return user
 
 
@@ -317,6 +392,7 @@ async def update_user_roles(
 )
 async def set_user_status(
     user_id: str,
+    request: Request,
     is_active: bool = Query(..., description="Nuevo estado de activación"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_permissions("users:status")),
@@ -331,10 +407,57 @@ async def set_user_status(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No puede desactivarse a sí mismo",
         )
+    # Protección de último admin: desactivar al último administrador activo
+    # dejaría el sistema sin administración.
+    if not is_active:
+        admin_role = db.query(Role).filter(func.lower(Role.rol) == "admin").first()
+        if admin_role and any(r.id == admin_role.id for r in user.roles):
+            otros_admins_activos = (
+                db.query(User)
+                .filter(
+                    User.id != user.id,
+                    User.is_active.is_(True),
+                    User.roles.any(Role.id == admin_role.id),
+                )
+                .count()
+            )
+            if otros_admins_activos == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No se puede desactivar al último administrador activo",
+                )
     user.is_active = is_active
     db.commit()
     db.refresh(user)
+    audit_log(
+        db=db,
+        action=AuditAction.ACTIVATE if is_active else AuditAction.DEACTIVATE,
+        user_id=current_user["id"],
+        resource_type="User",
+        resource_id=user.id,
+        request=request,
+    )
+    db.commit()
     return user
+
+
+@admin_router.get(
+    "/audit-actions",
+    description="Listar los tipos de acción de auditoría posibles (para poblar un filtro)",
+)
+async def list_audit_actions(
+    _: dict = Depends(require_permissions("audit:read")),
+):
+    """Catálogo de acciones de auditoría conocidas, para un filtro tipo desplegable."""
+    canonicas = [
+        v
+        for k, v in vars(AuditAction).items()
+        if not k.startswith("_") and isinstance(v, str)
+    ]
+    # USER_REGISTER / USER_LOGIN son strings ad-hoc usados hoy en user_routes.py,
+    # no forman parte de las constantes canónicas de AuditAction pero sí aparecen
+    # en los logs reales — se listan aparte para que el filtro los cubra también.
+    return sorted(set(canonicas) | {"USER_REGISTER", "USER_LOGIN"})
 
 
 @admin_router.get("/audit-logs", description="Obtener registros de auditoría")
@@ -346,18 +469,27 @@ async def get_audit_logs(
     ),
     user_id: str | None = Query(None, description="Filtrar por ID de usuario"),
     days: int = Query(7, description="Días hacia atrás a consultar (default: 7)"),
-    limit: int = Query(100, description="Límite de registros (default: 100, max: 500)"),
+    limit: int = Query(
+        100, description="Límite de registros por página (default: 100, max: 500)"
+    ),
+    offset: int = Query(
+        0, ge=0, description="Desplazamiento para paginación (default: 0)"
+    ),
 ):
     """
-    Obtener registros de auditoría (Sólo para Administradores).
+    Obtener registros de auditoría, paginados (Sólo para Administradores).
 
     Permite filtrar por:
     - action: tipo de acción (USER_LOGIN, USER_REGISTER, PASSWORD_CHANGE, etc.)
     - user_id: ID del usuario específico
     - days: cantidad de días hacia atrás
-    - limit: cantidad máxima de registros
+    - limit / offset: paginación
+
+    Devuelve {items, total, offset, limit} — `total` es el conteo total de
+    registros que matchean los filtros (sin paginar), para que el frontend
+    pueda calcular cuántas páginas hay.
     """
-    # Limitar el máximo de registros
+    # Limitar el máximo de registros por página
     limit = min(limit, 500)
 
     # Calcular fecha de inicio
@@ -371,20 +503,27 @@ async def get_audit_logs(
     if user_id:
         query = query.filter(AuditLog.user_id == user_id)
 
-    # Ordenar por fecha descendente y limitar
-    logs = query.order_by(AuditLog.created_at.desc()).limit(limit).all()
+    total = query.count()
 
-    return [
-        {
-            "id": log.id,
-            "action": log.action,
-            "user_id": log.user_id,
-            "resource_type": log.resource_type,
-            "resource_id": log.resource_id,
-            "details": log.details,
-            "ip_address": log.ip_address,
-            "user_agent": log.user_agent,
-            "created_at": log.created_at.isoformat() if log.created_at else None,
-        }
-        for log in logs
-    ]
+    # Ordenar por fecha descendente y paginar
+    logs = query.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "items": [
+            {
+                "id": log.id,
+                "action": log.action,
+                "user_id": log.user_id,
+                "resource_type": log.resource_type,
+                "resource_id": log.resource_id,
+                "details": log.details,
+                "ip_address": log.ip_address,
+                "user_agent": log.user_agent,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+            }
+            for log in logs
+        ],
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }

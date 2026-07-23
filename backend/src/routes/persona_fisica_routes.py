@@ -5,16 +5,18 @@ Permite a los usuarios registrar sus datos personales, situación laboral,
 y seleccionar subperfiles según su rol en el sector audiovisual.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from src.crud_helpers import (
+    apply_update_fields,
     check_duplicate_record,
-    create_record,
+    commit_or_conflict,
+    create_registrable_record,
     delete_record,
     get_user_record,
-    update_record,
+    integrity_as_conflict,
 )
 from src.database import get_db
 from src.models.persona_fisica_model import (
@@ -28,6 +30,7 @@ from src.models.persona_fisica_model import (
     SubperfilRealizadorIntegral,
     SubperfilTecnicoArtistico,
 )
+from src.rate_limiter import limiter
 from src.schemas.persona_fisica_schemas import (
     CapacitadorCreate,
     CapacitadorOut,
@@ -42,6 +45,7 @@ from src.schemas.persona_fisica_schemas import (
     TecnicoArtisticoCreate,
     TecnicoArtisticoOut,
 )
+from src.services import lifecycle_service
 from src.utils import get_current_user
 
 persona_fisica_router = APIRouter()
@@ -77,7 +81,15 @@ async def create_persona_fisica(
     Cada usuario solo puede tener **un registro** de Persona Física.
     """
     check_duplicate_record(db, PersonaFisica, current_user["id"], MSG_DUPLICATE)
-    return create_record(db, PersonaFisica, data, current_user["id"])
+    return create_registrable_record(
+        db,
+        PersonaFisica,
+        data,
+        current_user["id"],
+        on_flush=lambda r, ud: lifecycle_service.procesar_envio_si_corresponde(
+            db, r, ud
+        ),
+    )
 
 
 @persona_fisica_router.get("/me", response_model=PersonaFisicaOut)
@@ -94,9 +106,18 @@ async def update_my_persona_fisica(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Actualizar el registro de Persona Física del usuario actual"""
+    """Actualizar el registro de Persona Física del usuario actual.
+
+    Al enviar el formulario (borrador: false por primera vez) emite el
+    código RePA de la persona — PF es el primer formulario obligatorio,
+    así que este código queda disponible para que PJ/AS/AGAM lo hereden."""
     persona = get_user_record(db, PersonaFisica, current_user["id"], MSG_NOT_FOUND)
-    return update_record(db, persona, data)
+    update_data = apply_update_fields(persona, data)
+    with integrity_as_conflict(db):
+        lifecycle_service.procesar_envio_si_corresponde(db, persona, update_data)
+    commit_or_conflict(db)
+    db.refresh(persona)
+    return persona
 
 
 @persona_fisica_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
@@ -113,7 +134,9 @@ async def delete_my_persona_fisica(
 
 
 @persona_fisica_router.get("/search", response_model=list[PersonaFisicaSearchOut])
+@limiter.limit("30/minute")
 async def search_personas_fisicas(
+    request: Request,
     q: str,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -121,6 +144,11 @@ async def search_personas_fisicas(
     """
     Buscar personas físicas registradas en el RePA por nombre, apellido o DNI.
     Retorna resultados parciales (máximo 10) para uso en buscador de integrantes.
+
+    Limitado por IP (30/min): expone DNI y email del padrón a cualquier
+    usuario autenticado (necesario para el buscador de integrantes), así que
+    sin límite un usuario podría scrapear el padrón completo con consultas
+    de 2 caracteres en secuencia.
     """
     if not q or len(q.strip()) < 2:
         return []

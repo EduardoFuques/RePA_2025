@@ -3,6 +3,41 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# === ÍTEMS DE LAS RELACIONES 1:N (antes JSON suelto en TramiteFomento/ComiteFomento) ===
+
+
+class PagoItem(BaseModel):
+    """Un pago de rendición de un trámite de fomento (solo-admin)."""
+
+    fecha: datetime | None = None
+    monto: int | None = None
+    moneda: str | None = Field(None, max_length=10)
+    concepto: str | None = Field(None, max_length=255)
+    comprobante: str | None = Field(None, max_length=500)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AporteItem(BaseModel):
+    """Un aporte no-IAAviM declarado por el solicitante."""
+
+    organismo: str | None = Field(None, max_length=255)
+    programa: str | None = Field(None, max_length=255)
+    monto: int | None = None
+    moneda: str | None = Field(None, max_length=10)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IntegranteItem(BaseModel):
+    """Un integrante (evaluador) de un comité de fomento."""
+
+    evaluador_id: int
+    rol: str | None = Field(None, max_length=50)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # === EVENTO DE FOMENTO ===
 
 
@@ -118,7 +153,7 @@ class ComiteFomentoCreate(BaseModel):
     linea_id: int | None = None
     tipo: str = Field(..., max_length=50)  # tecnico, deliberativo
     nombre: str | None = Field(None, max_length=255)
-    integrantes: list[dict] | None = None  # [{evaluador_id, rol}]
+    integrantes: list[IntegranteItem] | None = None
     resolucion_designacion_path: str | None = Field(None, max_length=500)
     observaciones: str | None = None
     activo: bool = True
@@ -130,7 +165,7 @@ class ComiteFomentoUpdate(BaseModel):
     linea_id: int | None = None
     tipo: str | None = Field(None, max_length=50)
     nombre: str | None = Field(None, max_length=255)
-    integrantes: list[dict] | None = None
+    integrantes: list[IntegranteItem] | None = None
     resolucion_designacion_path: str | None = Field(None, max_length=500)
     observaciones: str | None = None
     activo: bool | None = None
@@ -144,7 +179,7 @@ class ComiteFomentoOut(BaseModel):
     linea_id: int | None = None
     tipo: str
     nombre: str | None = None
-    integrantes: list[dict] | None = None
+    integrantes: list[IntegranteItem] | None = None
     resolucion_designacion_path: str | None = None
     observaciones: str | None = None
     activo: bool
@@ -237,10 +272,9 @@ class TramiteFomentoCreate(BaseModel):
     moneda_principal: str | None = Field(None, max_length=10)
     presupuesto_total: int | None = None
     monto_solicitado_iaavim: int | None = None
-    monto_aprobado_iaavim: int | None = None
     aporte_privado_monto: int | None = None
     aporte_privado_fuente: str | None = Field(None, max_length=255)
-    otros_aportes_no_iaavim: list[dict] | None = None
+    otros_aportes_no_iaavim: list[AporteItem] | None = None
     aportes_en_especie: str | None = None
 
     monto_estimado_reintegro: int | None = None
@@ -257,34 +291,11 @@ class TramiteFomentoCreate(BaseModel):
     anexos_tecnicos_path: str | None = Field(None, max_length=500)
     otros_documentos: list[dict] | None = None
 
-    estado_tramite: str | None = Field(None, max_length=50)
-    fecha_ingreso: datetime | None = None
-    fecha_dictamen: datetime | None = None
-    fecha_resolucion: datetime | None = None
-    fecha_cierre: datetime | None = None
-
-    pendiente_juridico: bool = False
-    motivo_juridico: str | None = Field(None, max_length=255)
-    fecha_pendiente_juridico: datetime | None = None
-    pendiente_administracion: bool = False
-    motivo_administracion: str | None = Field(None, max_length=255)
-    fecha_pendiente_administracion: datetime | None = None
-    pendiente_agam: bool = False
-    motivo_agam: str | None = Field(None, max_length=255)
-    fecha_pendiente_agam: datetime | None = None
-
-    comite_asignado_id: int | None = None
-    resolucion_otorgamiento_id: int | None = None
-    resolucion_otorgamiento_path: str | None = Field(None, max_length=500)
-    convenio_path: str | None = Field(None, max_length=500)
-
-    nro_expediente: str | None = Field(None, max_length=50)
-    pagos: list[dict] | None = None
-    rendicion_estado: str | None = Field(None, max_length=50)
-
-    estado_agam: str | None = Field(None, max_length=50)
-    fecha_entrega_copia: datetime | None = None
-    acta_recepcion_path: str | None = Field(None, max_length=500)
+    # NOTA: los campos administrativos (estado_tramite, monto_aprobado_iaavim,
+    # nro_expediente, resoluciones, pagos, vinculaciones interáreas, fechas de
+    # dictamen/resolución/cierre, etc.) NO están acá a propósito: solo pueden
+    # modificarse vía TramiteFomentoAdminUpdate en la ruta admin. Un
+    # solicitante no debe poder autoaprobarse el subsidio ni fijarse el monto.
 
     borrador: bool = True
 
@@ -318,10 +329,9 @@ class TramiteFomentoUpdate(BaseModel):
     moneda_principal: str | None = Field(None, max_length=10)
     presupuesto_total: int | None = None
     monto_solicitado_iaavim: int | None = None
-    monto_aprobado_iaavim: int | None = None
     aporte_privado_monto: int | None = None
     aporte_privado_fuente: str | None = Field(None, max_length=255)
-    otros_aportes_no_iaavim: list[dict] | None = None
+    otros_aportes_no_iaavim: list[AporteItem] | None = None
     aportes_en_especie: str | None = None
 
     monto_estimado_reintegro: int | None = None
@@ -337,6 +347,21 @@ class TramiteFomentoUpdate(BaseModel):
     plan_financiamiento_path: str | None = Field(None, max_length=500)
     anexos_tecnicos_path: str | None = Field(None, max_length=500)
     otros_documentos: list[dict] | None = None
+
+    # NOTA: sin campos administrativos — ver nota en TramiteFomentoCreate.
+
+    borrador: bool | None = None
+
+
+class TramiteFomentoAdminUpdate(TramiteFomentoUpdate):
+    """Schema para actualización ADMIN de un Trámite de Fomento.
+
+    Extiende el schema de usuario con los campos administrativos del
+    expediente (estado, montos aprobados, resoluciones, pagos, vinculaciones
+    interáreas). Solo se usa en la ruta admin protegida por fomento:manage (check_permissions).
+    """
+
+    monto_aprobado_iaavim: int | None = None
 
     estado_tramite: str | None = Field(None, max_length=50)
     fecha_ingreso: datetime | None = None
@@ -360,14 +385,12 @@ class TramiteFomentoUpdate(BaseModel):
     convenio_path: str | None = Field(None, max_length=500)
 
     nro_expediente: str | None = Field(None, max_length=50)
-    pagos: list[dict] | None = None
+    pagos: list[PagoItem] | None = None
     rendicion_estado: str | None = Field(None, max_length=50)
 
     estado_agam: str | None = Field(None, max_length=50)
     fecha_entrega_copia: datetime | None = None
     acta_recepcion_path: str | None = Field(None, max_length=500)
-
-    borrador: bool | None = None
 
 
 class TramiteFomentoOut(BaseModel):
@@ -404,7 +427,7 @@ class TramiteFomentoOut(BaseModel):
     monto_aprobado_iaavim: int | None = None
     aporte_privado_monto: int | None = None
     aporte_privado_fuente: str | None = None
-    otros_aportes_no_iaavim: list[dict] | None = None
+    otros_aportes_no_iaavim: list[AporteItem] | None = None
     aportes_en_especie: str | None = None
 
     monto_estimado_reintegro: int | None = None
@@ -443,7 +466,7 @@ class TramiteFomentoOut(BaseModel):
     convenio_path: str | None = None
 
     nro_expediente: str | None = None
-    pagos: list[dict] | None = None
+    pagos: list[PagoItem] | None = None
     rendicion_estado: str | None = None
 
     estado_agam: str | None = None

@@ -38,6 +38,9 @@ from src.models.persona_fisica_model import (
 )
 from src.models.persona_juridica_model import IntegrantePJ, PersonaJuridica
 
+# Ciclo de vida / Código RePA
+from src.models.registro_lifecycle import EstadoRegistro, RepaCodeCounter
+
 # Comisión de Filmaciones
 from src.models.rodaje_model import Rodaje
 from src.models.user_models import (
@@ -97,4 +100,7 @@ __all__ = [
     # Audit Trail
     "AuditLog",
     "AuditAction",
+    # Ciclo de vida / Código RePA
+    "EstadoRegistro",
+    "RepaCodeCounter",
 ]

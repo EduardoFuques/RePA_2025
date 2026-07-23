@@ -2,6 +2,7 @@
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -24,14 +25,23 @@ class Sala(Base):
     """
 
     __tablename__ = "salas"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_sala IN ('sala_fija_comercial', 'sala_ambulante_comercial', "
+            "'sala_fija_no_comercial', 'cineclub', 'sala_ambulante_no_comercial', "
+            "'sala_mixta_multipantalla', 'festival_muestra')",
+            name="ck_salas_tipo_sala",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
 
     # === DATOS BÁSICOS ===
     nombre = Column(String(255), nullable=True)  # nullable para borrador
     tipo_sala = Column(String(50), nullable=True)  # nullable para borrador
-    # Opciones: cine_comercial, cine_arte, espacio_cultural, auditorio, aire_libre, otro
+    # Opciones: sala_fija_comercial, sala_ambulante_comercial, sala_fija_no_comercial,
+    # cineclub, sala_ambulante_no_comercial, sala_mixta_multipantalla, festival_muestra
     otro_tipo = Column(String(100), nullable=True)
 
     # === UBICACIÓN ===
@@ -97,9 +107,16 @@ class Exhibicion(Base):
     """
 
     __tablename__ = "exhibiciones"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_exhibicion IN ('sala_fija', 'ambulante', 'cine_movil', 'cineclub', "
+            "'festival', 'muestra', 'mercado', 'circuito_estreno', 'otra')",
+            name="ck_exhibiciones_tipo_exhibicion",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     obra_id = Column(Integer, ForeignKey("obras_audiovisuales.id"), nullable=True)
     sala_id = Column(Integer, ForeignKey("salas.id"), nullable=True)
 
@@ -112,10 +129,15 @@ class Exhibicion(Base):
 
     # === TIPO DE EXHIBICIÓN ===
     tipo_exhibicion = Column(String(50), nullable=True)  # nullable para borrador
-    # Opciones: estreno, reestreno, ciclo, festival, especial, otro
+    # Opciones: sala_fija, ambulante, cine_movil, cineclub, festival, muestra,
+    # mercado, circuito_estreno, otra
     nombre_evento = Column(
         String(255), nullable=True
     )  # Si es parte de un ciclo/festival
+
+    # === UBICACIÓN ===
+    localidad = Column(String(100), nullable=True)  # nullable para borrador
+    distrito = Column(String(50), nullable=True)  # nullable para borrador
 
     # === ESPECTADORES ===
     espectadores_total = Column(Integer, nullable=True)
@@ -149,9 +171,15 @@ class Festival(Base):
     """
 
     __tablename__ = "festivales"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_festival IN ('competitivo', 'no_competitivo', 'mixto')",
+            name="ck_festivales_tipo_festival",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
 
     # === DATOS BÁSICOS ===
     nombre = Column(String(255), nullable=True)  # nullable para borrador

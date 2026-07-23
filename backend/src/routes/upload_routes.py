@@ -45,6 +45,34 @@ def _validate_magic_bytes(content: bytes, extension: str) -> bool:
     return content[: len(expected)] == expected
 
 
+_UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1MB
+
+
+async def _read_upload_enforce_limit(file: UploadFile, max_size: int) -> bytes:
+    """Lee el archivo en chunks, cortando apenas se supera max_size.
+
+    `file.read()` sin límite consume el stream completo (Starlette lo spool-ea
+    a disco pasado 1MB) antes de que cualquier validación de tamaño pueda
+    rechazarlo — un archivo de varios GB se escribe entero a /tmp primero.
+    Leyendo en chunks y abortando en cuanto se supera el máximo, el corte es
+    inmediato y no depende del tamaño real subido.
+    """
+    chunks = []
+    total = 0
+    while True:
+        chunk = await file.read(_UPLOAD_CHUNK_SIZE)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_size:
+            max_mb = max_size // (1024 * 1024)
+            raise HTTPException(
+                status_code=400, detail=f"El archivo no puede superar los {max_mb}MB"
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def _sanitize_filename(name: str) -> str:
     """Sanitiza un nombre de archivo para uso seguro en headers Content-Disposition."""
     import re
@@ -93,13 +121,10 @@ async def upload_dni(
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="El archivo debe ser un PDF")
 
-    # Validar tamaño (máximo 5MB)
+    # Validar tamaño (máximo 5MB) leyendo en chunks, sin volcar el archivo
+    # entero a disco antes de poder rechazarlo (A15).
     max_size = 5 * 1024 * 1024  # 5MB
-    file_content = await file.read()
-    if len(file_content) > max_size:
-        raise HTTPException(
-            status_code=400, detail="El archivo no puede superar los 5MB"
-        )
+    file_content = await _read_upload_enforce_limit(file, max_size)
 
     # Validar contenido real del archivo (magic bytes)
     if not _validate_magic_bytes(file_content, ".pdf"):
@@ -227,6 +252,23 @@ ALLOWED_DOC_TYPES = {
         "extensions": {".pdf", ".doc", ".docx"},
         "max_size": 10 * 1024 * 1024,
     },
+    # AGAM - Obra Audiovisual
+    "agam_ficha_tecnica": {
+        "extensions": {".pdf", ".xls", ".xlsx"},
+        "max_size": 10 * 1024 * 1024,
+    },
+    "agam_convenio": {
+        "extensions": {".pdf", ".doc", ".docx"},
+        "max_size": 10 * 1024 * 1024,
+    },
+    # Rodajes - Comisión de Filmaciones (póliza, acuerdo de indemnización,
+    # autorizaciones, fotos de locaciones, permisos especiales — todos
+    # comparten el mismo tipo, el checklist del frontend los distingue
+    # por su propio campo "tipo" al guardarlos en documentos_adjuntos).
+    "rodaje_documento": {
+        "extensions": {".pdf", ".jpg", ".jpeg", ".png"},
+        "max_size": 10 * 1024 * 1024,
+    },
 }
 
 MIME_MAP = {
@@ -267,13 +309,8 @@ async def upload_document(
             status_code=400, detail=f"Extensión no permitida. Permitidas: {allowed}"
         )
 
-    # Validar tamaño
-    file_content = await file.read()
-    if len(file_content) > doc_config["max_size"]:
-        max_mb = doc_config["max_size"] // (1024 * 1024)
-        raise HTTPException(
-            status_code=400, detail=f"El archivo no puede superar los {max_mb}MB"
-        )
+    # Validar tamaño leyendo en chunks (A15)
+    file_content = await _read_upload_enforce_limit(file, doc_config["max_size"])
 
     # Validar contenido real del archivo (magic bytes)
     if not _validate_magic_bytes(file_content, file_extension):

@@ -1,8 +1,10 @@
 # routes/fomento_routes.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, joinedload
 
+from src.audit import audit_log
 from src.database import get_db
+from src.models.audit_model import AuditAction
 from src.models.fomento_model import (
     AcompanamientoSemillero,
     CohorteSemillero,
@@ -39,11 +41,24 @@ from src.schemas.fomento_schemas import (
     ParticipanteSemilleroCreate,
     ParticipanteSemilleroOut,
     ParticipanteSemilleroUpdate,
+    TramiteFomentoAdminUpdate,
     TramiteFomentoCreate,
     TramiteFomentoOut,
     TramiteFomentoUpdate,
 )
-from src.utils import check_admin_role, get_current_user
+from src.services.fomento_relational_service import (
+    attach_comite_output_fields,
+    attach_output_fields,
+    sync_aportes,
+    sync_integrantes,
+    sync_pagos,
+)
+from src.utils import (
+    check_any_permission,
+    check_permissions,
+    get_current_user,
+    get_user_permissions,
+)
 
 fomento_router = APIRouter(prefix="/fomento", tags=["fomento"])
 
@@ -62,7 +77,7 @@ async def create_evento(
     db: Session = Depends(get_db),
 ):
     """Crear un Evento/Convocatoria (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     db_evento = EventoFomento(**data.model_dump())
     db.add(db_evento)
     db.commit()
@@ -123,7 +138,7 @@ async def update_evento(
     db: Session = Depends(get_db),
 ):
     """Actualizar un Evento (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     evento = db.query(EventoFomento).filter(EventoFomento.id == evento_id).first()
     if not evento:
         raise HTTPException(
@@ -145,7 +160,7 @@ async def delete_evento(
     db: Session = Depends(get_db),
 ):
     """Eliminar un Evento y sus líneas (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     evento = db.query(EventoFomento).filter(EventoFomento.id == evento_id).first()
     if not evento:
         raise HTTPException(
@@ -171,7 +186,7 @@ async def create_linea(
     db: Session = Depends(get_db),
 ):
     """Crear una Línea dentro de un Evento (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     evento = db.query(EventoFomento).filter(EventoFomento.id == evento_id).first()
     if not evento:
         raise HTTPException(
@@ -202,7 +217,7 @@ async def update_linea(
     db: Session = Depends(get_db),
 ):
     """Actualizar una Línea (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     linea = db.query(LineaFomento).filter(LineaFomento.id == linea_id).first()
     if not linea:
         raise HTTPException(
@@ -224,7 +239,7 @@ async def delete_linea(
     db: Session = Depends(get_db),
 ):
     """Eliminar una Línea (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     linea = db.query(LineaFomento).filter(LineaFomento.id == linea_id).first()
     if not linea:
         raise HTTPException(
@@ -245,15 +260,28 @@ async def delete_linea(
 )
 async def create_tramite(
     data: TramiteFomentoCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Crear un nuevo Trámite de Fomento"""
-    db_tramite = TramiteFomento(**data.model_dump(), user_id=current_user["id"])
+    tramite_data = data.model_dump(exclude={"otros_aportes_no_iaavim"})
+    db_tramite = TramiteFomento(**tramite_data, user_id=current_user["id"])
     db.add(db_tramite)
+    db.flush()
+    sync_aportes(db, db_tramite, data.otros_aportes_no_iaavim)
+    audit_log(
+        db=db,
+        action=AuditAction.CREATE,
+        user_id=current_user["id"],
+        resource_type="TramiteFomento",
+        resource_id=str(db_tramite.id),
+        details={"titulo_proyecto": data.titulo_proyecto, "borrador": data.borrador},
+        request=request,
+    )
     db.commit()
     db.refresh(db_tramite)
-    return db_tramite
+    return attach_output_fields(db_tramite)
 
 
 @fomento_router.get("/tramites/me", response_model=TramiteFomentoOut)
@@ -271,12 +299,13 @@ async def get_my_tramite(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No se encontró trámite de fomento para este usuario",
         )
-    return tramite
+    return attach_output_fields(tramite)
 
 
 @fomento_router.put("/tramites/me", response_model=TramiteFomentoOut)
 async def update_my_tramite(
     data: TramiteFomentoUpdate,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -292,12 +321,25 @@ async def update_my_tramite(
             detail="No se encontró trámite de fomento para este usuario",
         )
 
-    for key, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(
+        exclude_unset=True, exclude={"otros_aportes_no_iaavim"}
+    )
+    for key, value in update_data.items():
         setattr(tramite, key, value)
+    sync_aportes(db, tramite, data.otros_aportes_no_iaavim)
 
+    audit_log(
+        db=db,
+        action=AuditAction.UPDATE,
+        user_id=current_user["id"],
+        resource_type="TramiteFomento",
+        resource_id=str(tramite.id),
+        details={"campos": sorted(update_data.keys())},
+        request=request,
+    )
     db.commit()
     db.refresh(tramite)
-    return tramite
+    return attach_output_fields(tramite)
 
 
 @fomento_router.get("/tramites", response_model=list[TramiteFomentoOut])
@@ -305,11 +347,12 @@ async def list_tramites(
     current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """Listar todos los Trámites de Fomento del usuario"""
-    return (
+    tramites = (
         db.query(TramiteFomento)
         .filter(TramiteFomento.user_id == current_user["id"])
         .all()
     )
+    return [attach_output_fields(t) for t in tramites]
 
 
 @fomento_router.get("/tramites/admin", response_model=list[TramiteFomentoOut])
@@ -320,8 +363,8 @@ async def list_all_tramites(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Listar TODOS los Trámites de Fomento (solo admin)"""
-    check_admin_role(current_user)
+    """Listar TODOS los Trámites de Fomento (admin, gestor_fomento o evaluador)"""
+    check_permissions(db, current_user, "tramites:read_all")
     query = db.query(TramiteFomento)
     if tipo_tramite:
         query = query.filter(TramiteFomento.tipo_tramite == tipo_tramite)
@@ -329,7 +372,8 @@ async def list_all_tramites(
         query = query.filter(TramiteFomento.estado_tramite == estado_tramite)
     if evento_id:
         query = query.filter(TramiteFomento.evento_id == evento_id)
-    return query.order_by(TramiteFomento.created_at.desc()).all()
+    tramites = query.order_by(TramiteFomento.created_at.desc()).all()
+    return [attach_output_fields(t) for t in tramites]
 
 
 @fomento_router.get("/tramites/{tramite_id}", response_model=TramiteFomentoOut)
@@ -351,13 +395,14 @@ async def get_tramite(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Trámite no encontrado"
         )
-    return tramite
+    return attach_output_fields(tramite)
 
 
 @fomento_router.put("/tramites/{tramite_id}", response_model=TramiteFomentoOut)
 async def update_tramite(
     tramite_id: int,
     data: TramiteFomentoUpdate,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -375,17 +420,103 @@ async def update_tramite(
             status_code=status.HTTP_404_NOT_FOUND, detail="Trámite no encontrado"
         )
 
-    for key, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(
+        exclude_unset=True, exclude={"otros_aportes_no_iaavim"}
+    )
+    for key, value in update_data.items():
         setattr(tramite, key, value)
+    sync_aportes(db, tramite, data.otros_aportes_no_iaavim)
 
+    audit_log(
+        db=db,
+        action=AuditAction.UPDATE,
+        user_id=current_user["id"],
+        resource_type="TramiteFomento",
+        resource_id=str(tramite.id),
+        details={"campos": sorted(update_data.keys())},
+        request=request,
+    )
     db.commit()
     db.refresh(tramite)
-    return tramite
+    return attach_output_fields(tramite)
+
+
+@fomento_router.get("/tramites/{tramite_id}/admin", response_model=TramiteFomentoOut)
+async def admin_get_tramite(
+    tramite_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """[Gestión] Obtener cualquier Trámite de Fomento por ID (sin filtrar por
+    titular). Requiere fomento:manage — es la contraparte de lectura de
+    admin_update_tramite, para la pantalla de detalle del backoffice."""
+    check_permissions(db, current_user, "fomento:manage")
+    tramite = db.query(TramiteFomento).filter(TramiteFomento.id == tramite_id).first()
+    if not tramite:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trámite no encontrado"
+        )
+    return attach_output_fields(tramite)
+
+
+@fomento_router.put("/tramites/{tramite_id}/admin", response_model=TramiteFomentoOut)
+async def admin_update_tramite(
+    tramite_id: int,
+    data: TramiteFomentoAdminUpdate,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """[Gestión] Actualizar cualquier Trámite de Fomento, incluidos los campos
+    administrativos del expediente (estado, montos aprobados, resoluciones,
+    pagos, vinculaciones interáreas). Requiere fomento:manage (admin o
+    gestor_fomento). Todo cambio queda auditado."""
+    check_permissions(db, current_user, "fomento:manage")
+
+    tramite = db.query(TramiteFomento).filter(TramiteFomento.id == tramite_id).first()
+    if not tramite:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trámite no encontrado"
+        )
+
+    update_data = data.model_dump(exclude_unset=True, exclude={"pagos"})
+    cambios_estado = {
+        k: {"antes": getattr(tramite, k), "despues": v}
+        for k, v in update_data.items()
+        if k in ("estado_tramite", "monto_aprobado_iaavim", "nro_expediente")
+        and getattr(tramite, k) != v
+    }
+    for key, value in update_data.items():
+        setattr(tramite, key, value)
+
+    pagos_antes = len(tramite.pagos_rel)
+    sync_pagos(db, tramite, data.pagos)
+    if data.pagos is not None and len(data.pagos) != pagos_antes:
+        cambios_estado["pagos"] = {"antes": pagos_antes, "despues": len(data.pagos)}
+
+    audit_log(
+        db=db,
+        action=AuditAction.UPDATE,
+        user_id=current_user["id"],
+        resource_type="TramiteFomento",
+        resource_id=str(tramite.id),
+        details={
+            "admin": True,
+            "titular": tramite.user_id,
+            "campos": sorted(update_data.keys()),
+            **({"cambios_clave": cambios_estado} if cambios_estado else {}),
+        },
+        request=request,
+    )
+    db.commit()
+    db.refresh(tramite)
+    return attach_output_fields(tramite)
 
 
 @fomento_router.delete("/tramites/{tramite_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_tramite(
     tramite_id: int,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -403,7 +534,17 @@ async def delete_tramite(
             status_code=status.HTTP_404_NOT_FOUND, detail="Trámite no encontrado"
         )
 
+    titulo = tramite.titulo_proyecto
     db.delete(tramite)
+    audit_log(
+        db=db,
+        action=AuditAction.DELETE,
+        user_id=current_user["id"],
+        resource_type="TramiteFomento",
+        resource_id=str(tramite_id),
+        details={"titulo_proyecto": titulo},
+        request=request,
+    )
     db.commit()
     return None
 
@@ -482,7 +623,7 @@ async def list_all_evaluadores(
     current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """Listar todos los Evaluadores del sistema (solo admin, para asignar a comités)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     return (
         db.query(Evaluador)
         .filter(Evaluador.borrador.is_(False))
@@ -583,17 +724,20 @@ async def create_comite(
     db: Session = Depends(get_db),
 ):
     """Crear un Comité de evaluación (solo admin)"""
-    check_admin_role(current_user)
+    check_any_permission(db, current_user, "fomento:manage", "tramites:evaluate")
     evento = db.query(EventoFomento).filter(EventoFomento.id == data.evento_id).first()
     if not evento:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Evento no encontrado"
         )
-    db_comite = ComiteFomento(**data.model_dump())
+    comite_data = data.model_dump(exclude={"integrantes"})
+    db_comite = ComiteFomento(**comite_data)
     db.add(db_comite)
+    db.flush()  # necesita comite.id real para las FKs de IntegranteComite
+    sync_integrantes(db, db_comite, data.integrantes)
     db.commit()
     db.refresh(db_comite)
-    return db_comite
+    return attach_comite_output_fields(db_comite)
 
 
 @fomento_router.get("/comites", response_model=list[ComiteFomentoOut])
@@ -603,11 +747,12 @@ async def list_comites(
     db: Session = Depends(get_db),
 ):
     """Listar Comités (solo admin). Opcionalmente filtrar por evento."""
-    check_admin_role(current_user)
+    check_any_permission(db, current_user, "fomento:manage", "tramites:evaluate")
     query = db.query(ComiteFomento)
     if evento_id:
         query = query.filter(ComiteFomento.evento_id == evento_id)
-    return query.order_by(ComiteFomento.created_at.desc()).all()
+    comites = query.order_by(ComiteFomento.created_at.desc()).all()
+    return [attach_comite_output_fields(c) for c in comites]
 
 
 @fomento_router.get("/comites/{comite_id}", response_model=ComiteFomentoOut)
@@ -617,13 +762,13 @@ async def get_comite(
     db: Session = Depends(get_db),
 ):
     """Obtener un Comité por ID (solo admin)"""
-    check_admin_role(current_user)
+    check_any_permission(db, current_user, "fomento:manage", "tramites:evaluate")
     comite = db.query(ComiteFomento).filter(ComiteFomento.id == comite_id).first()
     if not comite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Comité no encontrado"
         )
-    return comite
+    return attach_comite_output_fields(comite)
 
 
 @fomento_router.put("/comites/{comite_id}", response_model=ComiteFomentoOut)
@@ -634,17 +779,19 @@ async def update_comite(
     db: Session = Depends(get_db),
 ):
     """Actualizar un Comité (solo admin)"""
-    check_admin_role(current_user)
+    check_any_permission(db, current_user, "fomento:manage", "tramites:evaluate")
     comite = db.query(ComiteFomento).filter(ComiteFomento.id == comite_id).first()
     if not comite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Comité no encontrado"
         )
-    for key, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(exclude_unset=True, exclude={"integrantes"})
+    for key, value in update_data.items():
         setattr(comite, key, value)
+    sync_integrantes(db, comite, data.integrantes)
     db.commit()
     db.refresh(comite)
-    return comite
+    return attach_comite_output_fields(comite)
 
 
 @fomento_router.delete("/comites/{comite_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -654,7 +801,7 @@ async def delete_comite(
     db: Session = Depends(get_db),
 ):
     """Eliminar un Comité (solo admin)"""
-    check_admin_role(current_user)
+    check_any_permission(db, current_user, "fomento:manage", "tramites:evaluate")
     comite = db.query(ComiteFomento).filter(ComiteFomento.id == comite_id).first()
     if not comite:
         raise HTTPException(
@@ -679,7 +826,7 @@ async def create_dictamen(
     db: Session = Depends(get_db),
 ):
     """Crear un Dictamen (solo admin)"""
-    check_admin_role(current_user)
+    check_any_permission(db, current_user, "fomento:manage", "tramites:evaluate")
     tramite = (
         db.query(TramiteFomento).filter(TramiteFomento.id == data.tramite_id).first()
     )
@@ -707,7 +854,7 @@ async def list_dictamenes(
     db: Session = Depends(get_db),
 ):
     """Listar Dictámenes (solo admin). Filtrar por trámite o evaluador."""
-    check_admin_role(current_user)
+    check_any_permission(db, current_user, "fomento:manage", "tramites:evaluate")
     query = db.query(DictamenFomento)
     if tramite_id:
         query = query.filter(DictamenFomento.tramite_id == tramite_id)
@@ -725,11 +872,10 @@ async def get_dictamenes_by_tramite(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Obtener dictámenes de un trámite (admin ve todos, ciudadano ve devolucionados)"""
+    """Obtener dictámenes de un trámite (gestión/evaluación ve todos, ciudadano ve devolucionados)"""
     query = db.query(DictamenFomento).filter(DictamenFomento.tramite_id == tramite_id)
-    from src.utils import has_user_role
-
-    if not has_user_role(current_user, ["admin"]):
+    user_perms = get_user_permissions(db, current_user)
+    if not user_perms.intersection({"fomento:manage", "tramites:evaluate"}):
         query = query.filter(DictamenFomento.devolucion_presentante)
     return query.order_by(DictamenFomento.fecha.desc()).all()
 
@@ -741,7 +887,7 @@ async def get_dictamen(
     db: Session = Depends(get_db),
 ):
     """Obtener un Dictamen por ID (solo admin)"""
-    check_admin_role(current_user)
+    check_any_permission(db, current_user, "fomento:manage", "tramites:evaluate")
     dictamen = (
         db.query(DictamenFomento).filter(DictamenFomento.id == dictamen_id).first()
     )
@@ -761,7 +907,7 @@ async def update_dictamen(
     db: Session = Depends(get_db),
 ):
     """Actualizar un Dictamen (solo admin)"""
-    check_admin_role(current_user)
+    check_any_permission(db, current_user, "fomento:manage", "tramites:evaluate")
     dictamen = (
         db.query(DictamenFomento).filter(DictamenFomento.id == dictamen_id).first()
     )
@@ -786,7 +932,7 @@ async def delete_dictamen(
     db: Session = Depends(get_db),
 ):
     """Eliminar un Dictamen (solo admin)"""
-    check_admin_role(current_user)
+    check_any_permission(db, current_user, "fomento:manage", "tramites:evaluate")
     dictamen = (
         db.query(DictamenFomento).filter(DictamenFomento.id == dictamen_id).first()
     )
@@ -814,7 +960,7 @@ async def create_cohorte(
     db: Session = Depends(get_db),
 ):
     """Crear una Cohorte del Semillero (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     db_cohorte = CohorteSemillero(**data.model_dump())
     db.add(db_cohorte)
     db.commit()
@@ -828,7 +974,7 @@ async def list_cohortes(
     db: Session = Depends(get_db),
 ):
     """Listar Cohortes (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     return (
         db.query(CohorteSemillero).order_by(CohorteSemillero.anio_edicion.desc()).all()
     )
@@ -841,7 +987,7 @@ async def get_cohorte(
     db: Session = Depends(get_db),
 ):
     """Obtener una Cohorte por ID (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     cohorte = (
         db.query(CohorteSemillero).filter(CohorteSemillero.id == cohorte_id).first()
     )
@@ -860,7 +1006,7 @@ async def update_cohorte(
     db: Session = Depends(get_db),
 ):
     """Actualizar una Cohorte (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     cohorte = (
         db.query(CohorteSemillero).filter(CohorteSemillero.id == cohorte_id).first()
     )
@@ -882,7 +1028,7 @@ async def delete_cohorte(
     db: Session = Depends(get_db),
 ):
     """Eliminar una Cohorte (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     cohorte = (
         db.query(CohorteSemillero).filter(CohorteSemillero.id == cohorte_id).first()
     )
@@ -910,7 +1056,7 @@ async def create_participante(
     db: Session = Depends(get_db),
 ):
     """Agregar participante a una Cohorte (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     cohorte = (
         db.query(CohorteSemillero).filter(CohorteSemillero.id == cohorte_id).first()
     )
@@ -937,7 +1083,7 @@ async def list_participantes(
     db: Session = Depends(get_db),
 ):
     """Listar participantes de una Cohorte (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     return (
         db.query(ParticipanteSemillero)
         .filter(ParticipanteSemillero.cohorte_id == cohorte_id)
@@ -957,7 +1103,7 @@ async def update_participante(
     db: Session = Depends(get_db),
 ):
     """Actualizar un participante (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     part = (
         db.query(ParticipanteSemillero)
         .filter(ParticipanteSemillero.id == participante_id)
@@ -985,7 +1131,7 @@ async def delete_participante(
     db: Session = Depends(get_db),
 ):
     """Eliminar un participante (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     part = (
         db.query(ParticipanteSemillero)
         .filter(ParticipanteSemillero.id == participante_id)
@@ -1016,7 +1162,7 @@ async def create_acompanamiento(
     db: Session = Depends(get_db),
 ):
     """Registrar un acompañamiento para un participante (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     part = (
         db.query(ParticipanteSemillero)
         .filter(ParticipanteSemillero.id == participante_id)
@@ -1046,7 +1192,7 @@ async def list_acompanamientos(
     db: Session = Depends(get_db),
 ):
     """Listar acompañamientos de un participante (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     return (
         db.query(AcompanamientoSemillero)
         .filter(AcompanamientoSemillero.participante_id == participante_id)
@@ -1066,7 +1212,7 @@ async def update_acompanamiento(
     db: Session = Depends(get_db),
 ):
     """Actualizar un acompañamiento (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     acomp = (
         db.query(AcompanamientoSemillero)
         .filter(AcompanamientoSemillero.id == acompanamiento_id)
@@ -1094,7 +1240,7 @@ async def delete_acompanamiento(
     db: Session = Depends(get_db),
 ):
     """Eliminar un acompañamiento (solo admin)"""
-    check_admin_role(current_user)
+    check_permissions(db, current_user, "fomento:manage")
     acomp = (
         db.query(AcompanamientoSemillero)
         .filter(AcompanamientoSemillero.id == acompanamiento_id)

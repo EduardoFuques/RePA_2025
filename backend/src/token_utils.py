@@ -44,13 +44,28 @@ def _decode(token: str, expected_type: str | None = None) -> dict:
 
 
 def decode_access_token(token: str) -> dict:
-    """Decodifica un token de acceso (sin forzar el tipo, por compatibilidad)."""
-    return _decode(token)
+    """Decodifica un token de ACCESO, validando que sea de tipo "access".
+
+    Antes no forzaba el tipo, con lo cual un refresh token (7 días) o un
+    token de verificación/recuperación (24h) servía para autenticar
+    cualquier endpoint protegido. Cada tipo de token tiene ahora su decoder.
+    """
+    return _decode(token, expected_type="access")
 
 
 def decode_refresh_token(token: str) -> dict:
     """Decodifica un token de refresco, validando que sea de tipo "refresh"."""
     return _decode(token, expected_type="refresh")
+
+
+def decode_verify_token(token: str) -> dict:
+    """Decodifica un token de verificación de email (tipo "verify")."""
+    return _decode(token, expected_type="verify")
+
+
+def decode_recovery_token(token: str) -> dict:
+    """Decodifica un token de recuperación de contraseña (tipo "recover")."""
+    return _decode(token, expected_type="recover")
 
 
 # Generar un token de acceso
