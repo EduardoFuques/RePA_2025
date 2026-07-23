@@ -14,6 +14,7 @@ filas hijas son EXACTAMENTE lo que se mandó) y evita rediseñar la UI.
 `evaluadores` ANTES de tocar una sola fila — si alguno no existe, se
 rechaza el lote completo (nada se aplica parcialmente).
 """
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -28,7 +29,9 @@ from src.models.fomento_model import (
 from src.schemas.fomento_schemas import AporteItem, IntegranteItem, PagoItem
 
 
-def sync_pagos(db: Session, tramite: TramiteFomento, items: list[PagoItem] | None) -> None:
+def sync_pagos(
+    db: Session, tramite: TramiteFomento, items: list[PagoItem] | None
+) -> None:
     """Reemplaza todos los pagos del trámite por `items`. No-op si `items`
     es None (campo ausente del payload — no tocar lo existente)."""
     if items is None:
@@ -39,7 +42,9 @@ def sync_pagos(db: Session, tramite: TramiteFomento, items: list[PagoItem] | Non
         db.add(PagoFomento(tramite_id=tramite.id, **item.model_dump()))
 
 
-def sync_aportes(db: Session, tramite: TramiteFomento, items: list[AporteItem] | None) -> None:
+def sync_aportes(
+    db: Session, tramite: TramiteFomento, items: list[AporteItem] | None
+) -> None:
     """Reemplaza todos los aportes del trámite por `items`. No-op si `items`
     es None (campo ausente del payload — no tocar lo existente)."""
     if items is None:
@@ -62,8 +67,7 @@ def sync_integrantes(
     if items:
         ids = {item.evaluador_id for item in items}
         encontrados = {
-            row[0]
-            for row in db.query(Evaluador.id).filter(Evaluador.id.in_(ids)).all()
+            row[0] for row in db.query(Evaluador.id).filter(Evaluador.id.in_(ids)).all()
         }
         faltantes = ids - encontrados
         if faltantes:
@@ -90,5 +94,7 @@ def attach_output_fields(tramite: TramiteFomento) -> TramiteFomento:
 
 def attach_comite_output_fields(comite: ComiteFomento) -> ComiteFomento:
     """Adjunta `integrantes` como atributo plano para ComiteFomentoOut."""
-    comite.integrantes = [IntegranteItem.model_validate(i) for i in comite.integrantes_rel]
+    comite.integrantes = [
+        IntegranteItem.model_validate(i) for i in comite.integrantes_rel
+    ]
     return comite

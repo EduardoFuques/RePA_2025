@@ -73,9 +73,11 @@ async def create_asociacion(
             db,
             r,
             ud,
-            get_persona_fisica_titular=lambda: db.query(PersonaFisica)
-            .filter(PersonaFisica.user_id == current_user["id"])
-            .first(),
+            get_persona_fisica_titular=lambda: (
+                db.query(PersonaFisica)
+                .filter(PersonaFisica.user_id == current_user["id"])
+                .first()
+            ),
         ),
     )
 
@@ -106,9 +108,11 @@ async def update_my_asociacion(
             db,
             asoc,
             update_data,
-            get_persona_fisica_titular=lambda: db.query(PersonaFisica)
-            .filter(PersonaFisica.user_id == current_user["id"])
-            .first(),
+            get_persona_fisica_titular=lambda: (
+                db.query(PersonaFisica)
+                .filter(PersonaFisica.user_id == current_user["id"])
+                .first()
+            ),
         )
     commit_or_conflict(db)
     db.refresh(asoc)

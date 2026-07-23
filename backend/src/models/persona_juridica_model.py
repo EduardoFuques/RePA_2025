@@ -111,4 +111,9 @@ class IntegrantePJ(Base):
     email = Column(String(255), nullable=True)
     vinculado_repa = Column(Boolean, default=False)  # Si ya está registrado en RePA
 
-    persona_juridica = relationship("PersonaJuridica", backref=backref("integrantes", cascade="all, delete-orphan", passive_deletes=True))
+    persona_juridica = relationship(
+        "PersonaJuridica",
+        backref=backref(
+            "integrantes", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )

@@ -76,9 +76,7 @@ async def list_permissions(
 # ============================================================
 # ROLES
 # ============================================================
-@admin_router.get(
-    "/roles", response_model=list[RoleDetailOut], summary="Listar roles"
-)
+@admin_router.get("/roles", response_model=list[RoleDetailOut], summary="Listar roles")
 async def list_roles(
     db: Session = Depends(get_db),
     _: dict = Depends(require_permissions("roles:read")),
@@ -106,9 +104,7 @@ async def create_role(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El nombre del rol es obligatorio",
         )
-    existing = (
-        db.query(Role).filter(func.lower(Role.rol) == nombre.lower()).first()
-    )
+    existing = db.query(Role).filter(func.lower(Role.rol) == nombre.lower()).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -280,9 +276,7 @@ async def update_user(
 
     if user_in.email and user_in.email != user.email:
         # Validar unicidad de email para evitar IntegrityError 500
-        verify_email_unique(
-            db, user_in, {"id": user.id, "email": user.email}
-        )
+        verify_email_unique(db, user_in, {"id": user.id, "email": user.email})
         user.email = user_in.email
     if user_in.password:
         validar_password(user_in.password)
@@ -326,9 +320,7 @@ async def update_user_roles(
 
     current_role_ids -= set(patch.remove)
 
-    admin_role = (
-        db.query(Role).filter(func.lower(Role.rol) == "admin").first()
-    )
+    admin_role = db.query(Role).filter(func.lower(Role.rol) == "admin").first()
     admin_afectado = admin_role and admin_role.id in (
         set(patch.add) | set(patch.remove)
     )
@@ -337,9 +329,7 @@ async def update_user_roles(
     # roles:manage alcanza para los demás roles, pero no para escalar
     # a (o degradar de) administrador.
     if admin_afectado:
-        current_roles = {
-            r["rol"].lower() for r in (current_user.get("roles") or [])
-        }
+        current_roles = {r["rol"].lower() for r in (current_user.get("roles") or [])}
         if "admin" not in current_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -420,9 +410,7 @@ async def set_user_status(
     # Protección de último admin: desactivar al último administrador activo
     # dejaría el sistema sin administración.
     if not is_active:
-        admin_role = (
-            db.query(Role).filter(func.lower(Role.rol) == "admin").first()
-        )
+        admin_role = db.query(Role).filter(func.lower(Role.rol) == "admin").first()
         if admin_role and any(r.id == admin_role.id for r in user.roles):
             otros_admins_activos = (
                 db.query(User)
@@ -481,8 +469,12 @@ async def get_audit_logs(
     ),
     user_id: str | None = Query(None, description="Filtrar por ID de usuario"),
     days: int = Query(7, description="Días hacia atrás a consultar (default: 7)"),
-    limit: int = Query(100, description="Límite de registros por página (default: 100, max: 500)"),
-    offset: int = Query(0, ge=0, description="Desplazamiento para paginación (default: 0)"),
+    limit: int = Query(
+        100, description="Límite de registros por página (default: 100, max: 500)"
+    ),
+    offset: int = Query(
+        0, ge=0, description="Desplazamiento para paginación (default: 0)"
+    ),
 ):
     """
     Obtener registros de auditoría, paginados (Sólo para Administradores).

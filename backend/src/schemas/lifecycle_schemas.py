@@ -1,5 +1,6 @@
 # schemas/lifecycle_schemas.py
 """Campos de salida del ciclo de vida / Código RePA, compartidos por los *Out."""
+
 from datetime import datetime
 
 from pydantic import BaseModel

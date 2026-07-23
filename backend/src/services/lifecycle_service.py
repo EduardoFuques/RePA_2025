@@ -28,6 +28,7 @@ normal, ya que a esa altura ``codigo_repa`` ya está seteado).
 - Usar ``procesar_envio_si_corresponde`` desde las rutas — es idempotente y
   decide cuál de las dos formas de emisión corresponde según ``REPA_TIPO``.
 """
+
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
@@ -68,9 +69,7 @@ def puede_transicionar(actual: str, nuevo: str) -> bool:
 def _transicionar(registro, nuevo: str) -> None:
     actual = registro.estado
     if not puede_transicionar(actual, nuevo):
-        raise TransicionInvalida(
-            f"Transición no permitida: {actual!r} → {nuevo!r}"
-        )
+        raise TransicionInvalida(f"Transición no permitida: {actual!r} → {nuevo!r}")
     registro.estado = nuevo
 
 
@@ -178,10 +177,7 @@ def _fue_recien_enviado(registro, update_data: dict) -> bool:
     estaba en estado ``borrador``. Idempotente: en ediciones posteriores
     (el estado ya no es ``borrador``) devuelve False sin volver a emitir
     código ni reenviar."""
-    return (
-        update_data.get("borrador") is False
-        and registro.estado == E.borrador.value
-    )
+    return update_data.get("borrador") is False and registro.estado == E.borrador.value
 
 
 def procesar_envio_si_corresponde(

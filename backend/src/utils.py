@@ -121,9 +121,7 @@ def has_user_role(current_user: dict, required_roles: list[str]) -> bool:
         bool: True si tiene al menos un rol requerido, False en caso contrario
     """
     # Extraer los nombres de los roles del usuario en minúsculas
-    user_roles = {
-        role["rol"].lower() for role in (current_user.get("roles") or [])
-    }
+    user_roles = {role["rol"].lower() for role in (current_user.get("roles") or [])}
     # Comparación insensible a mayúsculas/minúsculas
     required_roles_lower = {role.lower() for role in required_roles}
 
@@ -148,11 +146,7 @@ def get_user_permissions(db: Session, current_user: dict) -> set[str]:
     if not role_names:
         return set()
 
-    roles = (
-        db.query(Role)
-        .filter(func.lower(Role.rol).in_(role_names))
-        .all()
-    )
+    roles = db.query(Role).filter(func.lower(Role.rol).in_(role_names)).all()
     perms: set[str] = set()
     for role in roles:
         perms.update(p.code for p in role.permissions)

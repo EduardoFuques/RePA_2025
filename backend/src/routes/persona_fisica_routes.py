@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from src.rate_limiter import limiter
 from src.crud_helpers import (
     apply_update_fields,
     check_duplicate_record,
@@ -31,6 +30,7 @@ from src.models.persona_fisica_model import (
     SubperfilRealizadorIntegral,
     SubperfilTecnicoArtistico,
 )
+from src.rate_limiter import limiter
 from src.schemas.persona_fisica_schemas import (
     CapacitadorCreate,
     CapacitadorOut,
@@ -86,7 +86,9 @@ async def create_persona_fisica(
         PersonaFisica,
         data,
         current_user["id"],
-        on_flush=lambda r, ud: lifecycle_service.procesar_envio_si_corresponde(db, r, ud),
+        on_flush=lambda r, ud: lifecycle_service.procesar_envio_si_corresponde(
+            db, r, ud
+        ),
     )
 
 

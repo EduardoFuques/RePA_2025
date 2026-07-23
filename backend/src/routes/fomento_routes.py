@@ -321,7 +321,9 @@ async def update_my_tramite(
             detail="No se encontró trámite de fomento para este usuario",
         )
 
-    update_data = data.model_dump(exclude_unset=True, exclude={"otros_aportes_no_iaavim"})
+    update_data = data.model_dump(
+        exclude_unset=True, exclude={"otros_aportes_no_iaavim"}
+    )
     for key, value in update_data.items():
         setattr(tramite, key, value)
     sync_aportes(db, tramite, data.otros_aportes_no_iaavim)
@@ -418,7 +420,9 @@ async def update_tramite(
             status_code=status.HTTP_404_NOT_FOUND, detail="Trámite no encontrado"
         )
 
-    update_data = data.model_dump(exclude_unset=True, exclude={"otros_aportes_no_iaavim"})
+    update_data = data.model_dump(
+        exclude_unset=True, exclude={"otros_aportes_no_iaavim"}
+    )
     for key, value in update_data.items():
         setattr(tramite, key, value)
     sync_aportes(db, tramite, data.otros_aportes_no_iaavim)
@@ -469,9 +473,7 @@ async def admin_update_tramite(
     gestor_fomento). Todo cambio queda auditado."""
     check_permissions(db, current_user, "fomento:manage")
 
-    tramite = (
-        db.query(TramiteFomento).filter(TramiteFomento.id == tramite_id).first()
-    )
+    tramite = db.query(TramiteFomento).filter(TramiteFomento.id == tramite_id).first()
     if not tramite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Trámite no encontrado"

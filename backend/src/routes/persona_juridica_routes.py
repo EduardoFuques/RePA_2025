@@ -68,7 +68,9 @@ async def create_persona_juridica(
         PersonaJuridica,
         data,
         current_user["id"],
-        on_flush=lambda r, ud: lifecycle_service.procesar_envio_si_corresponde(db, r, ud),
+        on_flush=lambda r, ud: lifecycle_service.procesar_envio_si_corresponde(
+            db, r, ud
+        ),
     )
 
 

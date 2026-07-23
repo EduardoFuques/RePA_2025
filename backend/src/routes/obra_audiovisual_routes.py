@@ -38,7 +38,9 @@ def _get_obra(db: Session, obra_id: int, user_id: str) -> ObraAudiovisual:
 def _titular_lookup(db: Session, user_id: str):
     """Callable perezoso para lifecycle_service: busca la PersonaFisica del
     usuario solo si de verdad se necesita (envío real, no cada request)."""
-    return lambda: db.query(PersonaFisica).filter(PersonaFisica.user_id == user_id).first()
+    return lambda: (
+        db.query(PersonaFisica).filter(PersonaFisica.user_id == user_id).first()
+    )
 
 
 # === CRUD OBRA AUDIOVISUAL ===

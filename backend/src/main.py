@@ -146,13 +146,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     # resolviéndose por sus propios handlers de FastAPI (match exacto de
     # clase antes de llegar acá vía MRO), así que esto solo captura fallas
     # realmente no anticipadas.
-    logger.exception(
-        "Excepción no manejada en %s %s", request.method, request.url.path
-    )
+    logger.exception("Excepción no manejada en %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
         content={"detail": "Error interno del servidor"},
     )
+
 
 # Configuración de CORS - Restringido a métodos y headers necesarios
 app.add_middleware(

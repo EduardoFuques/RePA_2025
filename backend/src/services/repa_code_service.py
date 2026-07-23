@@ -12,6 +12,7 @@ Formato (default, encapsulado aquí para poder ajustarlo según defina el PM):
 Sub-pregunta abierta (§0 del plan): ancho de secuencia, inclusión de año y prefijo por tipo
 vs correlativo único. Cambiar sólo las constantes / ``build_codigo`` impacta todo el sistema.
 """
+
 from sqlalchemy.orm import Session
 
 from src.models.registro_lifecycle import RepaCodeCounter

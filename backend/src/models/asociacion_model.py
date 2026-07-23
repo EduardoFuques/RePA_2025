@@ -79,9 +79,7 @@ class Asociacion(RegistroLifecycleMixin, Base):
     )
 
     # Relación con el usuario (user_id; revisado_por es otra FK a users)
-    user = relationship(
-        "User", back_populates="asociacion", foreign_keys=[user_id]
-    )
+    user = relationship("User", back_populates="asociacion", foreign_keys=[user_id])
 
 
 class IntegranteAsociacion(Base):
@@ -90,7 +88,9 @@ class IntegranteAsociacion(Base):
     __tablename__ = "integrantes_asociacion"
 
     id = Column(Integer, primary_key=True, index=True)
-    asociacion_id = Column(Integer, ForeignKey("asociaciones.id", ondelete="CASCADE"), nullable=False)
+    asociacion_id = Column(
+        Integer, ForeignKey("asociaciones.id", ondelete="CASCADE"), nullable=False
+    )
 
     nombre = Column(String(200), nullable=False)
     dni = Column(String(20), nullable=True)
@@ -98,4 +98,9 @@ class IntegranteAsociacion(Base):
     email = Column(String(255), nullable=True)
     vinculado_repa = Column(Boolean, default=False)
 
-    asociacion = relationship("Asociacion", backref=backref("integrantes", cascade="all, delete-orphan", passive_deletes=True))
+    asociacion = relationship(
+        "Asociacion",
+        backref=backref(
+            "integrantes", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )

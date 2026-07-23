@@ -87,6 +87,4 @@ class EstudianteESA(RegistroLifecycleMixin, Base):
     )
 
     # Relación con el usuario (user_id; revisado_por es otra FK a users)
-    user = relationship(
-        "User", back_populates="estudiante_esa", foreign_keys=[user_id]
-    )
+    user = relationship("User", back_populates="estudiante_esa", foreign_keys=[user_id])

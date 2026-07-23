@@ -147,7 +147,11 @@ class EquipoTecnicoObra(Base):
     __tablename__ = "equipo_tecnico_obra"
 
     id = Column(Integer, primary_key=True, index=True)
-    obra_id = Column(Integer, ForeignKey("obras_audiovisuales.id", ondelete="CASCADE"), nullable=False)
+    obra_id = Column(
+        Integer,
+        ForeignKey("obras_audiovisuales.id", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     rol = Column(String(100), nullable=False)
     # Roles: direccion, produccion_ejecutiva, direccion_fotografia, direccion_arte,
@@ -156,4 +160,9 @@ class EquipoTecnicoObra(Base):
     en_repa = Column(String(10), nullable=True)  # si, no
     codigo_repa = Column(String(50), nullable=True)  # Si está en RePA
 
-    obra = relationship("ObraAudiovisual", backref=backref("equipo_tecnico", cascade="all, delete-orphan", passive_deletes=True))
+    obra = relationship(
+        "ObraAudiovisual",
+        backref=backref(
+            "equipo_tecnico", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )

@@ -17,7 +17,6 @@ from src.database import get_db
 from src.models.audit_model import AuditAction
 from src.models.user_models import Role, TokenRecovery, User
 from src.rate_limiter import limiter
-from src.services.email_service import send_recovery_email, send_verification_email
 from src.schemas.user_schemas import (
     PasswordConfirm,
     RefreshTokenRequest,
@@ -27,6 +26,7 @@ from src.schemas.user_schemas import (
     UserOut,
     UserUpdate,
 )
+from src.services.email_service import send_recovery_email, send_verification_email
 from src.token_utils import (
     create_access_token,
     create_refresh_token,
@@ -171,7 +171,9 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
     "/resend-verification",
     description="Reenviar el email de verificación de cuenta",
     responses={
-        200: {"description": "Mensaje genérico, sin revelar si el email existe o ya está verificado"},
+        200: {
+            "description": "Mensaje genérico, sin revelar si el email existe o ya está verificado"
+        },
         429: {"description": "Demasiados intentos (rate limit)"},
     },
 )
@@ -651,7 +653,11 @@ async def become_estudiante(
             user_id=user.id,
             resource_type="User",
             resource_id=user.id,
-            details={"add": [estudiante_role.id], "rol": "estudiante", "self_service": True},
+            details={
+                "add": [estudiante_role.id],
+                "rol": "estudiante",
+                "self_service": True,
+            },
             request=request,
         )
         db.commit()

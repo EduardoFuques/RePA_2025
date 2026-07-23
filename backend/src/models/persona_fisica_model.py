@@ -153,9 +153,7 @@ class PersonaFisica(RegistroLifecycleMixin, Base):
     )
 
     # Relación con el usuario (user_id; revisado_por es otra FK a users)
-    user = relationship(
-        "User", back_populates="persona_fisica", foreign_keys=[user_id]
-    )
+    user = relationship("User", back_populates="persona_fisica", foreign_keys=[user_id])
 
 
 class SubperfilProductor(Base):
@@ -173,7 +171,12 @@ class SubperfilProductor(Base):
     anio = Column(Integer, nullable=True)
     rol = Column(String(500), nullable=True)
 
-    persona_fisica = relationship("PersonaFisica", backref=backref("obras_productor", cascade="all, delete-orphan", passive_deletes=True))
+    persona_fisica = relationship(
+        "PersonaFisica",
+        backref=backref(
+            "obras_productor", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )
 
 
 class SubperfilDirector(Base):
@@ -190,7 +193,12 @@ class SubperfilDirector(Base):
     anio = Column(Integer, nullable=True)
     rol = Column(String(500), nullable=True)
 
-    persona_fisica = relationship("PersonaFisica", backref=backref("obras_director", cascade="all, delete-orphan", passive_deletes=True))
+    persona_fisica = relationship(
+        "PersonaFisica",
+        backref=backref(
+            "obras_director", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )
 
 
 class SubperfilGuionista(Base):
@@ -207,7 +215,12 @@ class SubperfilGuionista(Base):
     anio = Column(Integer, nullable=True)
     rol = Column(String(500), nullable=True)
 
-    persona_fisica = relationship("PersonaFisica", backref=backref("obras_guionista", cascade="all, delete-orphan", passive_deletes=True))
+    persona_fisica = relationship(
+        "PersonaFisica",
+        backref=backref(
+            "obras_guionista", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )
 
 
 class SubperfilDocumentalista(Base):
@@ -224,7 +237,12 @@ class SubperfilDocumentalista(Base):
     anio = Column(Integer, nullable=True)
     rol = Column(String(500), nullable=True)
 
-    persona_fisica = relationship("PersonaFisica", backref=backref("obras_documentalista", cascade="all, delete-orphan", passive_deletes=True))
+    persona_fisica = relationship(
+        "PersonaFisica",
+        backref=backref(
+            "obras_documentalista", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )
 
 
 class SubperfilRealizadorIntegral(Base):
@@ -241,7 +259,14 @@ class SubperfilRealizadorIntegral(Base):
     anio = Column(Integer, nullable=True)
     rol = Column(String(500), nullable=True)
 
-    persona_fisica = relationship("PersonaFisica", backref=backref("obras_realizador_integral", cascade="all, delete-orphan", passive_deletes=True))
+    persona_fisica = relationship(
+        "PersonaFisica",
+        backref=backref(
+            "obras_realizador_integral",
+            cascade="all, delete-orphan",
+            passive_deletes=True,
+        ),
+    )
 
 
 class SubperfilTecnicoArtistico(Base):
@@ -251,7 +276,10 @@ class SubperfilTecnicoArtistico(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     persona_fisica_id = Column(
-        Integer, ForeignKey("personas_fisicas.id", ondelete="CASCADE"), unique=True, nullable=False
+        Integer,
+        ForeignKey("personas_fisicas.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
     )
 
     # Arrays de opciones seleccionadas
@@ -260,7 +288,12 @@ class SubperfilTecnicoArtistico(Base):
     obras_iaavim = Column(JSON, nullable=True)
     especializaciones = Column(JSON, nullable=True)
 
-    persona_fisica = relationship("PersonaFisica", backref=backref("tecnico_artistico", cascade="all, delete-orphan", passive_deletes=True))
+    persona_fisica = relationship(
+        "PersonaFisica",
+        backref=backref(
+            "tecnico_artistico", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )
 
 
 class SubperfilCapacitador(Base):
@@ -270,7 +303,10 @@ class SubperfilCapacitador(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     persona_fisica_id = Column(
-        Integer, ForeignKey("personas_fisicas.id", ondelete="CASCADE"), unique=True, nullable=False
+        Integer,
+        ForeignKey("personas_fisicas.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
     )
 
     capacitaciones_iaavim = Column(Boolean, default=False)
@@ -284,7 +320,12 @@ class SubperfilCapacitador(Base):
     cv_link = Column(String(500), nullable=True)
     materiales_link = Column(String(500), nullable=True)
 
-    persona_fisica = relationship("PersonaFisica", backref=backref("capacitador", cascade="all, delete-orphan", passive_deletes=True))
+    persona_fisica = relationship(
+        "PersonaFisica",
+        backref=backref(
+            "capacitador", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )
 
 
 class SubperfilInvestigador(Base):
@@ -294,7 +335,10 @@ class SubperfilInvestigador(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     persona_fisica_id = Column(
-        Integer, ForeignKey("personas_fisicas.id", ondelete="CASCADE"), unique=True, nullable=False
+        Integer,
+        ForeignKey("personas_fisicas.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
     )
 
     participo_proyectos = Column(Boolean, default=False)
@@ -309,4 +353,9 @@ class SubperfilInvestigador(Base):
     institucion_financiamiento = Column(String(255), nullable=True)
     interes_red_investigadores = Column(Boolean, default=False)
 
-    persona_fisica = relationship("PersonaFisica", backref=backref("investigador", cascade="all, delete-orphan", passive_deletes=True))
+    persona_fisica = relationship(
+        "PersonaFisica",
+        backref=backref(
+            "investigador", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )

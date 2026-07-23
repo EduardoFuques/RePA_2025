@@ -11,6 +11,7 @@ Define:
 El formato exacto del código (ancho de secuencia, prefijos) está encapsulado en
 ``src.services.repa_code_service`` para poder ajustarlo sin tocar los modelos.
 """
+
 import enum
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text

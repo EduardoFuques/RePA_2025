@@ -561,14 +561,21 @@ class PagoFomento(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tramite_id = Column(
-        Integer, ForeignKey("tramites_fomento.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer,
+        ForeignKey("tramites_fomento.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     fecha = Column(DateTime, nullable=True)
     monto = Column(Integer, nullable=True)
     moneda = Column(String(10), nullable=True)
     concepto = Column(String(255), nullable=True)
-    comprobante = Column(String(500), nullable=True)  # sin UI de upload aún — texto/path plano
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    comprobante = Column(
+        String(500), nullable=True
+    )  # sin UI de upload aún — texto/path plano
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     tramite = relationship("TramiteFomento", back_populates="pagos_rel")
 
@@ -585,13 +592,18 @@ class AporteFomento(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tramite_id = Column(
-        Integer, ForeignKey("tramites_fomento.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer,
+        ForeignKey("tramites_fomento.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     organismo = Column(String(255), nullable=True)
     programa = Column(String(255), nullable=True)
     monto = Column(Integer, nullable=True)
     moneda = Column(String(10), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     tramite = relationship("TramiteFomento", back_populates="aportes_rel")
 
@@ -609,14 +621,21 @@ class IntegranteComite(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     comite_id = Column(
-        Integer, ForeignKey("comites_fomento.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer,
+        ForeignKey("comites_fomento.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     # Sin ondelete: si el evaluador se borra, se prefiere que falle antes que
     # borrar en silencio la membresía histórica del comité (mismo criterio
     # que DictamenFomento.evaluador_id, arriba).
-    evaluador_id = Column(Integer, ForeignKey("evaluadores.id"), nullable=False, index=True)
+    evaluador_id = Column(
+        Integer, ForeignKey("evaluadores.id"), nullable=False, index=True
+    )
     rol = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     comite = relationship("ComiteFomento", back_populates="integrantes_rel")
     evaluador = relationship("Evaluador")

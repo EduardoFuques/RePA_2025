@@ -15,8 +15,9 @@ automáticamente si hace falta antes de aplicar la acción — no exponen un
 paso separado de "tomar para revisión" en la UI, alcanza con aprobar/
 observar/rechazar directamente sobre un registro "enviado".
 """
-from pydantic import BaseModel
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -41,10 +42,27 @@ admin_registros_router = APIRouter(prefix="/admin/registros", tags=["admin-regis
 
 # tipo (path param) -> (modelo SQLAlchemy, schema de salida, campos de búsqueda de texto)
 _TIPOS = {
-    "pf": (PersonaFisica, PersonaFisicaOut, [PersonaFisica.nombre, PersonaFisica.apellido, PersonaFisica.dni, PersonaFisica.email]),
-    "pj": (PersonaJuridica, PersonaJuridicaOut, [PersonaJuridica.nombre_pj, PersonaJuridica.cuit]),
+    "pf": (
+        PersonaFisica,
+        PersonaFisicaOut,
+        [
+            PersonaFisica.nombre,
+            PersonaFisica.apellido,
+            PersonaFisica.dni,
+            PersonaFisica.email,
+        ],
+    ),
+    "pj": (
+        PersonaJuridica,
+        PersonaJuridicaOut,
+        [PersonaJuridica.nombre_pj, PersonaJuridica.cuit],
+    ),
     "as": (Asociacion, AsociacionOut, [Asociacion.nombre_asociacion, Asociacion.cuit]),
-    "esa": (EstudianteESA, EstudianteESAOut, [EstudianteESA.nombre_completo, EstudianteESA.dni]),
+    "esa": (
+        EstudianteESA,
+        EstudianteESAOut,
+        [EstudianteESA.nombre_completo, EstudianteESA.dni],
+    ),
     "agam": (ObraAudiovisual, ObraAudiovisualOut, [ObraAudiovisual.titulo]),
 }
 
@@ -81,10 +99,14 @@ class AccionRevisionBody(BaseModel):
     motivo: str | None = None
 
 
-@admin_registros_router.get("/{tipo}", summary="[Admin] Padrón: listar/buscar registros por tipo")
+@admin_registros_router.get(
+    "/{tipo}", summary="[Admin] Padrón: listar/buscar registros por tipo"
+)
 async def listar_registros(
     tipo: str,
-    estado: str | None = Query(None, description="Filtrar por estado del ciclo de vida"),
+    estado: str | None = Query(
+        None, description="Filtrar por estado del ciclo de vida"
+    ),
     borrador: bool | None = Query(None, description="Filtrar por borrador"),
     q: str | None = Query(None, description="Búsqueda de texto libre"),
     limit: int = Query(50, le=200),
@@ -112,7 +134,9 @@ async def listar_registros(
     }
 
 
-@admin_registros_router.get("/{tipo}/{registro_id}", summary="[Admin] Ver el detalle de un registro")
+@admin_registros_router.get(
+    "/{tipo}/{registro_id}", summary="[Admin] Ver el detalle de un registro"
+)
 async def obtener_registro(
     tipo: str,
     registro_id: int,
@@ -124,7 +148,9 @@ async def obtener_registro(
     return schema.model_validate(registro)
 
 
-@admin_registros_router.post("/{tipo}/{registro_id}/aprobar", summary="[Admin] Aprobar un registro")
+@admin_registros_router.post(
+    "/{tipo}/{registro_id}/aprobar", summary="[Admin] Aprobar un registro"
+)
 async def aprobar_registro(
     tipo: str,
     registro_id: int,
@@ -145,7 +171,11 @@ async def aprobar_registro(
         user_id=current_user["id"],
         resource_type=model.__name__,
         resource_id=str(registro.id),
-        details={"accion": "aprobar", "codigo_repa": codigo, "titular": registro.user_id},
+        details={
+            "accion": "aprobar",
+            "codigo_repa": codigo,
+            "titular": registro.user_id,
+        },
         request=request,
     )
     db.commit()
@@ -153,7 +183,10 @@ async def aprobar_registro(
     return schema.model_validate(registro)
 
 
-@admin_registros_router.post("/{tipo}/{registro_id}/observar", summary="[Admin] Observar un registro (vuelve al usuario)")
+@admin_registros_router.post(
+    "/{tipo}/{registro_id}/observar",
+    summary="[Admin] Observar un registro (vuelve al usuario)",
+)
 async def observar_registro(
     tipo: str,
     registro_id: int,
@@ -171,7 +204,9 @@ async def observar_registro(
     registro = _get_registro_or_404(db, model, registro_id)
     try:
         _asegurar_en_revision(db, registro)
-        lifecycle_service.observar(db, registro, motivo=body.motivo, revisor_id=current_user["id"])
+        lifecycle_service.observar(
+            db, registro, motivo=body.motivo, revisor_id=current_user["id"]
+        )
     except lifecycle_service.TransicionInvalida as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     audit_log(
@@ -180,7 +215,11 @@ async def observar_registro(
         user_id=current_user["id"],
         resource_type=model.__name__,
         resource_id=str(registro.id),
-        details={"accion": "observar", "motivo": body.motivo, "titular": registro.user_id},
+        details={
+            "accion": "observar",
+            "motivo": body.motivo,
+            "titular": registro.user_id,
+        },
         request=request,
     )
     db.commit()
@@ -188,7 +227,9 @@ async def observar_registro(
     return schema.model_validate(registro)
 
 
-@admin_registros_router.post("/{tipo}/{registro_id}/rechazar", summary="[Admin] Rechazar un registro (terminal)")
+@admin_registros_router.post(
+    "/{tipo}/{registro_id}/rechazar", summary="[Admin] Rechazar un registro (terminal)"
+)
 async def rechazar_registro(
     tipo: str,
     registro_id: int,
@@ -206,7 +247,9 @@ async def rechazar_registro(
     registro = _get_registro_or_404(db, model, registro_id)
     try:
         _asegurar_en_revision(db, registro)
-        lifecycle_service.rechazar(db, registro, motivo=body.motivo, revisor_id=current_user["id"])
+        lifecycle_service.rechazar(
+            db, registro, motivo=body.motivo, revisor_id=current_user["id"]
+        )
     except lifecycle_service.TransicionInvalida as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     audit_log(
@@ -215,7 +258,11 @@ async def rechazar_registro(
         user_id=current_user["id"],
         resource_type=model.__name__,
         resource_id=str(registro.id),
-        details={"accion": "rechazar", "motivo": body.motivo, "titular": registro.user_id},
+        details={
+            "accion": "rechazar",
+            "motivo": body.motivo,
+            "titular": registro.user_id,
+        },
         request=request,
     )
     db.commit()

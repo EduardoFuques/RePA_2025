@@ -68,7 +68,10 @@ async def create_rodaje(
         user_id=current_user["id"],
         resource_type="Rodaje",
         resource_id=str(rodaje.id),
-        details={"titulo_produccion": data.titulo_produccion, "borrador": data.borrador},
+        details={
+            "titulo_produccion": data.titulo_produccion,
+            "borrador": data.borrador,
+        },
         request=request,
     )
     db.commit()

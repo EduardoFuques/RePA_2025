@@ -7,6 +7,7 @@ configurado no intenta enviar — solo deja un log; cubre desarrollo/testing,
 donde el token ya se devuelve directamente en la respuesta de la API para
 pruebas manuales.
 """
+
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -25,7 +26,9 @@ from src.logger import logger
 
 def _send_email(to_email: str, subject: str, html_body: str) -> None:
     if not SMTP_HOST:
-        logger.warning(f"SMTP no configurado — no se envía email a {to_email}: {subject}")
+        logger.warning(
+            f"SMTP no configurado — no se envía email a {to_email}: {subject}"
+        )
         return
 
     message = MIMEMultipart("alternative")
