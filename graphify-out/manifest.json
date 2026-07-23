@@ -165,8 +165,8 @@
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/main.py": {
-    "mtime": 1784567735.2854073,
-    "ast_hash": "be709efdc8ce3d20e34d219f95980169",
+    "mtime": 1784772291.8359177,
+    "ast_hash": "6c6347af8afc009cf3ea173224d63515",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/middlewarelogg.py": {
@@ -180,8 +180,8 @@
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/models/asociacion_model.py": {
-    "mtime": 1784567223.7768056,
-    "ast_hash": "cc661369f8b21d96203849fb26652080",
+    "mtime": 1784772291.8379264,
+    "ast_hash": "94e9d22234f7f89b8d8e2c45e5cbdc37",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/models/audit_model.py": {
@@ -190,8 +190,8 @@
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/models/esa_model.py": {
-    "mtime": 1780531945.4330647,
-    "ast_hash": "56e16be2b1bba1020e0d1712d56c727b",
+    "mtime": 1784772291.8359177,
+    "ast_hash": "70ebe45bcd7a952d01eb60f867e10e27",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/models/exhibicion_model.py": {
@@ -200,28 +200,28 @@
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/models/fomento_model.py": {
-    "mtime": 1784582635.0015843,
-    "ast_hash": "019c260a880b5860aaa6cd45200c1ac0",
+    "mtime": 1784772291.8424559,
+    "ast_hash": "74d16b1ed56d5039cf95f9e6c3285e73",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/models/obra_audiovisual_model.py": {
-    "mtime": 1784575044.1004927,
-    "ast_hash": "9808bdc434d66f404e2e1ee743982c1a",
+    "mtime": 1784772291.8424559,
+    "ast_hash": "721d17f44faf98f1d24b00ae9f57d9e2",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/models/persona_fisica_model.py": {
-    "mtime": 1784575141.9304197,
-    "ast_hash": "e3b1e1f9653703705c46afd5d39b2736",
+    "mtime": 1784772291.8459845,
+    "ast_hash": "487629e82187e8305219d22558b2edf8",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/models/persona_juridica_model.py": {
-    "mtime": 1784575187.2584727,
-    "ast_hash": "f8f953a2b0cec754cc5ff5533902414f",
+    "mtime": 1784772291.847997,
+    "ast_hash": "f2c7573cdc880906e7ec0c67e8b9b493",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/models/registro_lifecycle.py": {
-    "mtime": 1784567313.6701715,
-    "ast_hash": "22ecf59a15afe05f12e60be4da2a1c21",
+    "mtime": 1784772291.847997,
+    "ast_hash": "e41b24ceb7b7bce1a059c807fad67680",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/models/rodaje_model.py": {
@@ -255,18 +255,18 @@
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/admin_registros_routes.py": {
-    "mtime": 1784521475.3682406,
-    "ast_hash": "20fce5db31829bfda5fdad767e4e5ff0",
+    "mtime": 1784772291.8434653,
+    "ast_hash": "fc341beab706b0832f1fb3d354b7ee64",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/admin_routes.py": {
-    "mtime": 1784502801.2924054,
-    "ast_hash": "375f25ece15b8d4f4fa8e5c14a28d94c",
+    "mtime": 1784772291.847997,
+    "ast_hash": "989098e9e29edf198c3f57101b91c567",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/asociacion_routes.py": {
-    "mtime": 1784565030.6481626,
-    "ast_hash": "e433cf867928f0871cbc89495b3c3bcf",
+    "mtime": 1784772291.8359177,
+    "ast_hash": "21c517d9ffe5127f89821ea4bd608dd9",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/esa_routes.py": {
@@ -280,28 +280,28 @@
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/fomento_routes.py": {
-    "mtime": 1784582958.248058,
-    "ast_hash": "5453268bbdb9bd86cf786582bd8da53a",
+    "mtime": 1784772291.8379264,
+    "ast_hash": "92270636e7462bd51adf126d11a94b1c",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/obra_audiovisual_routes.py": {
-    "mtime": 1784565219.5749385,
-    "ast_hash": "e96a2370219ac7df379a076d036e5cfd",
+    "mtime": 1784772291.8399358,
+    "ast_hash": "31adef10f527c5eed41289ec5a069da6",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/persona_fisica_routes.py": {
-    "mtime": 1784568024.1405923,
-    "ast_hash": "b4479a3595157bb5662f0071c056cc3b",
+    "mtime": 1784772291.8454747,
+    "ast_hash": "fb27edf5cf5b10a7585a0d00953190eb",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/persona_juridica_routes.py": {
-    "mtime": 1784564998.1691704,
-    "ast_hash": "eb4782e03a394fe26a7ee6b0c6745228",
+    "mtime": 1784772291.8459845,
+    "ast_hash": "468d7047aad1f8064d42ad1a42b36a79",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/rodaje_routes.py": {
-    "mtime": 1784522550.097178,
-    "ast_hash": "f9662cf5066aa55bfe7fe883f73a3fb0",
+    "mtime": 1784772291.8359177,
+    "ast_hash": "eb70a3a75614132e63903426fb488aac",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/upload_routes.py": {
@@ -310,8 +310,8 @@
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/routes/user_routes.py": {
-    "mtime": 1784589099.2796383,
-    "ast_hash": "044d86b9ab0296bfedc77bec7b79de6c",
+    "mtime": 1784772291.8434653,
+    "ast_hash": "5270899f7366336c8ab82322427e697d",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/schemas/__init__.py": {
@@ -340,8 +340,8 @@
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/schemas/lifecycle_schemas.py": {
-    "mtime": 1780531979.5438025,
-    "ast_hash": "cbc36adc04879eab7511fe32b7edf377",
+    "mtime": 1784772291.8399358,
+    "ast_hash": "23ffc6ba1f320585ac84402b9d2213f2",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/schemas/obra_audiovisual_schemas.py": {
@@ -375,23 +375,23 @@
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/services/email_service.py": {
-    "mtime": 1784573582.2520106,
-    "ast_hash": "9201b89d9db0765b747277eeb2bda867",
+    "mtime": 1784772291.8399358,
+    "ast_hash": "65a39327cd9f0a4fbb6394274e93fe64",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/services/fomento_relational_service.py": {
-    "mtime": 1784582797.2224147,
-    "ast_hash": "b5d957ba7155ed7186392193d70afa08",
+    "mtime": 1784772291.8434653,
+    "ast_hash": "5d112104116655909c5bd5577cbe47f2",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/services/lifecycle_service.py": {
-    "mtime": 1784510197.2909255,
-    "ast_hash": "a76e56a6d8ef23aa9eb2db32801ee97e",
+    "mtime": 1784772291.850009,
+    "ast_hash": "b5723bfea8e99cddcdc62eb9a9f8c96b",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/services/repa_code_service.py": {
-    "mtime": 1784520047.816463,
-    "ast_hash": "cdb504dc1b7a8f08440268187deb52ff",
+    "mtime": 1784772291.850009,
+    "ast_hash": "61ae29234b553dea3007b1d9512e9370",
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/update_document_paths.py": {
@@ -400,8 +400,8 @@
     "semantic_hash": ""
   },
   "RePA_2025/backend/src/utils.py": {
-    "mtime": 1784522597.3607697,
-    "ast_hash": "a22a9f9ba3b9a6311c81b6d1d8df8bbd",
+    "mtime": 1784772291.847997,
+    "ast_hash": "d79a97583ea9a2d0503420e4c3d23127",
     "semantic_hash": ""
   },
   "RePA_2025/backend/tests/__init__.py": {
@@ -865,8 +865,8 @@
     "semantic_hash": ""
   },
   "RePA_2025/frontend/src/pages/Login.jsx": {
-    "mtime": 1784732638.6747713,
-    "ast_hash": "cf7bf61d5fa13ec191233b6ae79f8bbf",
+    "mtime": 1784771613.8359182,
+    "ast_hash": "60ee25458462e06419dd55c8f3964f3f",
     "semantic_hash": ""
   },
   "RePA_2025/frontend/src/pages/MiActividad.jsx": {
@@ -1350,8 +1350,8 @@
     "semantic_hash": ""
   },
   "RePA_2025/frontend/src/repa/pf/PersonaFisica.jsx": {
-    "mtime": 1784766525.4076185,
-    "ast_hash": "8b8a2366c6231fef8ee7eb9cb011e856",
+    "mtime": 1784771614.8032906,
+    "ast_hash": "52956e4f1a3479a56c094d752df8b0cd",
     "semantic_hash": ""
   },
   "RePA_2025/frontend/src/repa/pf/pf-confirmacion.jsx": {

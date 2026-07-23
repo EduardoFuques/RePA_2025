@@ -559,7 +559,7 @@ class PagoFomento(Base):
 
     __tablename__ = "pagos_fomento"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tramite_id = Column(
         Integer,
         ForeignKey("tramites_fomento.id", ondelete="CASCADE"),
@@ -590,7 +590,7 @@ class AporteFomento(Base):
 
     __tablename__ = "aportes_fomento"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     tramite_id = Column(
         Integer,
         ForeignKey("tramites_fomento.id", ondelete="CASCADE"),
@@ -619,7 +619,7 @@ class IntegranteComite(Base):
 
     __tablename__ = "integrantes_comite"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     comite_id = Column(
         Integer,
         ForeignKey("comites_fomento.id", ondelete="CASCADE"),

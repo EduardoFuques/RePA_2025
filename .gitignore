@@ -213,3 +213,4 @@ desktop.ini
 *.temp
 *.bak
 BACKLOG.md
+graphify-out/*
