@@ -9,14 +9,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.crud_helpers import (
+    apply_update_fields,
     check_duplicate_record,
-    create_record,
+    commit_or_conflict,
+    create_registrable_record,
     delete_record,
     get_user_record,
-    update_record,
+    integrity_as_conflict,
 )
 from src.database import get_db
 from src.models.asociacion_model import Asociacion, IntegranteAsociacion
+from src.models.persona_fisica_model import PersonaFisica
 from src.schemas.asociacion_schemas import (
     AsociacionCreate,
     AsociacionOut,
@@ -24,7 +27,8 @@ from src.schemas.asociacion_schemas import (
     IntegranteAsociacionCreate,
     IntegranteAsociacionOut,
 )
-from src.utils import get_current_user
+from src.services import lifecycle_service
+from src.utils import get_current_user, require_pf_aprobado
 
 asociacion_router = APIRouter()
 
@@ -50,6 +54,7 @@ MSG_DUPLICATE = "El usuario ya tiene un registro de Asociación/Colectivo"
 async def create_asociacion(
     data: AsociacionCreate,
     current_user: dict = Depends(get_current_user),
+    _gate: dict = Depends(require_pf_aprobado),
     db: Session = Depends(get_db),
 ):
     """
@@ -59,7 +64,20 @@ async def create_asociacion(
     e integrantes. Cada usuario solo puede tener **un registro** de Asociación.
     """
     check_duplicate_record(db, Asociacion, current_user["id"], MSG_DUPLICATE)
-    return create_record(db, Asociacion, data, current_user["id"])
+    return create_registrable_record(
+        db,
+        Asociacion,
+        data,
+        current_user["id"],
+        on_flush=lambda r, ud: lifecycle_service.procesar_envio_si_corresponde(
+            db,
+            r,
+            ud,
+            get_persona_fisica_titular=lambda: db.query(PersonaFisica)
+            .filter(PersonaFisica.user_id == current_user["id"])
+            .first(),
+        ),
+    )
 
 
 @asociacion_router.get("/me", response_model=AsociacionOut)
@@ -76,9 +94,25 @@ async def update_my_asociacion(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Actualizar el registro de Asociación/Colectivo del usuario actual"""
+    """Actualizar el registro de Asociación/Colectivo del usuario actual.
+
+    Al enviar el formulario (borrador: false por primera vez), AS no emite
+    código propio — hereda como "código de trámite" el codigo_repa de la
+    Persona Física del usuario (ver lifecycle_service)."""
     asoc = get_user_record(db, Asociacion, current_user["id"], MSG_NOT_FOUND)
-    return update_record(db, asoc, data)
+    update_data = apply_update_fields(asoc, data)
+    with integrity_as_conflict(db):
+        lifecycle_service.procesar_envio_si_corresponde(
+            db,
+            asoc,
+            update_data,
+            get_persona_fisica_titular=lambda: db.query(PersonaFisica)
+            .filter(PersonaFisica.user_id == current_user["id"])
+            .first(),
+        )
+    commit_or_conflict(db)
+    db.refresh(asoc)
+    return asoc
 
 
 @asociacion_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

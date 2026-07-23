@@ -1,0 +1,105 @@
+# =============================================================================
+# RePA 2025 — Compose de PRODUCCIÓN
+# =============================================================================
+# Uso: docker compose -f docker-compose.prod.yml up -d --build
+#
+# Diferencias deliberadas contra docker-compose.yml (desarrollo):
+#   - ENVIRONMENT=production hardcodeado (no heredable de un .env incompleto).
+#   - Backend sin --reload y sin bind mount del código fuente.
+#   - Frontend buildeado con VITE_SHOW_TEST_USERS=false (sin usuarios de prueba
+#     ni credenciales embebidas en el bundle).
+#   - SECRET_KEY y DATABASE_URL sin default: el deploy falla si faltan.
+#   - FRONTEND_URL obligatorio (arma los links de los emails de verificación
+#     de cuenta y recuperación de contraseña). SMTP_* son opcionales a nivel
+#     de arranque, pero sin SMTP_HOST configurado el sistema NO envía esos
+#     emails — ver advertencia en los logs del backend al iniciar.
+# =============================================================================
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER es obligatorio en producción}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio en producción}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB es obligatorio en producción}
+      PGDATA: /var/lib/postgresql/data
+      TZ: America/Argentina/Buenos_Aires
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    # Puerto NO expuesto externamente - solo accesible dentro de la red Docker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} && psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c 'SELECT 1'"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+    networks:
+      - repa-network
+
+  backend:
+    build: ./backend
+    image: repa-backend:${BACKEND_VERSION:-latest}
+    restart: unless-stopped
+    # Sin --reload ni bind mount: corre el código copiado en la imagen.
+    volumes:
+      - type: volume
+        source: repa-uploads
+        target: /app/uploads
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL es obligatoria en producción}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY es obligatoria en producción}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS es obligatorio en producción (dominios reales, sin localhost)}
+      ENVIRONMENT: production
+      API_ROOT_PATH: ${API_ROOT_PATH:-/api}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL es obligatorio en producción (para los links de confirmación/recuperación por email)}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-no-responder@iaavim.gob.ar}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+    # Puerto NO expuesto externamente - solo accesible dentro de la red Docker
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health/live"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - repa-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+        VITE_SHOW_TEST_USERS: "false"
+    image: repa-frontend:${FRONTEND_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+    depends_on:
+      - backend
+    networks:
+      - repa-network
+
+networks:
+  repa-network:
+    driver: bridge
+
+volumes:
+  repa-uploads:
+    driver: local

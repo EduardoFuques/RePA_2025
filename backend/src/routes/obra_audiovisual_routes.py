@@ -3,9 +3,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from src.crud_helpers import delete_record, get_record_by_id, update_record
+from src.crud_helpers import (
+    apply_update_fields,
+    commit_or_conflict,
+    delete_record,
+    get_record_by_id,
+    integrity_as_conflict,
+)
 from src.database import get_db
 from src.models.obra_audiovisual_model import EquipoTecnicoObra, ObraAudiovisual
+from src.models.persona_fisica_model import PersonaFisica
 from src.schemas.obra_audiovisual_schemas import (
     EquipoTecnicoCreate,
     EquipoTecnicoOut,
@@ -14,7 +21,8 @@ from src.schemas.obra_audiovisual_schemas import (
     ObraAudiovisualOut,
     ObraAudiovisualUpdate,
 )
-from src.utils import get_current_user
+from src.services import lifecycle_service
+from src.utils import get_current_user, require_pf_aprobado
 
 obra_audiovisual_router = APIRouter()
 
@@ -27,6 +35,12 @@ def _get_obra(db: Session, obra_id: int, user_id: str) -> ObraAudiovisual:
     return get_record_by_id(db, ObraAudiovisual, obra_id, user_id, MSG_OBRA_NOT_FOUND)
 
 
+def _titular_lookup(db: Session, user_id: str):
+    """Callable perezoso para lifecycle_service: busca la PersonaFisica del
+    usuario solo si de verdad se necesita (envío real, no cada request)."""
+    return lambda: db.query(PersonaFisica).filter(PersonaFisica.user_id == user_id).first()
+
+
 # === CRUD OBRA AUDIOVISUAL ===
 
 
@@ -36,6 +50,7 @@ def _get_obra(db: Session, obra_id: int, user_id: str) -> ObraAudiovisual:
 async def create_obra(
     data: ObraAudiovisualCreate,
     current_user: dict = Depends(get_current_user),
+    _gate: dict = Depends(require_pf_aprobado),
     db: Session = Depends(get_db),
 ):
     """Crear una nueva Obra Audiovisual"""
@@ -44,7 +59,15 @@ async def create_obra(
 
     db_obra = ObraAudiovisual(**obra_data, user_id=current_user["id"])
     db.add(db_obra)
-    db.commit()
+    with integrity_as_conflict(db):
+        db.flush()
+        lifecycle_service.procesar_envio_si_corresponde(
+            db,
+            db_obra,
+            obra_data,
+            get_persona_fisica_titular=_titular_lookup(db, current_user["id"]),
+        )
+    commit_or_conflict(db)
     db.refresh(db_obra)
 
     if equipo_data:
@@ -81,7 +104,11 @@ async def update_my_obra(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Actualizar la primera Obra Audiovisual del usuario actual"""
+    """Actualizar la primera Obra Audiovisual del usuario actual.
+
+    Al enviar el formulario (borrador: false por primera vez), AGAM no emite
+    código propio — hereda como "código de trámite" el codigo_repa de la
+    Persona Física del usuario (ver lifecycle_service)."""
     obra = (
         db.query(ObraAudiovisual)
         .filter(ObraAudiovisual.user_id == current_user["id"])
@@ -93,11 +120,15 @@ async def update_my_obra(
             detail="No se encontró obra audiovisual para este usuario",
         )
 
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(obra, key, value)
-
-    db.commit()
+    update_data = apply_update_fields(obra, data)
+    with integrity_as_conflict(db):
+        lifecycle_service.procesar_envio_si_corresponde(
+            db,
+            obra,
+            update_data,
+            get_persona_fisica_titular=_titular_lookup(db, current_user["id"]),
+        )
+    commit_or_conflict(db)
     db.refresh(obra)
     return obra
 
@@ -144,9 +175,20 @@ async def update_obra(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Actualizar una Obra Audiovisual"""
+    """Actualizar una Obra Audiovisual (ver update_my_obra para el detalle
+    de emisión de código de trámite)."""
     obra = _get_obra(db, obra_id, current_user["id"])
-    return update_record(db, obra, data)
+    update_data = apply_update_fields(obra, data)
+    with integrity_as_conflict(db):
+        lifecycle_service.procesar_envio_si_corresponde(
+            db,
+            obra,
+            update_data,
+            get_persona_fisica_titular=_titular_lookup(db, current_user["id"]),
+        )
+    commit_or_conflict(db)
+    db.refresh(obra)
+    return obra
 
 
 @obra_audiovisual_router.delete("/{obra_id}", status_code=status.HTTP_204_NO_CONTENT)

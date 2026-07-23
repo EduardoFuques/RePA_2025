@@ -11,7 +11,7 @@ class TestSalas:
         """Datos de prueba para Sala"""
         return {
             "nombre": "Cine Teatro Oberá",
-            "tipo_sala": "cine_comercial",
+            "tipo_sala": "sala_fija_comercial",
             "domicilio": "Av. Libertad 1234",
             "localidad": "Oberá",
             "distrito": "norte",
@@ -95,7 +95,7 @@ class TestExhibiciones:
             "titulo_obra": "Documental Misionero",
             "fecha_exhibicion": "2026-02-15",
             "cantidad_funciones": 3,
-            "tipo_exhibicion": "estreno",
+            "tipo_exhibicion": "circuito_estreno",
             "espectadores_total": 450,
             "espectadores_pagos": 400,
             "espectadores_gratuitos": 50,

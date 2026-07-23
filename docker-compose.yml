@@ -42,6 +42,14 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       API_ROOT_PATH: ${API_ROOT_PATH:-/api}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-no-responder@iaavim.gob.ar}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
     # Puerto NO expuesto externamente - solo accesible dentro de la red Docker
     expose:
       - "80"
@@ -61,6 +69,19 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Solo desarrollo: habilita el panel de quick-login con usuarios seed.
+        VITE_SHOW_TEST_USERS: "true"
+        # Datos de contacto/redes de la landing — vienen del .env raíz (o fallbacks).
+        VITE_CONTACT_EMAIL: ${VITE_CONTACT_EMAIL:-}
+        VITE_CONTACT_PHONE: ${VITE_CONTACT_PHONE:-}
+        VITE_CONTACT_WHATSAPP: ${VITE_CONTACT_WHATSAPP:-}
+        VITE_CONTACT_WHATSAPP_LABEL: ${VITE_CONTACT_WHATSAPP_LABEL:-}
+        VITE_SOCIAL_INSTAGRAM: ${VITE_SOCIAL_INSTAGRAM:-}
+        VITE_SOCIAL_FACEBOOK: ${VITE_SOCIAL_FACEBOOK:-}
+        VITE_CONTACT_SEDE: ${VITE_CONTACT_SEDE:-}
+        VITE_CONTACT_PORTAL: ${VITE_CONTACT_PORTAL:-}
+        VITE_CONTACT_PORTAL_URL: ${VITE_CONTACT_PORTAL_URL:-}
     image: repa-frontend:${FRONTEND_VERSION:-latest}
     restart: unless-stopped
     ports:

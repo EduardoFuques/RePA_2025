@@ -20,7 +20,11 @@ PERMISSIONS: dict[str, str] = {
     "fomento:manage": "Gestionar eventos, líneas, comités, dictámenes y semillero de fomento",
     "tramites:read_all": "Ver todos los trámites de fomento",
     "tramites:evaluate": "Evaluar trámites y cargar dictámenes",
+    "tramites:manage": "Editar y eliminar cualquier trámite de fomento (rol admin del módulo)",
     "reportes:read": "Ver reportes y estadísticas",
+    "registros:read_all": "Ver el padrón completo (PF, PJ, AS, ESA, AGAM) de todos los usuarios",
+    "registros:revisar": "Aprobar, observar o rechazar registros del Padrón RePA",
+    "rodajes:manage": "Gestionar rodajes (ver, actualizar y eliminar cualquier registro, ver estadísticas)",
 }
 
 # Permiso especial que representa "todos los permisos" (solo rol admin)
@@ -34,11 +38,20 @@ SYSTEM_ROLES: dict[str, dict] = {
     },
     "gestor_fomento": {
         "descripcion": "Gestiona convocatorias y trámites de fomento",
-        "permissions": {"fomento:manage", "tramites:read_all", "reportes:read"},
+        "permissions": {
+            "fomento:manage",
+            "tramites:read_all",
+            "tramites:manage",
+            "reportes:read",
+        },
     },
     "evaluador": {
         "descripcion": "Evalúa trámites de fomento y emite dictámenes",
         "permissions": {"tramites:evaluate", "tramites:read_all"},
+    },
+    "revisor_padron": {
+        "descripcion": "Revisa y aprueba registros del Padrón RePA (PF, PJ, AS, ESA, AGAM)",
+        "permissions": {"registros:read_all", "registros:revisar"},
     },
     "lectura": {
         "descripcion": "Acceso de solo lectura a usuarios, auditoría y reportes",
@@ -46,6 +59,10 @@ SYSTEM_ROLES: dict[str, dict] = {
     },
     "user": {
         "descripcion": "Usuario estándar; gestiona sus propios formularios",
+        "permissions": set(),
+    },
+    "estudiante": {
+        "descripcion": "Estudiante del audiovisual (ESA); rol de identidad/routing, sin permisos propios",
         "permissions": set(),
     },
 }

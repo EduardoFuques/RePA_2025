@@ -1,8 +1,30 @@
+import re
+
 import jwt
 from fastapi import Request
 
 from src.config import ALGORITHM, SECRET_KEY
 from src.logger import logger
+
+# Rutas que llevan un JWT en el path: /users/confirm/{token} y
+# /users/recovery/{token}. Un token de recuperación logueado en claro
+# permite tomar la cuenta, así que se redacta antes de escribir el log.
+_TOKEN_PATH_RE = re.compile(r"(/users/(?:confirm|recovery)/)[^/?#]+")
+
+_PARAMS_SENSIBLES = {"token", "password", "secret", "key", "authorization"}
+
+
+def redactar_url(url: str) -> str:
+    """Redacta tokens embebidos en el path de la URL."""
+    return _TOKEN_PATH_RE.sub(r"\1[REDACTED]", url)
+
+
+def filtrar_query_params(params: dict) -> dict:
+    """Redacta query params con nombres sensibles (token, password, etc.)."""
+    return {
+        k: "[REDACTED]" if k.lower() in _PARAMS_SENSIBLES else v
+        for k, v in params.items()
+    }
 
 
 def filtrar_headers_sensibles(headers: dict) -> dict:
@@ -36,9 +58,9 @@ async def log_requests(request: Request, call_next):
     """
     log_dict = {
         "method": request.method,
-        "url": str(request.url),
+        "url": redactar_url(str(request.url)),
         "headers": filtrar_headers_sensibles(dict(request.headers)),
-        "query_params": dict(request.query_params),
+        "query_params": filtrar_query_params(dict(request.query_params)),
     }
     # Agregar condicional, si hay usuario logueado y get_current_user(request) != None
     authorization: str = request.headers.get("Authorization")

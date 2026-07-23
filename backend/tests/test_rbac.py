@@ -16,7 +16,9 @@ class TestAuditLogsRouting:
         # Regresión: antes /{user_id} ocultaba /audit-logs (devolvía 404)
         resp = client.get("/admin_user/audit-logs", headers=admin_headers)
         assert resp.status_code == 200
-        assert isinstance(resp.json(), list)
+        body = resp.json()
+        assert isinstance(body["items"], list)
+        assert isinstance(body["total"], int)
 
 
 class TestPermissionEnforcement:
@@ -98,6 +100,79 @@ class TestAdminSelfProtection:
             headers=admin_headers,
         )
         assert resp.status_code == 400
+
+
+class TestBecomeEstudiante:
+    """Tests para POST /users/me/become-estudiante (auto-asignación del rol
+    'estudiante', usado por la pantalla de elección al primer login)."""
+
+    def test_list_roles_includes_estudiante(self, client, admin_headers):
+        resp = client.get("/admin_user/roles", headers=admin_headers)
+        assert resp.status_code == 200
+        nombres = {r["rol"] for r in resp.json()}
+        assert "estudiante" in nombres
+
+    def test_requires_auth(self, client):
+        resp = client.post("/users/me/become-estudiante")
+        assert resp.status_code == 401
+
+    def test_self_assigns_role(self, client, create_user):
+        import uuid
+
+        _user, headers = create_user(
+            f"chooser_{uuid.uuid4().hex[:8]}@example.com", roles=["user"]
+        )
+        resp = client.post("/users/me/become-estudiante", headers=headers)
+        assert resp.status_code == 200, resp.text
+        roles = {r["rol"] for r in resp.json()["roles"]}
+        assert "estudiante" in roles
+
+    def test_idempotent(self, client, create_user, db_session):
+        import uuid
+
+        from src.models.user_models import Role, UserRole
+
+        user, headers = create_user(
+            f"chooser2_{uuid.uuid4().hex[:8]}@example.com", roles=["user"]
+        )
+        primero = client.post("/users/me/become-estudiante", headers=headers)
+        segundo = client.post("/users/me/become-estudiante", headers=headers)
+        assert primero.status_code == 200
+        assert segundo.status_code == 200
+
+        db_session.commit()
+        estudiante_role = db_session.query(Role).filter(Role.rol == "estudiante").first()
+        count = (
+            db_session.query(UserRole)
+            .filter(
+                UserRole.user_id == user.id, UserRole.role_id == estudiante_role.id
+            )
+            .count()
+        )
+        assert count == 1
+
+    def test_leaves_audit_trail(self, client, create_user, db_session):
+        import uuid
+
+        from src.models.audit_model import AuditAction, AuditLog
+
+        user, headers = create_user(
+            f"chooser3_{uuid.uuid4().hex[:8]}@example.com", roles=["user"]
+        )
+        resp = client.post("/users/me/become-estudiante", headers=headers)
+        assert resp.status_code == 200
+
+        db_session.commit()
+        entry = (
+            db_session.query(AuditLog)
+            .filter(
+                AuditLog.user_id == user.id,
+                AuditLog.action == AuditAction.ROLE_CHANGE,
+                AuditLog.resource_type == "User",
+            )
+            .first()
+        )
+        assert entry is not None
 
 
 class TestStartupSmoke:

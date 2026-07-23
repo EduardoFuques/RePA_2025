@@ -9,11 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.crud_helpers import (
+    apply_update_fields,
     check_duplicate_record,
-    create_record,
+    commit_or_conflict,
+    create_registrable_record,
     delete_record,
     get_user_record,
-    update_record,
+    integrity_as_conflict,
 )
 from src.database import get_db
 from src.models.persona_juridica_model import IntegrantePJ, PersonaJuridica
@@ -24,7 +26,8 @@ from src.schemas.persona_juridica_schemas import (
     PersonaJuridicaOut,
     PersonaJuridicaUpdate,
 )
-from src.utils import get_current_user
+from src.services import lifecycle_service
+from src.utils import get_current_user, require_pf_aprobado
 
 persona_juridica_router = APIRouter()
 
@@ -50,6 +53,7 @@ MSG_DUPLICATE = "El usuario ya tiene un registro de Persona Jurídica"
 async def create_persona_juridica(
     data: PersonaJuridicaCreate,
     current_user: dict = Depends(get_current_user),
+    _gate: dict = Depends(require_pf_aprobado),
     db: Session = Depends(get_db),
 ):
     """
@@ -59,7 +63,13 @@ async def create_persona_juridica(
     y documentación. Cada usuario solo puede tener **un registro** de Persona Jurídica.
     """
     check_duplicate_record(db, PersonaJuridica, current_user["id"], MSG_DUPLICATE)
-    return create_record(db, PersonaJuridica, data, current_user["id"])
+    return create_registrable_record(
+        db,
+        PersonaJuridica,
+        data,
+        current_user["id"],
+        on_flush=lambda r, ud: lifecycle_service.procesar_envio_si_corresponde(db, r, ud),
+    )
 
 
 @persona_juridica_router.get("/me", response_model=PersonaJuridicaOut)
@@ -76,9 +86,17 @@ async def update_my_persona_juridica(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Actualizar el registro de Persona Jurídica del usuario actual"""
+    """Actualizar el registro de Persona Jurídica del usuario actual.
+
+    Al enviar el formulario (borrador: false por primera vez) emite el
+    código RePA propio de la PJ (independiente del de la Persona Física)."""
     pj = get_user_record(db, PersonaJuridica, current_user["id"], MSG_NOT_FOUND)
-    return update_record(db, pj, data)
+    update_data = apply_update_fields(pj, data)
+    with integrity_as_conflict(db):
+        lifecycle_service.procesar_envio_si_corresponde(db, pj, update_data)
+    commit_or_conflict(db)
+    db.refresh(pj)
+    return pj
 
 
 @persona_juridica_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

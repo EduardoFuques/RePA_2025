@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from src.database import create_all_tables, get_db, run_migrations
 from src.logger import logger
 from src.middlewarelogg import log_requests
 from src.rate_limiter import limiter, rate_limit_exceeded_handler
+from src.routes.admin_registros_routes import admin_registros_router
 from src.routes.admin_routes import admin_router
 from src.routes.asociacion_routes import asociacion_router
 from src.routes.esa_routes import esa_router
@@ -81,7 +83,7 @@ Los endpoints sensibles tienen límites de solicitudes:
 - **IAAviM** - Instituto de Artes Audiovisuales de Misiones
 - **Email**: sistemas@iaavim.gob.ar
     """,
-    version="1.8.6",
+    version="1.9.0",
     contact={
         "name": "IAAviM - Sistemas",
         "url": "https://iaavim.gob.ar",
@@ -136,6 +138,22 @@ Los endpoints sensibles tienen límites de solicitudes:
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    # Antes de esto, un 500 sin manejar solo quedaba en stdout de uvicorn
+    # (fuera de app.log). HTTPException y errores de validación siguen
+    # resolviéndose por sus propios handlers de FastAPI (match exacto de
+    # clase antes de llegar acá vía MRO), así que esto solo captura fallas
+    # realmente no anticipadas.
+    logger.exception(
+        "Excepción no manejada en %s %s", request.method, request.url.path
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor"},
+    )
+
 # Configuración de CORS - Restringido a métodos y headers necesarios
 app.add_middleware(
     CORSMiddleware,
@@ -175,6 +193,7 @@ app.include_router(fomento_router, tags=["Fomento"])
 
 # Rutas de Administración
 app.include_router(admin_router, prefix="/admin_user", tags=["Administrator User"])
+app.include_router(admin_registros_router, tags=["Admin — Padrón RePA"])
 
 # Rutas de Upload de archivos
 app.include_router(upload_router, tags=["Upload"])

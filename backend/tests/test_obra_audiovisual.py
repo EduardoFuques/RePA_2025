@@ -12,8 +12,8 @@ class TestObraAudiovisual:
             "titulo": "Mi Película de Prueba",
             "anio_estreno": 2025,
             "duracion_minutos": 90,
-            "tipo_produccion": "ficcion",
-            "genero": "drama",
+            "tipo_produccion": "independiente",
+            "genero": "ficcion",
             "idioma_original": "español"
         }
         response = client.post("/obras/", json=obra_data, headers=auth_headers)

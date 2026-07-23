@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from src.schemas.lifecycle_schemas import RegistroLifecycleOut
+
 
 # === INTEGRANTE ===
 class IntegranteAsociacionBase(BaseModel):
@@ -127,11 +129,16 @@ class AsociacionUpdate(BaseModel):
     borrador: bool | None = None
 
 
-class AsociacionOut(BaseModel):
+class AsociacionOut(RegistroLifecycleOut):
     """Schema de salida para Asociación/Colectivo"""
 
     id: int
     user_id: str
+
+    # AS no tiene código RePA propio (codigo_repa, heredado de
+    # RegistroLifecycleOut, queda siempre null acá) — usa como código de
+    # trámite el de la Persona Física que la presenta.
+    codigo_repa_titular: str | None = None
 
     # Datos básicos y contacto
     nombre_asociacion: str | None = None

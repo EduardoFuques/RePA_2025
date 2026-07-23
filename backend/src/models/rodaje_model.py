@@ -2,6 +2,7 @@
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -23,9 +24,28 @@ class Rodaje(Base):
     """
 
     __tablename__ = "rodajes"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_registro IN ('alta_rodaje', 'finalizacion_rodaje')",
+            name="ck_rodajes_tipo_registro",
+        ),
+        CheckConstraint(
+            "destino_aval IN ('festival', 'privado', 'coproduccion', 'otro')",
+            name="ck_rodajes_destino_aval",
+        ),
+        CheckConstraint(
+            "clasificacion IN ('ficcion', 'documental', 'animacion', 'experimental', 'otro')",
+            name="ck_rodajes_clasificacion",
+        ),
+        CheckConstraint(
+            "tipo_produccion IN ('largometraje', 'serie', 'publicidad', 'documental', "
+            "'videoclip', 'videojuego', 'otro')",
+            name="ck_rodajes_tipo_produccion",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
 
     # === 1. TIPO DE REGISTRO ===
     tipo_registro = Column(String(30), nullable=True)

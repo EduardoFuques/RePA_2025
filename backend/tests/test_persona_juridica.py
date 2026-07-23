@@ -16,7 +16,7 @@ class TestPersonaJuridica:
         data = {
             "nombre_pj": "Productora Test S.R.L.",
             "cuit": "30-99999901-0",
-            "figura_legal": "srl",
+            "figura_legal": "empresa",
             "fecha_constitucion": "2020-01-15",
             "objeto_social": "Producción audiovisual",
             "domicilio_legal": "Av. Test 123",
@@ -58,7 +58,7 @@ class TestPersonaJuridica:
         data = {
             "nombre_pj": "Productora Update S.R.L.",
             "cuit": "30-99999902-1",
-            "figura_legal": "srl",
+            "figura_legal": "empresa",
             "fecha_constitucion": "2020-01-15",
             "objeto_social": "Producción audiovisual",
             "domicilio_legal": "Av. Test 123",
@@ -98,7 +98,7 @@ class TestPersonaJuridica:
         data = {
             "nombre_pj": "Productora Duplicada S.R.L.",
             "cuit": "30-99999903-2",
-            "figura_legal": "srl",
+            "figura_legal": "empresa",
             "fecha_constitucion": "2020-01-15",
             "objeto_social": "Producción audiovisual",
             "domicilio_legal": "Av. Test 123",

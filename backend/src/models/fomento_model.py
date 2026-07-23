@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     ForeignKey,
@@ -100,18 +101,63 @@ class TramiteFomento(Base):
     """
 
     __tablename__ = "tramites_fomento"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_tramite IN ('convocatoria_competitiva', 'ventanilla_continua', "
+            "'cash_rebate', 'semillero', 'convocatoria_especial')",
+            name="ck_tramites_fomento_tipo_tramite",
+        ),
+        CheckConstraint(
+            "tipo_productora IN ('productora_asociada', 'coproductora_misionera', "
+            "'productora_misionera', 'otra')",
+            name="ck_tramites_fomento_tipo_productora",
+        ),
+        CheckConstraint(
+            "medio IN ('cine', 'tv', 'web', 'videojuego')",
+            name="ck_tramites_fomento_medio",
+        ),
+        CheckConstraint(
+            "genero IN ('ficcion', 'documental', 'animacion', 'experimental')",
+            name="ck_tramites_fomento_genero",
+        ),
+        CheckConstraint(
+            "extension IN ('corto', 'largo')",
+            name="ck_tramites_fomento_extension",
+        ),
+        CheckConstraint(
+            "formato_narrativo IN ('unitario', 'serie')",
+            name="ck_tramites_fomento_formato_narrativo",
+        ),
+        CheckConstraint(
+            # Unión de los 4 sub-flujos que comparten esta columna (Convocatoria /
+            # Ventanilla / Cash Rebate / Semillero).
+            "estado_tramite IN ('presentado', 'admisible', 'evaluado', 'seleccionado', "
+            "'no_seleccionado', 'desistido', 'retirado', 'ingresado', 'en_evaluacion', "
+            "'aprobado', 'denegado', 'verificacion', 'convenio', 'liquidado', "
+            "'inscripto', 'en_curso', 'finalizado')",
+            name="ck_tramites_fomento_estado_tramite",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
 
     # === IDENTIFICACIÓN ===
     tipo_tramite = Column(String(50), nullable=True)
     # Opciones: convocatoria_competitiva, ventanilla_continua, cash_rebate, semillero, convocatoria_especial
 
     # === EVENTO/LÍNEA/COHORTE ===
-    evento_id = Column(Integer, nullable=True)  # Para convocatorias
-    linea_id = Column(Integer, nullable=True)  # Para convocatorias
-    cohorte_semillero_id = Column(Integer, nullable=True)  # Para semillero
+    # FK reales (antes Integer suelto sin constraint — permitía referencias
+    # colgadas a un evento/línea/cohorte borrado o inexistente).
+    evento_id = Column(
+        Integer, ForeignKey("eventos_fomento.id"), nullable=True
+    )  # Para convocatorias
+    linea_id = Column(
+        Integer, ForeignKey("lineas_fomento.id"), nullable=True
+    )  # Para convocatorias
+    cohorte_semillero_id = Column(
+        Integer, ForeignKey("cohortes_semillero.id"), nullable=True
+    )  # Para semillero
 
     # === PRESENTANTE ===
     codigo_repa_presentante = Column(String(50), nullable=True)
@@ -145,9 +191,11 @@ class TramiteFomento(Base):
     monto_aprobado_iaavim = Column(Integer, nullable=True)
     aporte_privado_monto = Column(Integer, nullable=True)
     aporte_privado_fuente = Column(String(255), nullable=True)
-    otros_aportes_no_iaavim = Column(
-        JSON, nullable=True
-    )  # Lista de {organismo, programa, monto, moneda}
+    # Relación 1:N — antes JSON suelto (ver AporteFomento más abajo). Se
+    # sincroniza completo en cada guardado (reemplazar-todo), no incremental.
+    aportes_rel = relationship(
+        "AporteFomento", cascade="all, delete-orphan", back_populates="tramite"
+    )
     aportes_en_especie = Column(Text, nullable=True)
 
     # === CASH REBATE ===
@@ -205,9 +253,11 @@ class TramiteFomento(Base):
 
     # Administración
     nro_expediente = Column(String(50), nullable=True)
-    pagos = Column(
-        JSON, nullable=True
-    )  # Lista de {fecha, monto, moneda, concepto, comprobante}
+    # Relación 1:N — antes JSON suelto (ver PagoFomento más abajo). Se
+    # sincroniza completo en cada guardado (reemplazar-todo), no incremental.
+    pagos_rel = relationship(
+        "PagoFomento", cascade="all, delete-orphan", back_populates="tramite"
+    )
     rendicion_estado = Column(
         String(50), nullable=True
     )  # pendiente, presentada, observada, aprobada
@@ -249,7 +299,11 @@ class ComiteFomento(Base):
     linea_id = Column(Integer, ForeignKey("lineas_fomento.id"), nullable=True)
     tipo = Column(String(50), nullable=False)  # tecnico, deliberativo
     nombre = Column(String(255), nullable=True)
-    integrantes = Column(JSON, nullable=True)  # Lista de {evaluador_id, rol}
+    # Relación 1:N — antes JSON suelto (ver IntegranteComite más abajo). Se
+    # sincroniza completo en cada guardado (reemplazar-todo), no incremental.
+    integrantes_rel = relationship(
+        "IntegranteComite", cascade="all, delete-orphan", back_populates="comite"
+    )
     resolucion_designacion_path = Column(String(500), nullable=True)
     observaciones = Column(Text, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
@@ -311,13 +365,19 @@ class Evaluador(Base):
     """
 
     __tablename__ = "evaluadores"
+    __table_args__ = (
+        CheckConstraint(
+            "rol IN ('evaluador_tecnico', 'jurado_deliberativo', 'consultor')",
+            name="ck_evaluadores_rol",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
 
     # === DATOS PERSONALES ===
     nombre_completo = Column(String(255), nullable=True)
-    dni = Column(String(20), nullable=True)
+    dni = Column(String(20), unique=True, nullable=True)
     email = Column(String(255), nullable=True)
     telefono = Column(String(30), nullable=True)
     localidad = Column(String(100), nullable=True)
@@ -484,3 +544,79 @@ class AcompanamientoSemillero(Base):
     participante = relationship(
         "ParticipanteSemillero", back_populates="acompanamientos"
     )
+
+
+# === PAGOS, APORTES E INTEGRANTES DE COMITÉ (antes JSON suelto) ===
+
+
+class PagoFomento(Base):
+    """
+    Pago administrativo de un trámite de fomento (rendición).
+    Antes vivía como `TramiteFomento.pagos` (JSON sin validar); se
+    sincroniza completo en cada guardado admin (reemplazar-todo), no
+    incremental — ver `services/fomento_relational_service.sync_pagos`.
+    """
+
+    __tablename__ = "pagos_fomento"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tramite_id = Column(
+        Integer, ForeignKey("tramites_fomento.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    fecha = Column(DateTime, nullable=True)
+    monto = Column(Integer, nullable=True)
+    moneda = Column(String(10), nullable=True)
+    concepto = Column(String(255), nullable=True)
+    comprobante = Column(String(500), nullable=True)  # sin UI de upload aún — texto/path plano
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    tramite = relationship("TramiteFomento", back_populates="pagos_rel")
+
+
+class AporteFomento(Base):
+    """
+    Aporte no-IAAviM declarado por el solicitante de un trámite de fomento.
+    Antes vivía como `TramiteFomento.otros_aportes_no_iaavim` (JSON sin
+    validar); se sincroniza completo en cada guardado (reemplazar-todo) —
+    ver `services/fomento_relational_service.sync_aportes`.
+    """
+
+    __tablename__ = "aportes_fomento"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tramite_id = Column(
+        Integer, ForeignKey("tramites_fomento.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    organismo = Column(String(255), nullable=True)
+    programa = Column(String(255), nullable=True)
+    monto = Column(Integer, nullable=True)
+    moneda = Column(String(10), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    tramite = relationship("TramiteFomento", back_populates="aportes_rel")
+
+
+class IntegranteComite(Base):
+    """
+    Integrante (evaluador) de un comité de fomento.
+    Antes vivía como `ComiteFomento.integrantes` (JSON sin validar, sin FK a
+    `evaluadores` — un evaluador_id inexistente pasaba sin error); ahora es
+    una FK real, validada antes de aplicar el lote — ver
+    `services/fomento_relational_service.sync_integrantes`.
+    """
+
+    __tablename__ = "integrantes_comite"
+
+    id = Column(Integer, primary_key=True, index=True)
+    comite_id = Column(
+        Integer, ForeignKey("comites_fomento.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Sin ondelete: si el evaluador se borra, se prefiere que falle antes que
+    # borrar en silencio la membresía histórica del comité (mismo criterio
+    # que DictamenFomento.evaluador_id, arriba).
+    evaluador_id = Column(Integer, ForeignKey("evaluadores.id"), nullable=False, index=True)
+    rol = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    comite = relationship("ComiteFomento", back_populates="integrantes_rel")
+    evaluador = relationship("Evaluador")

@@ -3,6 +3,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from src.schemas.lifecycle_schemas import RegistroLifecycleOut
+
 
 # === DATOS PERSONALES ===
 class DatosPersonalesBase(BaseModel):
@@ -236,7 +238,7 @@ class PersonaFisicaUpdate(BaseModel):
     borrador: bool | None = None
 
 
-class PersonaFisicaOut(BaseModel):
+class PersonaFisicaOut(RegistroLifecycleOut):
     """Schema de salida para Persona Física"""
 
     id: int

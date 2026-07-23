@@ -3,6 +3,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from src.schemas.lifecycle_schemas import RegistroLifecycleOut
+
 
 class EstudianteESACreate(BaseModel):
     """Schema para crear un registro de Estudiante ESA"""
@@ -88,7 +90,7 @@ class EstudianteESAUpdate(BaseModel):
     borrador: bool | None = None
 
 
-class EstudianteESAOut(BaseModel):
+class EstudianteESAOut(RegistroLifecycleOut):
     """Schema de salida para Estudiante ESA"""
 
     id: int

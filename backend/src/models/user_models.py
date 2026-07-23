@@ -71,18 +71,37 @@ class User(Base):
     roles = relationship("Role", secondary="user_roles", backref="users")
 
     # Relaciones con formularios RePA
+    # foreign_keys explícito: cada entidad tiene además 'revisado_por' (2da FK a users)
     persona_fisica = relationship(
-        "PersonaFisica", back_populates="user", uselist=False
+        "PersonaFisica",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="PersonaFisica.user_id",
     )  # 1:1
     persona_juridica = relationship(
-        "PersonaJuridica", back_populates="user", uselist=False
+        "PersonaJuridica",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="PersonaJuridica.user_id",
     )  # 1:1
-    asociacion = relationship("Asociacion", back_populates="user", uselist=False)  # 1:1
-    obras_audiovisuales = relationship("ObraAudiovisual", back_populates="user")  # 1:N
+    asociacion = relationship(
+        "Asociacion",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="Asociacion.user_id",
+    )  # 1:1
+    obras_audiovisuales = relationship(
+        "ObraAudiovisual",
+        back_populates="user",
+        foreign_keys="ObraAudiovisual.user_id",
+    )  # 1:N
 
     # Relaciones con ESA y Exhibiciones
     estudiante_esa = relationship(
-        "EstudianteESA", back_populates="user", uselist=False
+        "EstudianteESA",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="EstudianteESA.user_id",
     )  # 1:1
     salas = relationship("Sala", back_populates="user")  # 1:N
     exhibiciones = relationship("Exhibicion", back_populates="user")  # 1:N

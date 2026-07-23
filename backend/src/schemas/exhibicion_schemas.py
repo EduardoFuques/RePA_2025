@@ -116,6 +116,9 @@ class ExhibicionCreate(BaseModel):
     tipo_exhibicion: str | None = Field(None, max_length=50)
     nombre_evento: str | None = Field(None, max_length=255)
 
+    localidad: str | None = Field(None, max_length=100)
+    distrito: str | None = Field(None, max_length=50)
+
     espectadores_total: int | None = None
     espectadores_pagos: int | None = None
     espectadores_gratuitos: int | None = None
@@ -141,6 +144,9 @@ class ExhibicionUpdate(BaseModel):
     tipo_exhibicion: str | None = Field(None, max_length=50)
     nombre_evento: str | None = Field(None, max_length=255)
 
+    localidad: str | None = Field(None, max_length=100)
+    distrito: str | None = Field(None, max_length=50)
+
     espectadores_total: int | None = None
     espectadores_pagos: int | None = None
     espectadores_gratuitos: int | None = None
@@ -165,6 +171,8 @@ class ExhibicionOut(BaseModel):
     cantidad_funciones: int = 1
     tipo_exhibicion: str | None = None
     nombre_evento: str | None = None
+    localidad: str | None = None
+    distrito: str | None = None
     espectadores_total: int | None = None
     espectadores_pagos: int | None = None
     espectadores_gratuitos: int | None = None

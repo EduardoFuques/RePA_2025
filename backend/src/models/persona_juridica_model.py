@@ -2,6 +2,7 @@
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -10,19 +11,30 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql import func
 
 from src.database import Base
+from src.models.registro_lifecycle import RegistroLifecycleMixin
 
 
-class PersonaJuridica(Base):
+class PersonaJuridica(RegistroLifecycleMixin, Base):
     """
     Modelo para Persona Jurídica del RePA.
     Corresponde al formulario PJ del frontend.
     """
 
     __tablename__ = "personas_juridicas"
+    __table_args__ = (
+        CheckConstraint(
+            "figura_legal IN ('cooperativa', 'fundacion', 'asociacion_civil', "
+            "'empresa', 'sas', 'otra')",
+            name="ck_personas_juridicas_figura_legal",
+        ),
+    )
+
+    # Tipo de entidad para la emisión del código RePA.
+    REPA_TIPO = "PJ"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
@@ -31,7 +43,7 @@ class PersonaJuridica(Base):
     nombre_pj = Column(String(255), nullable=True)  # nullable para borrador
     cuit = Column(String(15), unique=True, nullable=True)  # nullable para borrador
     figura_legal = Column(String(50), nullable=True)  # nullable para borrador
-    # Opciones: sa, srl, sas, cooperativa, fundacion, asociacion_civil, otra
+    # Opciones: cooperativa, fundacion, asociacion_civil, empresa, sas, otra
     otra_figura_legal = Column(String(100), nullable=True)
     fecha_constitucion = Column(Date, nullable=True)
     objeto_social = Column(Text, nullable=True)
@@ -77,8 +89,10 @@ class PersonaJuridica(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    # Relación con el usuario
-    user = relationship("User", back_populates="persona_juridica")
+    # Relación con el usuario (user_id; revisado_por es otra FK a users)
+    user = relationship(
+        "User", back_populates="persona_juridica", foreign_keys=[user_id]
+    )
 
 
 class IntegrantePJ(Base):
@@ -88,7 +102,7 @@ class IntegrantePJ(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     persona_juridica_id = Column(
-        Integer, ForeignKey("personas_juridicas.id"), nullable=False
+        Integer, ForeignKey("personas_juridicas.id", ondelete="CASCADE"), nullable=False
     )
 
     nombre = Column(String(200), nullable=False)
@@ -97,4 +111,4 @@ class IntegrantePJ(Base):
     email = Column(String(255), nullable=True)
     vinculado_repa = Column(Boolean, default=False)  # Si ya está registrado en RePA
 
-    persona_juridica = relationship("PersonaJuridica", backref="integrantes")
+    persona_juridica = relationship("PersonaJuridica", backref=backref("integrantes", cascade="all, delete-orphan", passive_deletes=True))

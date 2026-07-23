@@ -12,11 +12,16 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from src.audit import audit_log
+from src.config import FRONTEND_URL
 from src.database import get_db
+from src.models.audit_model import AuditAction
 from src.models.user_models import Role, TokenRecovery, User
 from src.rate_limiter import limiter
+from src.services.email_service import send_recovery_email, send_verification_email
 from src.schemas.user_schemas import (
     PasswordConfirm,
+    RefreshTokenRequest,
+    ResendVerificationRequest,
     UserCreate,
     UserFormsMetadata,
     UserOut,
@@ -25,7 +30,9 @@ from src.schemas.user_schemas import (
 from src.token_utils import (
     create_access_token,
     create_refresh_token,
-    decode_access_token,
+    decode_recovery_token,
+    decode_refresh_token,
+    decode_verify_token,
 )
 from src.utils import (
     get_current_user,
@@ -67,13 +74,17 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
     - Al menos un número
     """
 
-    # Verificar si el usuario ya existe
+    # Mensaje único para alta real y email ya existente: la respuesta no debe
+    # permitir enumerar qué correos están registrados en el padrón.
+    generic_message = (
+        "Registro exitoso. En producción recibirás un email de verificación."
+    )
+
+    # Verificar si el usuario ya existe — misma respuesta que el alta real
+    # (el aviso de "esta cuenta ya existe" llegaría por email, no por acá).
     existing_user = db.query(User).filter(User.email == user_in.email).first()
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo electrónico ya está registrado",
-        )
+        return {"message": generic_message}
 
     # Validar la contraseña
     validar_password(user_in.password)
@@ -121,13 +132,11 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=1440),
     )
 
-    # Guardar el nuevo usuario y el token de recuperación en la base de datos
+    # Guardar el nuevo usuario, el token de recuperación y la entrada de
+    # auditoría en una sola transacción: o se persiste todo o nada.
     try:
         db.add(new_user)
         db.add(recovery_record)
-        db.commit()
-
-        # Registrar en audit trail
         audit_log(
             db=db,
             action="USER_REGISTER",
@@ -137,25 +146,81 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
             details={"email": user_in.email},
             request=request,
         )
+        db.commit()
     except Exception:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Error en el registro de New User",
         )
-    # TODO: Implementar envío de email en producción
-    # verification_url = f"{URL_SITE}/users/confirm/{registration_token}"
+    confirm_url = f"{FRONTEND_URL}/confirmar-cuenta/{registration_token}"
+    send_verification_email(user_in.email, confirm_url)
 
-    response = {
-        "id": new_user.id,
-        "email": new_user.email,
-        "is_active": new_user.is_active,
-        "created_at": new_user.created_at,
-        "last_login": new_user.last_login,
-        "roles": [{"id": role.id, "rol": role.rol} for role in new_user.roles],
-        "message": "Registro exitoso. En producción recibirás un email de verificación.",
-    }
+    # Respuesta mínima e idéntica a la del caso "email ya registrado", para
+    # que ambas sean indistinguibles desde afuera (anti-enumeración).
+    response = {"message": generic_message}
     # Solo exponer el token en entornos no productivos para pruebas manuales
+    from src.config import IS_PRODUCTION
+
+    if not IS_PRODUCTION:
+        response["verification_token"] = registration_token
+    return response
+
+
+@user_router.post(
+    "/resend-verification",
+    description="Reenviar el email de verificación de cuenta",
+    responses={
+        200: {"description": "Mensaje genérico, sin revelar si el email existe o ya está verificado"},
+        429: {"description": "Demasiados intentos (rate limit)"},
+    },
+)
+@limiter.limit("3/minute")
+async def resend_verification(
+    request: Request, data: ResendVerificationRequest, db: Session = Depends(get_db)
+):
+    """
+    Reenviar el email de verificación de cuenta.
+
+    Solo genera y envía un token nuevo si el usuario existe y sigue
+    inactivo (`is_active=False`); en cualquier otro caso (email
+    inexistente, o cuenta ya verificada) devuelve el mismo mensaje
+    genérico, sin revelarlo (anti-enumeración, mismo criterio que
+    `recovery_passwd_user`).
+    """
+    generic_message = {
+        "detail": "Si el email está registrado y pendiente de verificación, recibirás un nuevo correo de confirmación."
+    }
+
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user or user.is_active:
+        return generic_message
+
+    # Invalida cualquier token activo del usuario (verify o recover): un
+    # usuario todavía no verificado no puede tener un recovery legítimo
+    # pendiente (nunca pudo loguearse para pedirlo), así que no hay pérdida
+    # funcional real, y evita dejar tokens viejos vigentes en paralelo.
+    db.query(TokenRecovery).filter(
+        TokenRecovery.user_id == user.id, TokenRecovery.is_active.is_(True)
+    ).update({"is_active": False})
+
+    registration_token = create_access_token(
+        data={"sub": user.id, "roles": ["unverified"]},
+        expires_delta=1440,
+        type="verify",
+    )
+    recovery_record = TokenRecovery(
+        user_id=user.id,
+        token_payload=registration_token,
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=1440),
+    )
+    db.add(recovery_record)
+    db.commit()
+
+    confirm_url = f"{FRONTEND_URL}/confirmar-cuenta/{registration_token}"
+    send_verification_email(user.email, confirm_url)
+
+    response = dict(generic_message)
     from src.config import IS_PRODUCTION
 
     if not IS_PRODUCTION:
@@ -188,13 +253,11 @@ async def confirm_registration(
         raise HTTPException(status_code=404, detail="Token no encontrado o inactivo")
 
     try:
-        # Verificar token
-        payload = decode_access_token(token)
+        # Verificar token (valida tipo "verify" en el decode)
+        payload = decode_verify_token(token)
 
-        # Validaciones críticas: debe ser token de verificación con rol unverified
-        if payload.get("type") != "verify" or "unverified" not in payload.get(
-            "roles", []
-        ):
+        # Validación crítica adicional: debe llevar el rol unverified
+        if "unverified" not in payload.get("roles", []):
             raise HTTPException(status_code=400, detail="Token inválido")
 
         user_id = payload.get("sub")
@@ -294,12 +357,57 @@ def login(
         details={"email": user.email},
         request=request,
     )
+    db.commit()
 
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
     }
+
+
+@user_router.post(
+    "/refresh",
+    summary="Renovar access token",
+    description="Cambia un refresh_token vigente por un access_token nuevo, sin pedir credenciales de nuevo.",
+    responses={
+        200: {"description": "Renovación exitosa, retorna un access_token nuevo"},
+        401: {"description": "Refresh token inválido, expirado o de tipo incorrecto"},
+    },
+)
+@limiter.limit("20/minute")
+def refresh_access_token(
+    request: Request, data: RefreshTokenRequest, db: Session = Depends(get_db)
+):
+    """
+    Antes el access_token (30 min) no tenía forma de renovarse: el
+    refresh_token ya se emitía en el login pero ningún endpoint lo
+    consumía, así que la sesión se cortaba sin aviso a los 30 minutos.
+
+    Roles y estado (`is_active`) se toman de la base al momento de
+    refrescar, no del token viejo, para mantener el mismo criterio que
+    `get_current_user` (un usuario desactivado no puede renovar su sesión).
+    """
+    payload = decode_refresh_token(data.refresh_token)
+
+    user = db.query(User).filter(User.id == payload.get("sub")).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario inactivo o inexistente",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token = create_access_token(
+        data={
+            "sub": user.id,
+            "email": user.email,
+            "roles": [{"id": role.id, "rol": role.rol} for role in user.roles],
+        },
+        expires_delta=30,
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 # Generar el Token de Recover Password
@@ -312,14 +420,14 @@ async def recovery_passwd_user(
     request: Request, user_in: UserUpdate, db: Session = Depends(get_db)
 ):
     """
-    Generar el Token de Recover Password.
-    Generar una password aleatoria y enviarla al correo del usuario.
+    Generar el Token de Recover Password y (en producción) enviarlo por email.
+
+    La nueva contraseña NO se recibe en este paso: se fija recién en
+    POST /recovery/{token}, una vez demostrada la posesión del token.
+    Antes este endpoint aceptaba y persistía contraseñas elegidas por
+    cualquiera sin verificar identidad (diseño invertido).
     Args:
         email (string): Email del usuario
-        passwd (string): Password Nuevo del usuario
-    Returns:
-        dict: Token de acceso y refresh token
-        URL: dirección de recovery password
     """
     # Respuesta genérica para no revelar si el email existe en el sistema
     generic_response = {
@@ -330,22 +438,17 @@ async def recovery_passwd_user(
     if not user:
         return generic_response
 
-    validar_password(user_in.password)
-    hashed_password = get_password_hash(user_in.password)
     # Generar token de recuperación (24h de validez)
-    # NOTA: el hash de la nueva contraseña se almacena solo en TokenRecovery, nunca en el JWT
     registration_token = create_access_token(
         data={"sub": user.id},
         expires_delta=1440,  # 24 horas en minutos
         type="recover",
     )
 
-    # Guardar token de recuperación (la nueva contraseña hasheada solo vive en la DB)
     recovery_record = TokenRecovery(
         user_id=user.id,
         token_payload=registration_token,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=1440),
-        new_password=hashed_password,
     )
 
     # Guardar el token de recuperación en la base de datos
@@ -358,8 +461,8 @@ async def recovery_passwd_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Error en el registro de Token Recovery",
         )
-    # TODO: Implementar envío de email en producción
-    # verification_url = f"{URL_SITE}/users/recovery/{registration_token}"
+    recovery_url = f"{FRONTEND_URL}/restablecer-contrasena/{registration_token}"
+    send_recovery_email(user.email, recovery_url)
 
     return generic_response
 
@@ -370,16 +473,18 @@ async def recovery_passwd_user(
     response_model=UserOut,
     description="Recuperar la contraseña del usuario",
 )
-async def recovery_passwd(token: str, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def recovery_passwd(
+    request: Request, token: str, user_in: UserUpdate, db: Session = Depends(get_db)
+):
     """
-    Recuperar la contraseña del usuario.
+    Fijar la nueva contraseña del usuario, demostrada la posesión del token.
     Args:
         token (string): Token de recuperación
+        user_in: body con la nueva contraseña ({"password": "..."})
     """
-    # Verificar token
-    payload = decode_access_token(token)
-    if payload.get("type") != "recover":
-        raise HTTPException(status_code=400, detail="Token inválido")
+    # Verificar token (valida tipo "recover" en el decode)
+    payload = decode_recovery_token(token)
     user_id = payload.get("sub")
     # Buscar el usuario en la base de datos
     user = db.query(User).filter(User.id == user_id).first()
@@ -387,7 +492,7 @@ async def recovery_passwd(token: str, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Usuario no existe"
         )
-    # Buscar la nueva contraseña en el registro de recuperación (nunca en el JWT)
+    # El token debe existir y seguir activo (un solo uso)
     recovery_record = (
         db.query(TokenRecovery)
         .filter(
@@ -396,17 +501,30 @@ async def recovery_passwd(token: str, db: Session = Depends(get_db)):
         )
         .first()
     )
-    if not recovery_record or not recovery_record.new_password:
+    if not recovery_record:
         raise HTTPException(status_code=400, detail="Token inválido o expirado")
-    # Actualizar la contraseña del usuario
-    user.hashed_password = recovery_record.new_password
-    db.commit()
-    db.refresh(user)
-    # Invalidar el token de recuperación
+    # La nueva contraseña llega recién ahora, con el token en mano
+    if not user_in.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe indicar la nueva contraseña",
+        )
+    validar_password(user_in.password)
+    user.hashed_password = get_password_hash(user_in.password)
+    # Invalidar el token de recuperación (misma transacción que el cambio)
     db.query(TokenRecovery).filter(TokenRecovery.token_payload == token).update(
         {"is_active": False}
     )
+    audit_log(
+        db=db,
+        action="PASSWORD_RESET",
+        user_id=user.id,
+        resource_type="User",
+        resource_id=user.id,
+        request=request,
+    )
     db.commit()
+    db.refresh(user)
 
     return user
 
@@ -489,6 +607,57 @@ async def get_user_forms_metadata(
         has_festival=db.query(Festival).filter(Festival.user_id == user_id).first()
         is not None,
     )
+
+
+# Auto-asignación del rol "estudiante" (pantalla de elección al primer login)
+@user_router.post(
+    "/me/become-estudiante",
+    response_model=UserOut,
+    description="Auto-asignarse el rol 'estudiante' (elección de perfil al primer ingreso)",
+)
+async def become_estudiante(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Un usuario recién registrado, sin ningún registro todavía, elige entre el
+    camino de estudiante (ESA) o el camino general (Persona Física) en la
+    pantalla de onboarding. Este endpoint es lo que dispara el camino
+    estudiante: se lo autoasigna, sin necesitar ningún permiso especial
+    (es una etiqueta de identidad/ruteo, no de autorización — ver rbac.py).
+
+    Idempotente: llamarlo dos veces no duplica el rol ni la entrada de
+    auditoría.
+    """
+    user = db.query(User).filter(User.id == current_user["id"]).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+        )
+
+    estudiante_role = db.query(Role).filter(Role.rol == "estudiante").first()
+    if not estudiante_role:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="El rol 'estudiante' no está sincronizado en el sistema",
+        )
+
+    if estudiante_role not in user.roles:
+        user.roles.append(estudiante_role)
+        audit_log(
+            db=db,
+            action=AuditAction.ROLE_CHANGE,
+            user_id=user.id,
+            resource_type="User",
+            resource_id=user.id,
+            details={"add": [estudiante_role.id], "rol": "estudiante", "self_service": True},
+            request=request,
+        )
+        db.commit()
+        db.refresh(user)
+
+    return user
 
 
 # Actualizar usuario

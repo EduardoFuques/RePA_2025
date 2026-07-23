@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.schemas.lifecycle_schemas import RegistroLifecycleOut
+
 
 # === EQUIPO TÉCNICO ===
 class EquipoTecnicoBase(BaseModel):
@@ -48,6 +50,7 @@ class ObraAudiovisualCreate(BaseModel):
     subtitulos: str | None = None
     uso_material: list[str] | None = None
     otro_uso: str | None = None
+    ficha_tecnica_path: str | None = Field(None, max_length=500)
     ubicacion: str | None = None
 
     # Datos relacionales
@@ -63,6 +66,7 @@ class ObraAudiovisualCreate(BaseModel):
     autoriza_exhibicion: str | None = None
     autoriza_investigacion: str | None = None
     convenio_cesion: str | None = None
+    archivo_convenio_path: str | None = Field(None, max_length=500)
     restricciones: str | None = None
 
     # Equipo técnico (opcional en creación, se puede agregar después)
@@ -95,6 +99,7 @@ class ObraAudiovisualUpdate(BaseModel):
     subtitulos: str | None = None
     uso_material: list[str] | None = None
     otro_uso: str | None = None
+    ficha_tecnica_path: str | None = Field(None, max_length=500)
     ubicacion: str | None = None
 
     # Datos relacionales
@@ -110,18 +115,23 @@ class ObraAudiovisualUpdate(BaseModel):
     autoriza_exhibicion: str | None = None
     autoriza_investigacion: str | None = None
     convenio_cesion: str | None = None
+    archivo_convenio_path: str | None = Field(None, max_length=500)
     restricciones: str | None = None
 
     # Estado
     borrador: bool | None = None
 
 
-class ObraAudiovisualOut(BaseModel):
+class ObraAudiovisualOut(RegistroLifecycleOut):
     """Schema de salida para Obra Audiovisual"""
 
     id: int
     user_id: str
     codigo_agam: str | None = None
+    # AGAM no tiene código RePA propio (codigo_repa, heredado de
+    # RegistroLifecycleOut, queda siempre null acá) — usa como código de
+    # trámite el de la Persona Física que la presenta.
+    codigo_repa_titular: str | None = None
 
     # Identificación
     titulo: str

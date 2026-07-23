@@ -23,7 +23,7 @@ from src.schemas.exhibicion_schemas import (
     SalaOut,
     SalaUpdate,
 )
-from src.utils import get_current_user
+from src.utils import get_current_user, require_pf_aprobado
 
 exhibicion_router = APIRouter()
 
@@ -37,6 +37,7 @@ exhibicion_router = APIRouter()
 async def create_sala(
     data: SalaCreate,
     current_user: dict = Depends(get_current_user),
+    _gate: dict = Depends(require_pf_aprobado),
     db: Session = Depends(get_db),
 ):
     """Crear una nueva Sala de Exhibición"""
@@ -165,6 +166,7 @@ async def delete_sala(
 async def create_exhibicion(
     data: ExhibicionCreate,
     current_user: dict = Depends(get_current_user),
+    _gate: dict = Depends(require_pf_aprobado),
     db: Session = Depends(get_db),
 ):
     """Crear una nueva Exhibición"""
@@ -305,6 +307,7 @@ async def delete_exhibicion(
 async def create_festival(
     data: FestivalCreate,
     current_user: dict = Depends(get_current_user),
+    _gate: dict = Depends(require_pf_aprobado),
     db: Session = Depends(get_db),
 ):
     """Crear un nuevo Festival"""

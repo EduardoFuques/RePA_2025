@@ -2,6 +2,7 @@
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     ForeignKey,
@@ -9,24 +10,65 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql import func
 
 from src.database import Base
+from src.models.registro_lifecycle import RegistroLifecycleMixin
 
 
-class ObraAudiovisual(Base):
+class ObraAudiovisual(RegistroLifecycleMixin, Base):
     """
     Modelo para Obras Audiovisuales del AGAM (Archivo General Audiovisual Misionero).
     Corresponde al formulario AGAM del frontend.
     """
 
     __tablename__ = "obras_audiovisuales"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_produccion IN ('independiente', 'comunitario', 'institucional', "
+            "'publicitario', 'otro')",
+            name="ck_obras_audiovisuales_tipo_produccion",
+        ),
+        CheckConstraint(
+            "medio IN ('cine', 'tv', 'digital', 'videojuego', 'otro')",
+            name="ck_obras_audiovisuales_medio",
+        ),
+        CheckConstraint(
+            "extension IN ('cortometraje', 'mediometraje', 'largometraje')",
+            name="ck_obras_audiovisuales_extension",
+        ),
+        CheckConstraint(
+            "formato_narrativo IN ('unitario', 'serie', 'miniserie')",
+            name="ck_obras_audiovisuales_formato_narrativo",
+        ),
+        CheckConstraint(
+            "genero IN ('ficcion', 'documental', 'animacion', 'experimental', 'otro')",
+            name="ck_obras_audiovisuales_genero",
+        ),
+        CheckConstraint(
+            "resolucion IN ('sd', 'hd', 'full_hd', '2k', '4k')",
+            name="ck_obras_audiovisuales_resolucion",
+        ),
+        CheckConstraint(
+            "registro_obra_nacional IN ('si', 'no', 'en_tramite')",
+            name="ck_obras_audiovisuales_registro_obra_nacional",
+        ),
+    )
+
+    # Tipo de entidad para la emisión del código RePA.
+    REPA_TIPO = "AGAM"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(
-        String, ForeignKey("users.id"), nullable=False
+        String, ForeignKey("users.id"), nullable=False, index=True
     )  # Usuario que registra
+
+    # AGAM no emite código RePA propio (ver RegistroLifecycleMixin.codigo_repa,
+    # que queda NULL acá): usa como "código de trámite" el codigo_repa de la
+    # Persona Física que la presenta. No es unique porque un mismo user puede
+    # tener varias obras, todas con el mismo código de trámite.
+    codigo_repa_titular = Column(String(30), nullable=True)
 
     # === IDENTIFICACIÓN ===
     codigo_agam = Column(
@@ -46,7 +88,7 @@ class ObraAudiovisual(Base):
     # Opciones: ficcion, documental, animacion, experimental, otro
     subgenero = Column(String(100), nullable=True)
     medio = Column(String(30), nullable=True)
-    # Opciones: cine, television, digital, otro
+    # Opciones: cine, tv, digital, videojuego, otro
 
     # === DATOS TÉCNICOS ===
     formatos_disponibles = Column(JSON, nullable=True)
@@ -90,8 +132,10 @@ class ObraAudiovisual(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    # Relación con el usuario
-    user = relationship("User", back_populates="obras_audiovisuales")
+    # Relación con el usuario (user_id; revisado_por es otra FK a users)
+    user = relationship(
+        "User", back_populates="obras_audiovisuales", foreign_keys=[user_id]
+    )
 
     # Relaciones con Exhibiciones
     exhibiciones = relationship("Exhibicion", back_populates="obra")
@@ -103,7 +147,7 @@ class EquipoTecnicoObra(Base):
     __tablename__ = "equipo_tecnico_obra"
 
     id = Column(Integer, primary_key=True, index=True)
-    obra_id = Column(Integer, ForeignKey("obras_audiovisuales.id"), nullable=False)
+    obra_id = Column(Integer, ForeignKey("obras_audiovisuales.id", ondelete="CASCADE"), nullable=False)
 
     rol = Column(String(100), nullable=False)
     # Roles: direccion, produccion_ejecutiva, direccion_fotografia, direccion_arte,
@@ -112,4 +156,4 @@ class EquipoTecnicoObra(Base):
     en_repa = Column(String(10), nullable=True)  # si, no
     codigo_repa = Column(String(50), nullable=True)  # Si está en RePA
 
-    obra = relationship("ObraAudiovisual", backref="equipo_tecnico")
+    obra = relationship("ObraAudiovisual", backref=backref("equipo_tecnico", cascade="all, delete-orphan", passive_deletes=True))

@@ -54,7 +54,7 @@ TEST_PERSONA_FISICA = {
         "personas_a_cargo": True,
         "tipo_personas_a_cargo": ["hijos"],
         "principal_fuente_audiovisual": True,
-        "relacion_laboral": "autonomo",
+        "relacion_laboral": "freelance",
         "inscripto_afip": "si",
         "situacion_iva": "monotributo",
         "pertenece_red": True,
@@ -130,7 +130,7 @@ TEST_PERSONA_FISICA = {
         "discapacidad": "no",
         "personas_a_cargo": False,
         "principal_fuente_audiovisual": True,
-        "relacion_laboral": "autonomo",
+        "relacion_laboral": "freelance",
         "inscripto_afip": "si",
         "situacion_iva": "monotributo",
         "pertenece_red": True,
@@ -172,7 +172,7 @@ TEST_PERSONA_FISICA = {
         "personas_a_cargo": True,
         "tipo_personas_a_cargo": ["adultos_mayores"],
         "principal_fuente_audiovisual": True,
-        "relacion_laboral": "autonomo",
+        "relacion_laboral": "freelance",
         "inscripto_afip": "si",
         "situacion_iva": "responsable_inscripto",
         "pertenece_red": True,
@@ -195,7 +195,7 @@ TEST_PERSONA_JURIDICA = {
     "admin@repa.gob.ar": {
         "nombre_pj": "Productora Audiovisual del Litoral S.R.L.",
         "cuit": "30-71234567-8",
-        "figura_legal": "srl",
+        "figura_legal": "empresa",
         "fecha_constitucion": date(2015, 6, 20),
         "objeto_social": "Producción, distribución y comercialización de contenidos audiovisuales. Prestación de servicios de producción cinematográfica y televisiva.",
         "domicilio_legal": "Av. Corrientes 1500, Piso 3",
@@ -410,6 +410,37 @@ def sync_rbac(db):
     logger.info("RBAC sincronizado: permisos y roles del sistema")
 
 
+def backfill_estudiante_role(db):
+    """
+    Le asigna el rol 'estudiante' a cualquier usuario que ya tenga un
+    registro ESA cargado pero todavía no tenga el rol (por ejemplo, datos
+    creados antes de que este rol existiera). Idempotente — corre en cada
+    arranque del backend, tanto en desarrollo como en producción, y no hace
+    nada si ya está todo al día.
+    """
+    from src.models.esa_model import EstudianteESA
+
+    estudiante_role = db.query(Role).filter(Role.rol == "estudiante").first()
+    if not estudiante_role:
+        return
+
+    user_ids_con_esa = {
+        row[0] for row in db.query(EstudianteESA.user_id).distinct().all()
+    }
+    if not user_ids_con_esa:
+        return
+
+    usuarios = db.query(User).filter(User.id.in_(user_ids_con_esa)).all()
+    asignados = 0
+    for user in usuarios:
+        if estudiante_role not in user.roles:
+            user.roles.append(estudiante_role)
+            asignados += 1
+    if asignados:
+        db.commit()
+        logger.info(f"Backfill rol 'estudiante': {asignados} usuario(s) actualizados")
+
+
 def seed_data():
     """
     Carga datos en la base de datos. Asume que el esquema ya existe
@@ -423,6 +454,7 @@ def seed_data():
         db = SessionLocal()
         try:
             sync_rbac(db)
+            backfill_estudiante_role(db)
         finally:
             db.close()
         return  # No cargar datos de prueba en producción
@@ -432,10 +464,12 @@ def seed_data():
     try:
         # Sincronizar RBAC (permisos + roles del sistema)
         sync_rbac(db)
+        backfill_estudiante_role(db)
 
         # Seed de usuarios de prueba
         admin_role = db.query(Role).filter(Role.rol == "admin").first()
         user_role = db.query(Role).filter(Role.rol == "user").first()
+        estudiante_role = db.query(Role).filter(Role.rol == "estudiante").first()
 
         for test_user in TEST_USERS:
             existing = db.query(User).filter(User.email == test_user["email"]).first()
@@ -525,11 +559,10 @@ def seed_data():
                 db.refresh(new_user)
 
                 if user_role:
-                    user_role_entry = UserRole(
-                        user_id=new_user.id, role_id=user_role.id
-                    )
-                    db.add(user_role_entry)
-                    db.commit()
+                    db.add(UserRole(user_id=new_user.id, role_id=user_role.id))
+                if estudiante_role:
+                    db.add(UserRole(user_id=new_user.id, role_id=estudiante_role.id))
+                db.commit()
 
                 print(f"✓ Usuario ESA creado: {test_user['email']}")
             else:

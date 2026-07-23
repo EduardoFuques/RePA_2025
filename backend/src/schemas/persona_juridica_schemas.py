@@ -3,6 +3,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from src.schemas.lifecycle_schemas import RegistroLifecycleOut
+
 
 # === INTEGRANTE ===
 class IntegrantePJBase(BaseModel):
@@ -121,7 +123,7 @@ class PersonaJuridicaUpdate(BaseModel):
     borrador: bool | None = None
 
 
-class PersonaJuridicaOut(BaseModel):
+class PersonaJuridicaOut(RegistroLifecycleOut):
     """Schema de salida para Persona Jurídica"""
 
     id: int
