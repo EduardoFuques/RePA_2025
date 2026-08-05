@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 
 from src.audit import audit_log
 from src.database import get_db
-from src.search import filtro_texto
 from src.models.asociacion_model import Asociacion
 from src.models.audit_model import AuditAction
 from src.models.esa_model import EstudianteESA
@@ -36,6 +35,7 @@ from src.schemas.esa_schemas import EstudianteESAOut
 from src.schemas.obra_audiovisual_schemas import ObraAudiovisualOut
 from src.schemas.persona_fisica_schemas import PersonaFisicaOut
 from src.schemas.persona_juridica_schemas import PersonaJuridicaOut
+from src.search import filtro_texto
 from src.services import lifecycle_service
 from src.utils import require_permissions
 
@@ -193,16 +193,16 @@ async def listar_registros_unificado(
             )
 
     # Más recientes primero; los que no tienen fecha van al final.
-    filas.sort(key=lambda f: (f["updated_at"] is not None, f["updated_at"]), reverse=True)
+    filas.sort(
+        key=lambda f: (f["updated_at"] is not None, f["updated_at"]), reverse=True
+    )
     total = len(filas)
     pagina = filas[offset : offset + limit]
 
     # Email del titular: una sola consulta para toda la página (evita N+1).
     user_ids = {f["user_id"] for f in pagina if f["user_id"]}
     if user_ids:
-        emails = dict(
-            db.query(User.id, User.email).filter(User.id.in_(user_ids)).all()
-        )
+        emails = dict(db.query(User.id, User.email).filter(User.id.in_(user_ids)).all())
         for f in pagina:
             f["user_email"] = emails.get(f["user_id"])
     else:

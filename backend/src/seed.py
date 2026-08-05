@@ -1,16 +1,17 @@
 """
 Seed de datos de prueba para desarrollo/QA + sincronización de RBAC.
 
-IMPORTANTE: Los datos de prueba (usuarios, Padrón, Fomento) NO se cargan
-en producción — se deshabilitan automáticamente si ENVIRONMENT=production.
-El sync de RBAC y el backfill de rol 'estudiante' sí corren siempre.
+IMPORTANTE: Los datos de prueba (usuarios, Padrón, Fomento) NO se cargan en
+producción (ENVIRONMENT=production) ni en tests (IS_TESTING) — el sync de
+RBAC y el backfill de rol 'estudiante' sí corren siempre, en todos los
+entornos.
 """
 
 from datetime import date, datetime, timedelta, timezone
 
 from passlib.context import CryptContext
 
-from src.config import IS_PRODUCTION
+from src.config import IS_PRODUCTION, IS_TESTING
 from src.database import SessionLocal
 from src.document_generator import generate_fomento_documents, generate_test_documents
 from src.logger import logger
@@ -73,7 +74,19 @@ TEST_ESA_USERS = [
 
 # === DATOS DE PADRÓN ===
 
-def _pf(nombre, apellido, dni, cuil, email, municipio, distrito, subperfiles, estado, **overrides):
+
+def _pf(
+    nombre,
+    apellido,
+    dni,
+    cuil,
+    email,
+    municipio,
+    distrito,
+    subperfiles,
+    estado,
+    **overrides,
+):
     """Defaults válidos de Persona Física para usuarios de prueba que no
     necesitan un perfil elaborado (staff: admin/gestor/evaluador/revisor/
     lectura). Todos quedan en estado 'vigente'/'aprobado' para que
@@ -124,44 +137,114 @@ def _pf(nombre, apellido, dni, cuil, email, municipio, distrito, subperfiles, es
 
 TEST_PERSONA_FISICA = {
     "admin1@repa.gob.ar": _pf(
-        "Sofía", "Benítez", "59000001", "27-59000001-4", "admin1@repa.gob.ar",
-        "Posadas", "sur", ["productor"], "vigente",
+        "Sofía",
+        "Benítez",
+        "59000001",
+        "27-59000001-4",
+        "admin1@repa.gob.ar",
+        "Posadas",
+        "sur",
+        ["productor"],
+        "vigente",
     ),
     "admin2@repa.gob.ar": _pf(
-        "Martín", "Duarte", "59000002", "20-59000002-1", "admin2@repa.gob.ar",
-        "Posadas", "sur", ["director"], "aprobado",
+        "Martín",
+        "Duarte",
+        "59000002",
+        "20-59000002-1",
+        "admin2@repa.gob.ar",
+        "Posadas",
+        "sur",
+        ["director"],
+        "aprobado",
     ),
     "gestor1@repa.gob.ar": _pf(
-        "Valentina", "Ríos", "59000003", "27-59000003-8", "gestor1@repa.gob.ar",
-        "Oberá", "norte", ["productor", "director"], "vigente",
+        "Valentina",
+        "Ríos",
+        "59000003",
+        "27-59000003-8",
+        "gestor1@repa.gob.ar",
+        "Oberá",
+        "norte",
+        ["productor", "director"],
+        "vigente",
     ),
     "gestor2@repa.gob.ar": _pf(
-        "Emiliano", "Cabrera", "59000004", "20-59000004-5", "gestor2@repa.gob.ar",
-        "Eldorado", "norte", ["guionista"], "aprobado",
+        "Emiliano",
+        "Cabrera",
+        "59000004",
+        "20-59000004-5",
+        "gestor2@repa.gob.ar",
+        "Eldorado",
+        "norte",
+        ["guionista"],
+        "aprobado",
     ),
     "evaluador1@repa.gob.ar": _pf(
-        "Rocío", "Aguirre", "59000005", "27-59000005-2", "evaluador1@repa.gob.ar",
-        "Posadas", "sur", ["investigador"], "vigente",
+        "Rocío",
+        "Aguirre",
+        "59000005",
+        "27-59000005-2",
+        "evaluador1@repa.gob.ar",
+        "Posadas",
+        "sur",
+        ["investigador"],
+        "vigente",
     ),
     "evaluador2@repa.gob.ar": _pf(
-        "Federico", "Villalba", "59000006", "20-59000006-9", "evaluador2@repa.gob.ar",
-        "Apóstoles", "sur", ["documentalista"], "aprobado",
+        "Federico",
+        "Villalba",
+        "59000006",
+        "20-59000006-9",
+        "evaluador2@repa.gob.ar",
+        "Apóstoles",
+        "sur",
+        ["documentalista"],
+        "aprobado",
     ),
     "revisor1@repa.gob.ar": _pf(
-        "Camila", "Sosa", "59000007", "27-59000007-6", "revisor1@repa.gob.ar",
-        "Puerto Iguazú", "norte", ["realizadorIntegral"], "vigente",
+        "Camila",
+        "Sosa",
+        "59000007",
+        "27-59000007-6",
+        "revisor1@repa.gob.ar",
+        "Puerto Iguazú",
+        "norte",
+        ["realizadorIntegral"],
+        "vigente",
     ),
     "revisor2@repa.gob.ar": _pf(
-        "Lucas", "Ortigoza", "59000008", "20-59000008-3", "revisor2@repa.gob.ar",
-        "Leandro N. Alem", "norte", ["tecnicoArtistico"], "aprobado",
+        "Lucas",
+        "Ortigoza",
+        "59000008",
+        "20-59000008-3",
+        "revisor2@repa.gob.ar",
+        "Leandro N. Alem",
+        "norte",
+        ["tecnicoArtistico"],
+        "aprobado",
     ),
     "lectura1@repa.gob.ar": _pf(
-        "Antonella", "Kurtz", "59000009", "27-59000009-0", "lectura1@repa.gob.ar",
-        "Posadas", "sur", ["capacitador"], "vigente",
+        "Antonella",
+        "Kurtz",
+        "59000009",
+        "27-59000009-0",
+        "lectura1@repa.gob.ar",
+        "Posadas",
+        "sur",
+        ["capacitador"],
+        "vigente",
     ),
     "lectura2@repa.gob.ar": _pf(
-        "Bruno", "Insaurralde", "59000010", "20-59000010-7", "lectura2@repa.gob.ar",
-        "Montecarlo", "norte", ["investigador"], "aprobado",
+        "Bruno",
+        "Insaurralde",
+        "59000010",
+        "20-59000010-7",
+        "lectura2@repa.gob.ar",
+        "Montecarlo",
+        "norte",
+        ["investigador"],
+        "aprobado",
     ),
     "usuario1@repa.gob.ar": {
         "nombre": "Juan Carlos",
@@ -500,7 +583,9 @@ def seed_padron_data(db):
         user = db.query(User).filter(User.email == email).first()
         if not user:
             continue
-        existing = db.query(PersonaFisica).filter(PersonaFisica.user_id == user.id).first()
+        existing = (
+            db.query(PersonaFisica).filter(PersonaFisica.user_id == user.id).first()
+        )
         if existing:
             _asegurar_codigo(db, existing, "PF", revisor, ahora, data=pf_data)
             continue
@@ -620,7 +705,10 @@ def seed_fomento_data(db):
     evento1, _ = _get_or_create(
         db,
         EventoFomento,
-        {"nombre": "Convocatoria General de Fomento Audiovisual 2025", "anio_edicion": 2025},
+        {
+            "nombre": "Convocatoria General de Fomento Audiovisual 2025",
+            "anio_edicion": 2025,
+        },
         {
             "tipo": "competitiva",
             "estado": "activo",
@@ -660,9 +748,21 @@ def seed_fomento_data(db):
                     "requiere_evaluacion": True,
                     "tipo_comite": "tecnico",
                     "documentacion_requerida": [
-                        {"tipo": "dossier", "descripcion": "Dossier del proyecto", "obligatorio": True},
-                        {"tipo": "presupuesto", "descripcion": "Presupuesto detallado", "obligatorio": True},
-                        {"tipo": "plan_financiamiento", "descripcion": "Plan de financiamiento", "obligatorio": False},
+                        {
+                            "tipo": "dossier",
+                            "descripcion": "Dossier del proyecto",
+                            "obligatorio": True,
+                        },
+                        {
+                            "tipo": "presupuesto",
+                            "descripcion": "Presupuesto detallado",
+                            "obligatorio": True,
+                        },
+                        {
+                            "tipo": "plan_financiamiento",
+                            "descripcion": "Plan de financiamiento",
+                            "obligatorio": False,
+                        },
                     ],
                     "campos_especificos": [],
                 },
@@ -694,7 +794,10 @@ def seed_fomento_data(db):
                 "roles_habilitados": ["tecnico", "deliberativo"],
                 "rol": "evaluador_tecnico" if i == 1 else "jurado_deliberativo",
                 "disponible_convocatorias": True,
-                "tipos_convocatoria": ["convocatoria_competitiva", "convocatoria_especial"],
+                "tipos_convocatoria": [
+                    "convocatoria_competitiva",
+                    "convocatoria_especial",
+                ],
                 "borrador": False,
             },
         )
@@ -729,11 +832,19 @@ def seed_fomento_data(db):
 
     tramites_convocatoria = []
     for tipo, (evento, linea_nombres) in (
-        ("convocatoria_competitiva", (evento1, ["Línea Largometrajes", "Línea Series Web"])),
-        ("convocatoria_especial", (evento2, ["Línea Documental Regional", "Línea Coproducción NEA"])),
+        (
+            "convocatoria_competitiva",
+            (evento1, ["Línea Largometrajes", "Línea Series Web"]),
+        ),
+        (
+            "convocatoria_especial",
+            (evento2, ["Línea Documental Regional", "Línea Coproducción NEA"]),
+        ),
     ):
         estados = TRAMITE_ESTADOS_POR_TIPO[tipo]
-        for idx, (linea_nombre, estado) in enumerate(zip(linea_nombres, estados)):
+        for idx, (linea_nombre, estado) in enumerate(
+            zip(linea_nombres, estados, strict=True)
+        ):
             user = usuarios_solicitantes[idx % len(usuarios_solicitantes)]
             titulo = f"Proyecto {tipo} #{idx + 1}"
             tramite, _ = _get_or_create(
@@ -783,20 +894,28 @@ def seed_fomento_data(db):
                     "sinopsis": "Proyecto audiovisual de prueba cargado por el seed de QA.",
                     "moneda_principal": "ARS",
                     "presupuesto_total": 3_000_000,
-                    "monto_estimado_reintegro": 900_000 if tipo == "cash_rebate" else None,
+                    "monto_estimado_reintegro": 900_000
+                    if tipo == "cash_rebate"
+                    else None,
                     "estado_tramite": estado,
                     "fecha_ingreso": ahora,
                     "borrador": False,
                 },
             )
 
-    for idx, (cohorte, estado) in enumerate(zip(cohortes, TRAMITE_ESTADOS_POR_TIPO["semillero"])):
+    for idx, (cohorte, estado) in enumerate(
+        zip(cohortes, TRAMITE_ESTADOS_POR_TIPO["semillero"], strict=True)
+    ):
         user = usuarios_solicitantes[idx % len(usuarios_solicitantes)]
         titulo = f"Proyecto semillero #{idx + 1}"
         _get_or_create(
             db,
             TramiteFomento,
-            {"user_id": user.id, "tipo_tramite": "semillero", "titulo_proyecto": titulo},
+            {
+                "user_id": user.id,
+                "tipo_tramite": "semillero",
+                "titulo_proyecto": titulo,
+            },
             {
                 "cohorte_semillero_id": cohorte.id,
                 "tipo_productora": "productora_misionera",
@@ -861,6 +980,7 @@ def seed_fomento_data(db):
             ["María Torres", "Diego Benítez"],
             ["Sofía Ramírez", "Nicolás Duarte"],
         ),
+        strict=True,
     ):
         existentes = (
             db.query(ParticipanteSemillero).filter_by(cohorte_id=cohorte.id).count()
@@ -893,7 +1013,9 @@ def seed_fomento_data(db):
             )
         db.commit()
 
-    logger.info("Datos de Fomento sembrados: eventos, líneas, evaluadores, trámites, comités y semillero")
+    logger.info(
+        "Datos de Fomento sembrados: eventos, líneas, evaluadores, trámites, comités y semillero"
+    )
 
 
 # === ORQUESTADOR ===
@@ -909,13 +1031,23 @@ def seed_data():
     (convocatorias, líneas, trámites, comités, semillero) y genera los
     documentos adjuntos de prueba. Todo es idempotente: correr esto en cada
     arranque del contenedor no duplica filas.
+
+    NO corre en tests (IS_TESTING): main.py llama a seed_data() en el
+    lifespan de la app, y el `client` fixture de la suite crea un TestClient
+    nuevo (= un lifespan nuevo) por cada test — este seed pesado corriendo
+    cientos de veces multiplicaba el tiempo de la suite y, peor, algunos
+    tests mutan datos que este seed asume estables (p. ej.
+    test_update_user_as_admin le cambia el email a admin1@repa.gob.ar),
+    dejando registros huérfanos que chocan por DNI/CUIL únicos en el
+    siguiente arranque. Los tests arman sus propios usuarios via fixtures
+    (create_user, admin_headers, etc.) — no necesitan este seed.
     """
     db = SessionLocal()
     try:
         sync_rbac(db)
         backfill_estudiante_role(db)
 
-        if IS_PRODUCTION:
+        if IS_PRODUCTION or IS_TESTING:
             return
 
         seed_test_users(db)

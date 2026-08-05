@@ -18,7 +18,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from src.audit import audit_log
-from src.search import filtro_texto
 from src.database import get_db
 from src.models.audit_model import AuditAction, AuditLog
 from src.models.user_models import Permission, Role, User
@@ -32,6 +31,7 @@ from src.schemas.user_schemas import (
     UserRolePatch,
     UserUpdate,
 )
+from src.search import filtro_texto
 from src.utils import (
     get_password_hash,
     require_permissions,
@@ -351,7 +351,9 @@ async def update_user(
         detalles["email_anterior"] = email_anterior
     audit_log(
         db=db,
-        action=AuditAction.PASSWORD_CHANGE if cambios == ["password"] else AuditAction.UPDATE,
+        action=AuditAction.PASSWORD_CHANGE
+        if cambios == ["password"]
+        else AuditAction.UPDATE,
         user_id=current_user["id"],
         resource_type="User",
         resource_id=user.id,

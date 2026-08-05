@@ -201,10 +201,16 @@ class TestAdmin:
         
         from src.models.user_models import User, Role
         
-        # Obtener usuario y rol
+        # Obtener usuario y rol. Excluye el rol "admin" a propósito: designar
+        # admin exige que el usuario ya tenga una Persona Física en el Padrón
+        # (ver admin_routes.py update_user_roles) — esa regla ya tiene su
+        # propia cobertura en TestDesignarAdminRequierePersonaFisica más
+        # abajo. Este test solo verifica el camino feliz genérico de
+        # actualizar roles, así que agarrar "admin" acá era un choque con
+        # esa regla, no con lo que el test dice probar.
         user = db_session.query(User).filter(User.email != "admin_test@example.com").first()
-        role = db_session.query(Role).first()
-        
+        role = db_session.query(Role).filter(Role.rol != "admin").first()
+
         if not user or not role:
             pytest.skip("No hay usuarios o roles para actualizar")
         

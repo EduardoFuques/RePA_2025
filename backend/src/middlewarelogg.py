@@ -20,6 +20,7 @@ def get_request_id() -> str | None:
     """request_id de la request en curso, o None fuera de una request."""
     return request_id_actual.get()
 
+
 # Rutas que llevan un JWT en el path: /users/confirm/{token} y
 # /users/recovery/{token}. Un token de recuperación logueado en claro
 # permite tomar la cuenta, así que se redacta antes de escribir el log.

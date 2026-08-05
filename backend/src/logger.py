@@ -6,14 +6,32 @@ from logging.handlers import TimedRotatingFileHandler
 
 from src.config import IS_TESTING, LOGS_PATH
 
-
 # Atributos que `logging` pone en todo LogRecord. Cualquier otro llegó por
 # `extra={...}` en la llamada, así que es contexto que queremos en el JSON.
 _ATRIBUTOS_ESTANDAR = {
-    "args", "asctime", "created", "exc_info", "exc_text", "filename",
-    "funcName", "levelname", "levelno", "lineno", "message", "module",
-    "msecs", "msg", "name", "pathname", "process", "processName",
-    "relativeCreated", "stack_info", "stacklevel", "thread", "threadName",
+    "args",
+    "asctime",
+    "created",
+    "exc_info",
+    "exc_text",
+    "filename",
+    "funcName",
+    "levelname",
+    "levelno",
+    "lineno",
+    "message",
+    "module",
+    "msecs",
+    "msg",
+    "name",
+    "pathname",
+    "process",
+    "processName",
+    "relativeCreated",
+    "stack_info",
+    "stacklevel",
+    "thread",
+    "threadName",
     "taskName",
 }
 

@@ -6,7 +6,7 @@ Permite rastrear quién hizo qué, cuándo y sobre qué recurso.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
@@ -31,6 +31,13 @@ class AuditLog(Base):
     """
 
     __tablename__ = "audit_logs"
+    __table_args__ = (
+        # Declarado acá para que coincida con lo que crea la migración
+        # f7a8b9c0d1e2 (op.create_index con postgresql_using="gin") — sin
+        # esto `alembic check` ve el índice en la DB pero no en el modelo y
+        # lo marca como drift a eliminar.
+        Index("ix_audit_logs_details_gin", "details", postgresql_using="gin"),
+    )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)

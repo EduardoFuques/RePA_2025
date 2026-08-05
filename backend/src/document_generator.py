@@ -228,7 +228,10 @@ def generate_fomento_documents(db):
         create_sample_pdf(
             filepath,
             f"Dictamen #{dictamen.id}",
-            {"Puntaje": dictamen.puntaje or "N/A", "Tipo": dictamen.tipo_dictamen or "N/A"},
+            {
+                "Puntaje": dictamen.puntaje or "N/A",
+                "Tipo": dictamen.tipo_dictamen or "N/A",
+            },
         )
         dictamen.archivo_pdf_path = filename
         print(f"  ✓ Documento de dictamen creado: #{dictamen.id}")
