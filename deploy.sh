@@ -19,16 +19,23 @@ if [ -f .env ]; then
   set +a
 fi
 
-# HTTPS es opt-in: si SSL_DOMAIN apunta a un certificado real presente en
-# este servidor, se agrega el override docker-compose.ssl.yml (puerto 443
-# + nginx-ssl.conf). Si no, sigue siendo HTTP-only como siempre — no hace
-# falta tocar nada en servidores sin certificado propio.
+# HTTPS es opt-in: si configuraste SSL_DOMAIN en .env, se agrega el
+# override docker-compose.ssl.yml (puerto 443 + nginx-ssl.conf). Si no,
+# sigue siendo HTTP-only como siempre.
+#
+# A propósito NO se valida acá que el certificado exista: certbot deja
+# /etc/letsencrypt/live/ en 700 root:root, así que este script (corriendo
+# como usuario normal) no puede ni leer el directorio para chequearlo —
+# el chequeo fallaba en silencio y el deploy quedaba HTTP-only sin avisar
+# nada. Docker sí puede montarlo (el daemon corre como root), así que se
+# deja que `docker compose up` sea el que falle fuerte y claro si
+# SSL_DOMAIN está mal configurado o el certificado no existe.
 COMPOSE_FILES=(-f docker-compose.yml)
-if [ -n "$SSL_DOMAIN" ] && [ -f "/etc/letsencrypt/live/$SSL_DOMAIN/fullchain.pem" ]; then
-  echo "✓ Certificado encontrado para $SSL_DOMAIN — habilitando HTTPS"
+if [ -n "$SSL_DOMAIN" ]; then
+  echo "✓ SSL_DOMAIN=$SSL_DOMAIN — habilitando HTTPS"
   COMPOSE_FILES+=(-f docker-compose.ssl.yml)
 else
-  echo "ℹ Sin SSL_DOMAIN o sin certificado — deploy HTTP-only"
+  echo "ℹ SSL_DOMAIN no configurado — deploy HTTP-only"
 fi
 echo ""
 
