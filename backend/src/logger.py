@@ -7,6 +7,17 @@ from logging.handlers import TimedRotatingFileHandler
 from src.config import IS_TESTING, LOGS_PATH
 
 
+# Atributos que `logging` pone en todo LogRecord. Cualquier otro llegó por
+# `extra={...}` en la llamada, así que es contexto que queremos en el JSON.
+_ATRIBUTOS_ESTANDAR = {
+    "args", "asctime", "created", "exc_info", "exc_text", "filename",
+    "funcName", "levelname", "levelno", "lineno", "message", "module",
+    "msecs", "msg", "name", "pathname", "process", "processName",
+    "relativeCreated", "stack_info", "stacklevel", "thread", "threadName",
+    "taskName",
+}
+
+
 class JSONFormatter(logging.Formatter):
     """Formatter que genera logs en formato JSON estructurado."""
 
@@ -25,11 +36,20 @@ class JSONFormatter(logging.Formatter):
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
 
-        # Agregar campos extra si existen
+        # Campos extra.
+        #
+        # Antes solo se leía `record.extra_data`, una clave que nadie seteaba
+        # nunca: todo el contexto que el middleware pasaba por `extra={...}`
+        # se descartaba y terminaba como repr de dict dentro de `message`.
+        # Ahora se recoge cualquier atributo que no sea de los que `logging`
+        # pone por su cuenta, que es exactamente lo que llegó por `extra`.
         if hasattr(record, "extra_data"):
             log_data["extra"] = record.extra_data
+        for clave, valor in record.__dict__.items():
+            if clave not in _ATRIBUTOS_ESTANDAR and clave != "extra_data":
+                log_data[clave] = valor
 
-        return json.dumps(log_data, ensure_ascii=False)
+        return json.dumps(log_data, ensure_ascii=False, default=str)
 
 
 # Configurar nivel desde variable de entorno

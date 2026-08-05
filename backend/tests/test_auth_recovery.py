@@ -170,6 +170,75 @@ class TestUpdateMe:
         assert resp.status_code == 401
 
 
+class TestChangeOwnPassword:
+    """PUT /users/me/password — cambio de contraseña logueado, con confirmación
+    de la contraseña actual (a diferencia de PUT /users/me, que no la pide)."""
+
+    def test_requiere_auth(self, client):
+        resp = client.put(
+            "/users/me/password",
+            json={"current_password": "x", "new_password": "Nueva1234!"},
+        )
+        assert resp.status_code == 401
+
+    def test_contrasena_actual_incorrecta_es_400(self, client, cuenta):
+        _user, headers, _password = cuenta
+        resp = client.put(
+            "/users/me/password",
+            headers=headers,
+            json={"current_password": "incorrecta", "new_password": "Nueva1234!"},
+        )
+        assert resp.status_code == 400
+
+    def test_nueva_contrasena_debil_es_400(self, client, cuenta):
+        _user, headers, password = cuenta
+        resp = client.put(
+            "/users/me/password",
+            headers=headers,
+            json={"current_password": password, "new_password": "debil"},
+        )
+        assert resp.status_code == 400
+
+    def test_cambio_exitoso_permite_login_con_la_nueva(self, client, cuenta):
+        user, headers, password = cuenta
+        nueva = "OtraClave5678!"
+
+        resp = client.put(
+            "/users/me/password",
+            headers=headers,
+            json={"current_password": password, "new_password": nueva},
+        )
+        assert resp.status_code == 200
+
+        # La vieja ya no sirve.
+        login_vieja = client.post(
+            "/users/token", data={"username": user.email, "password": password}
+        )
+        assert login_vieja.status_code == 400
+
+        # La nueva sí.
+        login_nueva = client.post(
+            "/users/token", data={"username": user.email, "password": nueva}
+        )
+        assert login_nueva.status_code == 200
+
+    def test_cambio_exitoso_queda_auditado(self, client, cuenta, admin_headers):
+        user, headers, password = cuenta
+        resp = client.put(
+            "/users/me/password",
+            headers=headers,
+            json={"current_password": password, "new_password": "CambioAuditado9!"},
+        )
+        assert resp.status_code == 200
+
+        logs = client.get(
+            f"/admin_user/audit-logs?action=PASSWORD_CHANGE&user_id={user.id}&days=1",
+            headers=admin_headers,
+        ).json()
+        assert logs["total"] >= 1
+        assert logs["items"][0]["details"]["origen"] == "autoservicio"
+
+
 class TestDeleteMe:
     def test_password_incorrecta_es_400(self, client, cuenta):
         _user, headers, _password = cuenta

@@ -81,6 +81,14 @@ class PasswordConfirm(BaseModel):
     password: str
 
 
+# Cambio de contraseña estando logueado: a diferencia de PUT /users/me (que
+# acepta una password nueva sin pedir la actual), este exige la actual como
+# confirmación — mismo criterio que ya usa DELETE /me con PasswordConfirm.
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
 # Esquema para actualizar roles de usuario
 class UserRolePatch(BaseModel):
     add: list[int] = []
