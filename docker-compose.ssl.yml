@@ -1,0 +1,20 @@
+# Override de HTTPS para un VPS con certificado real (Let's Encrypt).
+# NO se usa solo — se combina con el docker-compose.yml de base:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.ssl.yml up -d --build
+#
+# deploy.sh lo agrega automáticamente si detecta un certificado en
+# /etc/letsencrypt/live/$SSL_DOMAIN/ — no hace falta invocarlo a mano en
+# ese caso. Configurar SSL_DOMAIN en el .env del VPS (ver .env.example).
+#
+# El frontend base (docker-compose.yml) sigue sirviendo solo HTTP en el
+# puerto 80 sin este override — así que el dev local en Windows (sin
+# certificados) no se rompe: este archivo es opt-in, no reemplaza nada.
+services:
+  frontend:
+    ports:
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt/live/${SSL_DOMAIN}/fullchain.pem:/certs/fullchain.pem:ro
+      - /etc/letsencrypt/live/${SSL_DOMAIN}/privkey.pem:/certs/privkey.pem:ro
+      - ./frontend/nginx-ssl.conf:/etc/nginx/conf.d/default.conf:ro
