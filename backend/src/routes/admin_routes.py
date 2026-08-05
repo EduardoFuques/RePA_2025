@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from src.audit import audit_log
 from src.database import get_db
@@ -31,6 +31,7 @@ from src.schemas.user_schemas import (
     UserRolePatch,
     UserUpdate,
 )
+from src.search import filtro_texto
 from src.utils import (
     get_password_hash,
     require_permissions,
@@ -224,19 +225,64 @@ async def delete_role(
 
 @admin_router.get(
     "/users",
-    response_model=list[UserOut],
-    summary="Listar todos los usuarios",
+    summary="Listar usuarios (paginado y filtrable)",
     responses={
-        200: {"description": "Lista de usuarios"},
+        200: {"description": "{items, total, offset, limit}"},
         403: {"description": "No autorizado (requiere rol admin)"},
     },
 )
 async def get_users(
     db: Session = Depends(get_db),
     _: dict = Depends(require_permissions("users:read")),
+    search: str | None = Query(None, description="Búsqueda por email (ignora acentos)"),
+    role: str | None = Query(None, description="Filtrar por nombre de rol"),
+    is_active: bool | None = Query(None, description="Filtrar por estado de la cuenta"),
+    limit: int = Query(25, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ):
-    """Obtener todos los usuarios registrados en el sistema."""
-    return db.query(User).all()
+    """
+    Listar usuarios con paginación y filtros.
+
+    Antes devolvía `db.query(User).all()` sin límite y el frontend filtraba en
+    memoria: con el padrón creciendo eso deja de servir, y la búsqueda no veía
+    los usuarios que no estaban en la página.
+
+    Devuelve `{items, total, offset, limit}` para poder paginar del lado del
+    cliente sabiendo cuántas páginas hay.
+    """
+    query = db.query(User)
+
+    if search and search.strip():
+        query = query.filter(filtro_texto(db, [User.email], search.strip()))
+    if is_active is not None:
+        query = query.filter(User.is_active.is_(is_active))
+    if role:
+        query = query.filter(User.roles.any(Role.rol == role))
+
+    total = query.count()
+    usuarios = (
+        query.options(selectinload(User.persona_fisica))
+        .order_by(User.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    # `tiene_persona_fisica`: para designar admin hace falta ya tener un
+    # registro de Persona Física (ver update_user_roles) — se muestra acá
+    # para que Administradores.jsx pueda avisarlo antes de intentarlo.
+    items = []
+    for u in usuarios:
+        item = UserOut.model_validate(u).model_dump()
+        item["tiene_persona_fisica"] = u.persona_fisica is not None
+        items.append(item)
+
+    return {
+        "items": items,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
 
 
 def _get_user_or_404(db: Session, user_id: str) -> User:
@@ -268,22 +314,53 @@ async def get_user(
 async def update_user(
     user_id: str,
     user_in: UserUpdate,
+    request: Request,
     db: Session = Depends(get_db),
-    _: dict = Depends(require_permissions("users:write")),
+    current_user: dict = Depends(require_permissions("users:write")),
 ):
-    """Modificar email y/o contraseña de un usuario."""
+    """Modificar email y/o contraseña de un usuario.
+
+    Deja auditoría: un admin cambiando el email o la contraseña de otra cuenta
+    es exactamente el tipo de acción que hay que poder reconstruir después, y
+    hasta acá era el único endpoint sensible que no registraba nada.
+    """
     user = _get_user_or_404(db, user_id)
+
+    cambios = []
+    email_anterior = user.email
 
     if user_in.email and user_in.email != user.email:
         # Validar unicidad de email para evitar IntegrityError 500
         verify_email_unique(db, user_in, {"id": user.id, "email": user.email})
         user.email = user_in.email
+        cambios.append("email")
     if user_in.password:
         validar_password(user_in.password)
         user.hashed_password = get_password_hash(user_in.password)
+        cambios.append("password")
+
+    if not cambios:
+        return user
 
     db.commit()
     db.refresh(user)
+
+    # Nunca la contraseña, ni vieja ni nueva: solo que se cambió.
+    detalles = {"campos": cambios, "email": user.email}
+    if "email" in cambios:
+        detalles["email_anterior"] = email_anterior
+    audit_log(
+        db=db,
+        action=AuditAction.PASSWORD_CHANGE
+        if cambios == ["password"]
+        else AuditAction.UPDATE,
+        user_id=current_user["id"],
+        resource_type="User",
+        resource_id=user.id,
+        details=detalles,
+        request=request,
+    )
+    db.commit()
     return user
 
 
@@ -305,7 +382,8 @@ async def update_user_roles(
     """
     user = _get_user_or_404(db, user_id)
 
-    current_role_ids = {r.id for r in user.roles}
+    original_role_ids = {r.id for r in user.roles}
+    current_role_ids = set(original_role_ids)
 
     # Validar que los roles a agregar existan
     add_ids = set(patch.add)
@@ -335,6 +413,23 @@ async def update_user_roles(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo un administrador puede otorgar o quitar el rol admin",
             )
+
+    # Para ser designado administrador hay que ya estar en la plataforma:
+    # tener un registro de Persona Física en el Padrón. No aplica si el
+    # usuario ya era admin (ej. patch que solo toca otros roles). Va
+    # DESPUÉS del chequeo de permisos de arriba: quién puede intentarlo
+    # importa antes que si el objetivo califica.
+    if (
+        admin_role
+        and admin_role.id in add_ids
+        and admin_role.id not in original_role_ids
+        and user.persona_fisica is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El usuario no tiene un registro de Persona Física en el Padrón. "
+            "Para ser administrador primero tiene que completar su registro RePA.",
+        )
 
     # Auto-protección: el admin no puede quitarse su propio rol admin
     if (
@@ -467,8 +562,36 @@ async def get_audit_logs(
     action: str | None = Query(
         None, description="Filtrar por acción (USER_LOGIN, USER_REGISTER, etc.)"
     ),
+    actions: list[str] | None = Query(
+        None,
+        description=(
+            "Filtrar por varias acciones a la vez. Sirve para feeds que solo "
+            "quieren acciones con significado (creaciones, cambios de rol…) y "
+            "no el ruido de los logins."
+        ),
+    ),
     user_id: str | None = Query(None, description="Filtrar por ID de usuario"),
-    days: int = Query(7, description="Días hacia atrás a consultar (default: 7)"),
+    email: str | None = Query(
+        None,
+        description=(
+            "Filtrar por email del usuario. Evita tener que pegar un UUID a mano, "
+            "que era la única forma de filtrar por persona."
+        ),
+    ),
+    resource_type: str | None = Query(
+        None, description="Filtrar por tipo de recurso (User, Role, PersonaFisica…)"
+    ),
+    resource_id: str | None = Query(None, description="Filtrar por ID de recurso"),
+    request_id: str | None = Query(
+        None,
+        description=(
+            "Todas las acciones de una misma request HTTP. Es el mismo valor que "
+            "aparece en la línea de log canónico de esa request."
+        ),
+    ),
+    desde: datetime | None = Query(None, description="Fecha/hora mínima (ISO)"),
+    hasta: datetime | None = Query(None, description="Fecha/hora máxima (ISO)"),
+    days: int = Query(7, description="Días hacia atrás (se ignora si se pasa `desde`)"),
     limit: int = Query(
         100, description="Límite de registros por página (default: 100, max: 500)"
     ),
@@ -492,21 +615,47 @@ async def get_audit_logs(
     # Limitar el máximo de registros por página
     limit = min(limit, 500)
 
-    # Calcular fecha de inicio
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    # `desde` explícito gana sobre la ventana de días.
+    start_date = desde or (datetime.now(timezone.utc) - timedelta(days=days))
 
     # Construir query
     query = db.query(AuditLog).filter(AuditLog.created_at >= start_date)
+    if hasta:
+        query = query.filter(AuditLog.created_at <= hasta)
 
     if action:
         query = query.filter(AuditLog.action == action)
+    if actions:
+        query = query.filter(AuditLog.action.in_(actions))
     if user_id:
         query = query.filter(AuditLog.user_id == user_id)
+    if email and email.strip():
+        query = query.filter(
+            AuditLog.user_id.in_(
+                db.query(User.id).filter(filtro_texto(db, [User.email], email.strip()))
+            )
+        )
+    if resource_type:
+        query = query.filter(AuditLog.resource_type == resource_type)
+    if resource_id:
+        query = query.filter(AuditLog.resource_id == resource_id)
+    if request_id:
+        query = query.filter(AuditLog.request_id == request_id)
 
     total = query.count()
 
     # Ordenar por fecha descendente y paginar
     logs = query.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit).all()
+
+    # El UUID del usuario no le dice nada a quien lee la auditoría: se resuelve
+    # el email en un solo query por página (no uno por fila).
+    ids = {log.user_id for log in logs if log.user_id}
+    emails: dict[str, str] = {}
+    if ids:
+        emails = {
+            u.id: u.email
+            for u in db.query(User.id, User.email).filter(User.id.in_(ids)).all()
+        }
 
     return {
         "items": [
@@ -514,9 +663,11 @@ async def get_audit_logs(
                 "id": log.id,
                 "action": log.action,
                 "user_id": log.user_id,
+                "user_email": emails.get(log.user_id),
                 "resource_type": log.resource_type,
                 "resource_id": log.resource_id,
                 "details": log.details,
+                "request_id": log.request_id,
                 "ip_address": log.ip_address,
                 "user_agent": log.user_agent,
                 "created_at": log.created_at.isoformat() if log.created_at else None,

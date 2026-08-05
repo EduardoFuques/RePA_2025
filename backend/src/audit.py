@@ -60,19 +60,28 @@ def audit_log(
 
         user_agent = request.headers.get("User-Agent", "")[:500]
 
-    # Serializar details a JSON (default=str cubre date/datetime/Decimal)
-    details_json = (
-        json.dumps(details, ensure_ascii=False, default=str) if details else None
+    # `details` es JSONB: se guarda el dict tal cual. El round-trip por
+    # json.dumps/loads normaliza los tipos que JSONB no acepta (date, datetime,
+    # Decimal) usando default=str, igual que antes.
+    details_norm = (
+        json.loads(json.dumps(details, ensure_ascii=False, default=str))
+        if details
+        else None
     )
+
+    # request_id del contexto: correlaciona esta fila con la línea de log
+    # canónico de la request que la generó.
+    from src.middlewarelogg import get_request_id
 
     audit_entry = AuditLog(
         user_id=user_id,
         action=action,
         resource_type=resource_type,
         resource_id=resource_id,
-        details=details_json,
+        details=details_norm,
         ip_address=ip_address,
         user_agent=user_agent,
+        request_id=get_request_id(),
     )
 
     # IMPORTANTE: no commitea — el caller es dueño de la transacción y debe

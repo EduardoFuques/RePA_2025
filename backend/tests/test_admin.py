@@ -55,13 +55,68 @@ class TestAdmin:
         return {}
 
     def test_get_users_as_admin(self, client: TestClient, admin_headers: dict):
-        """Test obtener lista de usuarios como admin."""
+        """Test obtener lista de usuarios como admin.
+
+        El endpoint devuelve `{items, total, offset, limit}` (antes: una lista
+        sin paginar con TODOS los usuarios).
+        """
         if not admin_headers:
             pytest.skip("No se pudo obtener token de admin")
-        
+
         response = client.get("/admin_user/users", headers=admin_headers)
         assert response.status_code == 200
-        assert isinstance(response.json(), list)
+        data = response.json()
+        assert isinstance(data["items"], list)
+        assert data["total"] >= len(data["items"])
+        assert data["offset"] == 0
+
+    def test_get_users_paginacion(self, client: TestClient, admin_headers: dict):
+        """La paginación recorta `items` sin alterar `total`."""
+        if not admin_headers:
+            pytest.skip("No se pudo obtener token de admin")
+
+        completo = client.get("/admin_user/users", headers=admin_headers).json()
+        if completo["total"] < 2:
+            pytest.skip("Hacen falta al menos 2 usuarios para probar paginación")
+
+        pagina = client.get(
+            "/admin_user/users?limit=1&offset=0", headers=admin_headers
+        ).json()
+        assert len(pagina["items"]) == 1
+        assert pagina["total"] == completo["total"]
+
+        segunda = client.get(
+            "/admin_user/users?limit=1&offset=1", headers=admin_headers
+        ).json()
+        assert segunda["items"][0]["id"] != pagina["items"][0]["id"]
+
+    def test_get_users_filtros(self, client: TestClient, admin_headers: dict):
+        """Búsqueda por email, filtro por rol y por estado."""
+        if not admin_headers:
+            pytest.skip("No se pudo obtener token de admin")
+
+        todos = client.get("/admin_user/users?limit=200", headers=admin_headers).json()
+        objetivo = todos["items"][0]
+
+        # Búsqueda por email: el usuario buscado tiene que aparecer.
+        encontrado = client.get(
+            f"/admin_user/users?search={objetivo['email']}", headers=admin_headers
+        ).json()
+        assert objetivo["id"] in [u["id"] for u in encontrado["items"]]
+
+        # Filtro por estado: nada activo aparece bajo is_active=false.
+        inactivos = client.get(
+            "/admin_user/users?is_active=false&limit=200", headers=admin_headers
+        ).json()
+        assert all(u["is_active"] is False for u in inactivos["items"])
+
+        # Filtro por rol: todos los devueltos tienen ese rol.
+        admins = client.get(
+            "/admin_user/users?role=admin&limit=200", headers=admin_headers
+        ).json()
+        assert all(
+            any(r["rol"] == "admin" for r in u["roles"]) for u in admins["items"]
+        )
 
     def test_get_users_sin_auth(self, client: TestClient):
         """Test que obtener usuarios requiere autenticación."""
@@ -146,10 +201,16 @@ class TestAdmin:
         
         from src.models.user_models import User, Role
         
-        # Obtener usuario y rol
+        # Obtener usuario y rol. Excluye el rol "admin" a propósito: designar
+        # admin exige que el usuario ya tenga una Persona Física en el Padrón
+        # (ver admin_routes.py update_user_roles) — esa regla ya tiene su
+        # propia cobertura en TestDesignarAdminRequierePersonaFisica más
+        # abajo. Este test solo verifica el camino feliz genérico de
+        # actualizar roles, así que agarrar "admin" acá era un choque con
+        # esa regla, no con lo que el test dice probar.
         user = db_session.query(User).filter(User.email != "admin_test@example.com").first()
-        role = db_session.query(Role).first()
-        
+        role = db_session.query(Role).filter(Role.rol != "admin").first()
+
         if not user or not role:
             pytest.skip("No hay usuarios o roles para actualizar")
         
@@ -158,5 +219,88 @@ class TestAdmin:
             json={"add": [role.id], "remove": []},
             headers=admin_headers
         )
-        
+
         assert response.status_code == 200
+
+
+class TestDesignarAdminRequierePersonaFisica:
+    """Para ser designado administrador, el usuario ya tiene que estar en la
+    plataforma: tener un registro de Persona Física en el Padrón."""
+
+    def _admin_role_id(self, db_session):
+        from src.models.user_models import Role
+
+        db_session.rollback()
+        return db_session.query(Role).filter(Role.rol == "admin").first().id
+
+    def test_sin_persona_fisica_es_400(self, client, create_user, admin_headers, db_session):
+        candidato, _ = create_user(
+            f"sinpf_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["user"]
+        )
+        admin_role_id = self._admin_role_id(db_session)
+
+        resp = client.put(
+            f"/admin_user/users/{candidato.id}/roles",
+            headers=admin_headers,
+            json={"add": [admin_role_id], "remove": []},
+        )
+        assert resp.status_code == 400
+        assert "Persona Física" in resp.json()["detail"]
+
+    def test_con_persona_fisica_permite_otorgar(self, client, create_user, admin_headers, db_session):
+        from src.models.persona_fisica_model import PersonaFisica
+
+        candidato, _ = create_user(
+            f"conpf_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["user"]
+        )
+        db_session.add(PersonaFisica(user_id=candidato.id))
+        db_session.commit()
+        admin_role_id = self._admin_role_id(db_session)
+
+        resp = client.put(
+            f"/admin_user/users/{candidato.id}/roles",
+            headers=admin_headers,
+            json={"add": [admin_role_id], "remove": []},
+        )
+        assert resp.status_code == 200
+        assert any(r["rol"] == "admin" for r in resp.json()["roles"])
+
+    def test_listado_indica_quien_tiene_pf(self, client, create_user, admin_headers, db_session):
+        from src.models.persona_fisica_model import PersonaFisica
+
+        con_pf, _ = create_user(
+            f"listapf_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["user"]
+        )
+        db_session.add(PersonaFisica(user_id=con_pf.id))
+        db_session.commit()
+        sin_pf, _ = create_user(
+            f"listasinpf_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["user"]
+        )
+
+        data = client.get(
+            f"/admin_user/users?search={con_pf.email}", headers=admin_headers
+        ).json()
+        assert data["items"][0]["tiene_persona_fisica"] is True
+
+        data = client.get(
+            f"/admin_user/users?search={sin_pf.email}", headers=admin_headers
+        ).json()
+        assert data["items"][0]["tiene_persona_fisica"] is False
+
+    def test_no_aplica_si_ya_era_admin(self, client, create_user, admin_headers, db_session):
+        """Un patch que no agrega el rol admin de nuevo (ya lo tenía) no debe
+        exigir Persona Física — ej. tocar solo otro rol en el mismo pedido."""
+        from src.models.user_models import Role
+
+        ya_admin, _ = create_user(
+            f"yaadmin_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["admin"]
+        )
+        admin_role_id = self._admin_role_id(db_session)
+        otro_rol = db_session.query(Role).filter(Role.rol != "admin").first()
+
+        resp = client.put(
+            f"/admin_user/users/{ya_admin.id}/roles",
+            headers=admin_headers,
+            json={"add": [admin_role_id, otro_rol.id], "remove": []},
+        )
+        assert resp.status_code == 200

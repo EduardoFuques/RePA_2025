@@ -18,6 +18,7 @@ from src.models.audit_model import AuditAction
 from src.models.user_models import Role, TokenRecovery, User
 from src.rate_limiter import limiter
 from src.schemas.user_schemas import (
+    PasswordChange,
     PasswordConfirm,
     RefreshTokenRequest,
     ResendVerificationRequest,
@@ -139,7 +140,7 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
         db.add(recovery_record)
         audit_log(
             db=db,
-            action="USER_REGISTER",
+            action=AuditAction.USER_REGISTER,
             user_id=new_user_id,
             resource_type="User",
             resource_id=new_user_id,
@@ -318,6 +319,18 @@ def login(
 
     # Verificar la contraseña
     if not pwd_context.verify(form_data.password, user.hashed_password):
+        # Los intentos fallidos son justamente lo que se quiere poder revisar
+        # después: se registran contra el usuario cuya cuenta se intentó usar.
+        audit_log(
+            db=db,
+            action=AuditAction.LOGIN_FAILED,
+            user_id=user.id,
+            resource_type="User",
+            resource_id=user.id,
+            details={"email": user.email, "motivo": "password_incorrecta"},
+            request=request,
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Correo electrónico o contraseña incorrectos",
@@ -352,7 +365,7 @@ def login(
     # Registrar login en audit trail
     audit_log(
         db=db,
-        action="USER_LOGIN",
+        action=AuditAction.LOGIN,
         user_id=user.id,
         resource_type="User",
         resource_id=user.id,
@@ -703,6 +716,52 @@ async def update_user(
 
     # Devolver el usuario actualizado
     return user
+
+
+@user_router.put(
+    "/me/password",
+    description="Cambiar la contraseña propia estando logueado (requiere la contraseña actual)",
+)
+async def change_own_password(
+    data: PasswordChange,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Cambiar la propia contraseña sin pasar por el flujo de recuperación por
+    email. A diferencia de PUT /users/me, exige la contraseña actual —mismo
+    criterio que ya usa DELETE /me— para que una sesión comprometida no alcance
+    por sí sola para desplazar a la dueña real de la cuenta.
+    """
+    user = db.query(User).filter(User.id == current_user["id"]).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Usuario no encontrado"
+        )
+
+    if not pwd_context.verify(data.current_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña actual es incorrecta",
+        )
+
+    validar_password(data.new_password)
+    user.hashed_password = get_password_hash(data.new_password)
+    db.commit()
+
+    audit_log(
+        db=db,
+        action=AuditAction.PASSWORD_CHANGE,
+        user_id=user.id,
+        resource_type="User",
+        resource_id=user.id,
+        details={"origen": "autoservicio"},
+        request=request,
+    )
+    db.commit()
+
+    return {"detail": "Contraseña actualizada correctamente"}
 
 
 # Eliminar usuario
