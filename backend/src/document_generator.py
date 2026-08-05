@@ -161,3 +161,77 @@ def generate_test_documents(db):
     # Commit de los cambios
     db.commit()
     print("✅ Documentos generados y base de datos actualizada!")
+
+
+def generate_fomento_documents(db):
+    """Generar documentos de prueba para evaluadores, trámites y dictámenes de Fomento"""
+    from src.models.fomento_model import DictamenFomento, Evaluador, TramiteFomento
+
+    print("\n📁 Generando documentos de prueba (Fomento)...")
+    os.makedirs(UPLOAD_BASE_DIR, exist_ok=True)
+
+    # CV de evaluadores
+    evaluadores = db.query(Evaluador).filter(Evaluador.cv_path.is_(None)).all()
+    for evaluador in evaluadores:
+        filename = f"CV_{evaluador.nombre_completo}_{uuid.uuid4().hex[:8]}.pdf"
+        filepath = os.path.join(get_user_upload_dir(evaluador.user_id), filename)
+        create_sample_pdf(
+            filepath,
+            f"CV - {evaluador.nombre_completo}",
+            {"Rol": evaluador.rol or "N/A", "Email": evaluador.email or "N/A"},
+        )
+        evaluador.cv_path = filename
+        print(f"  ✓ CV creado para evaluador: {evaluador.nombre_completo}")
+
+    # Dossier y presupuesto de trámites de fomento
+    tramites = (
+        db.query(TramiteFomento)
+        .filter(TramiteFomento.carpeta_dossier_path.is_(None))
+        .all()
+    )
+    for tramite in tramites:
+        upload_dir = get_user_upload_dir(tramite.user_id)
+        extra_info = {
+            "Proyecto": tramite.titulo_proyecto or "N/A",
+            "Tipo de trámite": tramite.tipo_tramite or "N/A",
+            "Estado": tramite.estado_tramite or "N/A",
+        }
+
+        filename = f"dossier_{tramite.id}_{uuid.uuid4().hex[:8]}.pdf"
+        filepath = os.path.join(upload_dir, filename)
+        create_sample_pdf(filepath, f"Dossier - {tramite.titulo_proyecto}", extra_info)
+        tramite.carpeta_dossier_path = filename
+
+        filename = f"presupuesto_{tramite.id}_{uuid.uuid4().hex[:8]}.pdf"
+        filepath = os.path.join(upload_dir, filename)
+        create_sample_pdf(
+            filepath, f"Presupuesto detallado - {tramite.titulo_proyecto}", extra_info
+        )
+        tramite.presupuesto_detallado_path = filename
+
+        print(f"  ✓ Documentos creados para trámite: {tramite.titulo_proyecto}")
+
+    # Dictámenes
+    dictamenes = (
+        db.query(DictamenFomento)
+        .filter(DictamenFomento.archivo_pdf_path.is_(None))
+        .all()
+    )
+    for dictamen in dictamenes:
+        evaluador = (
+            db.query(Evaluador).filter(Evaluador.id == dictamen.evaluador_id).first()
+        )
+        if not evaluador:
+            continue
+        filename = f"dictamen_{dictamen.id}_{uuid.uuid4().hex[:8]}.pdf"
+        filepath = os.path.join(get_user_upload_dir(evaluador.user_id), filename)
+        create_sample_pdf(
+            filepath,
+            f"Dictamen #{dictamen.id}",
+            {"Puntaje": dictamen.puntaje or "N/A", "Tipo": dictamen.tipo_dictamen or "N/A"},
+        )
+        dictamen.archivo_pdf_path = filename
+        print(f"  ✓ Documento de dictamen creado: #{dictamen.id}")
+
+    db.commit()
+    print("✅ Documentos de Fomento generados y base de datos actualizada!")

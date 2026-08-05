@@ -1,79 +1,168 @@
 """
-Seed de datos de prueba para desarrollo.
+Seed de datos de prueba para desarrollo/QA + sincronización de RBAC.
 
-IMPORTANTE: Este módulo NO debe ejecutarse en producción.
-Se deshabilita automáticamente si ENVIRONMENT=production.
+IMPORTANTE: Los datos de prueba (usuarios, Padrón, Fomento) NO se cargan
+en producción — se deshabilitan automáticamente si ENVIRONMENT=production.
+El sync de RBAC y el backfill de rol 'estudiante' sí corren siempre.
 """
 
 from datetime import date, datetime, timedelta, timezone
 
 from passlib.context import CryptContext
-from sqlalchemy.exc import IntegrityError
 
 from src.config import IS_PRODUCTION
 from src.database import SessionLocal
-from src.document_generator import generate_test_documents
+from src.document_generator import generate_fomento_documents, generate_test_documents
 from src.logger import logger
 from src.models.asociacion_model import Asociacion
 from src.models.esa_model import EstudianteESA
+from src.models.fomento_model import (
+    AcompanamientoSemillero,
+    CohorteSemillero,
+    ComiteFomento,
+    DictamenFomento,
+    Evaluador,
+    EventoFomento,
+    IntegranteComite,
+    LineaFomento,
+    ParticipanteSemillero,
+    TramiteFomento,
+)
 from src.models.persona_fisica_model import PersonaFisica
 from src.models.persona_juridica_model import PersonaJuridica
 from src.models.user_models import Permission, Role, User, UserRole
 from src.rbac import PERMISSIONS, SYSTEM_ROLES
+from src.services.repa_code_service import generar_codigo_repa
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Usuarios de prueba para desarrollo
-TEST_USERS = [
-    {"email": "admin@repa.gob.ar", "password": "Admin1234", "role": "admin"},
-    {"email": "usuario1@repa.gob.ar", "password": "Test1234", "role": "user"},
-    {"email": "usuario2@repa.gob.ar", "password": "Test1234", "role": "user"},
-    {"email": "usuario3@repa.gob.ar", "password": "Test1234", "role": "user"},
+# === USUARIOS DE PRUEBA: 2 por cada rol del sistema ===
+# admin1/admin2 usan Admin1234; el resto Test1234. estudiante* se crea aparte
+# (vía EstudianteESA + backfill_estudiante_role, no se les asigna el rol acá).
+TEST_ROLE_USERS = {
+    "admin": [
+        ("admin1@repa.gob.ar", "Admin1234"),
+        ("admin2@repa.gob.ar", "Admin1234"),
+    ],
+    "gestor_fomento": [
+        ("gestor1@repa.gob.ar", "Test1234"),
+        ("gestor2@repa.gob.ar", "Test1234"),
+    ],
+    "evaluador": [
+        ("evaluador1@repa.gob.ar", "Test1234"),
+        ("evaluador2@repa.gob.ar", "Test1234"),
+    ],
+    "revisor_padron": [
+        ("revisor1@repa.gob.ar", "Test1234"),
+        ("revisor2@repa.gob.ar", "Test1234"),
+    ],
+    "lectura": [
+        ("lectura1@repa.gob.ar", "Test1234"),
+        ("lectura2@repa.gob.ar", "Test1234"),
+    ],
+    "user": [
+        ("usuario1@repa.gob.ar", "Test1234"),
+        ("usuario2@repa.gob.ar", "Test1234"),
+    ],
+}
+
+TEST_ESA_USERS = [
+    ("estudiante1@esa.repa.gob.ar", "Test1234"),
+    ("estudiante2@esa.repa.gob.ar", "Test1234"),
 ]
 
-# Datos de prueba para Persona Física
-TEST_PERSONA_FISICA = {
-    "admin@repa.gob.ar": {
-        "nombre": "María",
-        "apellido": "González",
-        "dni": "30123456",
-        "cuil": "27-30123456-8",
-        "fecha_nacimiento": date(1985, 3, 15),
-        "email": "admin@repa.gob.ar",
-        "telefono": "+54 376 4123456",
-        "domicilio": "Av. Roque Sáenz Peña 1234",
-        "municipio": "Posadas",
-        "distrito": "sur",
+# === DATOS DE PADRÓN ===
+
+def _pf(nombre, apellido, dni, cuil, email, municipio, distrito, subperfiles, estado, **overrides):
+    """Defaults válidos de Persona Física para usuarios de prueba que no
+    necesitan un perfil elaborado (staff: admin/gestor/evaluador/revisor/
+    lectura). Todos quedan en estado 'vigente'/'aprobado' para que
+    seed_padron_data() les emita código RePA — sin esto, cualquier rol que
+    no sea admin/estudiante y no tenga NINGÚN registro cae en el
+    OnboardingChooser al loguearse (ver AppLayout.jsx: el gate solo se
+    saltea con isAdmin()/isStudent() o si getFormsMetadata() devuelve algún
+    'has_*' en true)."""
+    data = {
+        "nombre": nombre,
+        "apellido": apellido,
+        "dni": dni,
+        "cuil": cuil,
+        "fecha_nacimiento": date(1988, 1, 1),
+        "email": email,
+        "telefono": "+54 376 4000000",
+        "domicilio": "Av. Centenario 100",
+        "municipio": municipio,
+        "distrito": distrito,
         "nivel_educativo": "universitario_completo",
-        "trabajo_final": True,
-        "titulo_tesis": "Cine documental en la región NEA",
+        "trabajo_final": False,
         "pueblo_originario": "no",
         "afrodescendiente": "no",
         "lgbtiq": "no",
         "discapacidad": "no",
-        "personas_a_cargo": True,
-        "tipo_personas_a_cargo": ["hijos"],
+        "personas_a_cargo": False,
         "principal_fuente_audiovisual": True,
         "relacion_laboral": "freelance",
         "inscripto_afip": "si",
         "situacion_iva": "monotributo",
-        "pertenece_red": True,
-        "nombre_red": "Red de Documentalistas del NEA",
+        "pertenece_red": False,
         "proyectos_iaavim": True,
         "conoce_lineas_fomento": "si",
         "interes_formacion": True,
-        "areas_capacitacion": "Dirección, Producción, Guión",
+        "areas_capacitacion": "Producción, gestión cultural",
         "interes_difusion": True,
         "interes_experto_iaavim": True,
-        "subperfiles_seleccionados": ["productor", "director", "documentalista"],
+        "subperfiles_seleccionados": subperfiles,
         "acepta_terminos": True,
-        "portfolio_link": "https://portfolio.mariagonzalez.com.ar",
-        "redes_sociales": [
-            "https://instagram.com/mariagonzalez",
-            "https://linkedin.com/in/mariagonzalez",
-        ],
+        "portfolio_link": None,
+        "redes_sociales": [],
         "declaracion_inicial": True,
-    },
+        "estado": estado,
+    }
+    data.update(overrides)
+    return data
+
+
+TEST_PERSONA_FISICA = {
+    "admin1@repa.gob.ar": _pf(
+        "Sofía", "Benítez", "59000001", "27-59000001-4", "admin1@repa.gob.ar",
+        "Posadas", "sur", ["productor"], "vigente",
+    ),
+    "admin2@repa.gob.ar": _pf(
+        "Martín", "Duarte", "59000002", "20-59000002-1", "admin2@repa.gob.ar",
+        "Posadas", "sur", ["director"], "aprobado",
+    ),
+    "gestor1@repa.gob.ar": _pf(
+        "Valentina", "Ríos", "59000003", "27-59000003-8", "gestor1@repa.gob.ar",
+        "Oberá", "norte", ["productor", "director"], "vigente",
+    ),
+    "gestor2@repa.gob.ar": _pf(
+        "Emiliano", "Cabrera", "59000004", "20-59000004-5", "gestor2@repa.gob.ar",
+        "Eldorado", "norte", ["guionista"], "aprobado",
+    ),
+    "evaluador1@repa.gob.ar": _pf(
+        "Rocío", "Aguirre", "59000005", "27-59000005-2", "evaluador1@repa.gob.ar",
+        "Posadas", "sur", ["investigador"], "vigente",
+    ),
+    "evaluador2@repa.gob.ar": _pf(
+        "Federico", "Villalba", "59000006", "20-59000006-9", "evaluador2@repa.gob.ar",
+        "Apóstoles", "sur", ["documentalista"], "aprobado",
+    ),
+    "revisor1@repa.gob.ar": _pf(
+        "Camila", "Sosa", "59000007", "27-59000007-6", "revisor1@repa.gob.ar",
+        "Puerto Iguazú", "norte", ["realizadorIntegral"], "vigente",
+    ),
+    "revisor2@repa.gob.ar": _pf(
+        "Lucas", "Ortigoza", "59000008", "20-59000008-3", "revisor2@repa.gob.ar",
+        "Leandro N. Alem", "norte", ["tecnicoArtistico"], "aprobado",
+    ),
+    "lectura1@repa.gob.ar": _pf(
+        "Antonella", "Kurtz", "59000009", "27-59000009-0", "lectura1@repa.gob.ar",
+        "Posadas", "sur", ["capacitador"], "vigente",
+    ),
+    "lectura2@repa.gob.ar": _pf(
+        "Bruno", "Insaurralde", "59000010", "20-59000010-7", "lectura2@repa.gob.ar",
+        "Montecarlo", "norte", ["investigador"], "aprobado",
+    ),
     "usuario1@repa.gob.ar": {
         "nombre": "Juan Carlos",
         "apellido": "Rodríguez",
@@ -110,6 +199,7 @@ TEST_PERSONA_FISICA = {
         "portfolio_link": "https://juancarlos.portfolio.com",
         "redes_sociales": ["https://instagram.com/juancarlosrodriguez"],
         "declaracion_inicial": True,
+        "estado": "vigente",
     },
     "usuario2@repa.gob.ar": {
         "nombre": "Luciana",
@@ -149,79 +239,11 @@ TEST_PERSONA_FISICA = {
             "https://behance.net/lucianaf",
         ],
         "declaracion_inicial": True,
-    },
-    "usuario3@repa.gob.ar": {
-        "nombre": "Pedro",
-        "apellido": "Martínez",
-        "dni": "28901234",
-        "cuil": "20-28901234-7",
-        "fecha_nacimiento": date(1980, 5, 30),
-        "email": "usuario3@repa.gob.ar",
-        "telefono": "+54 376 4345678",
-        "domicilio": "Calle San Martín 123",
-        "municipio": "Apóstoles",
-        "distrito": "sur",
-        "nivel_educativo": "posgrado",
-        "trabajo_final": True,
-        "titulo_tesis": "Historia del cine misionero 1960-2000",
-        "pueblo_originario": "no",
-        "afrodescendiente": "no",
-        "lgbtiq": "no",
-        "discapacidad": "si",
-        "tipo_discapacidad": "Motriz",
-        "personas_a_cargo": True,
-        "tipo_personas_a_cargo": ["adultos_mayores"],
-        "principal_fuente_audiovisual": True,
-        "relacion_laboral": "freelance",
-        "inscripto_afip": "si",
-        "situacion_iva": "responsable_inscripto",
-        "pertenece_red": True,
-        "nombre_red": "Asociación de Investigadores Audiovisuales",
-        "proyectos_iaavim": True,
-        "conoce_lineas_fomento": "si",
-        "interes_formacion": False,
-        "interes_difusion": True,
-        "interes_experto_iaavim": True,
-        "subperfiles_seleccionados": ["investigador", "documentalista", "capacitador"],
-        "acepta_terminos": True,
-        "portfolio_link": "https://academia.edu/pedromartinez",
-        "redes_sociales": ["https://researchgate.net/pedromartinez"],
-        "declaracion_inicial": True,
+        "estado": "aprobado",
     },
 }
 
-# Datos de prueba para Persona Jurídica (solo admin y usuario1)
 TEST_PERSONA_JURIDICA = {
-    "admin@repa.gob.ar": {
-        "nombre_pj": "Productora Audiovisual del Litoral S.R.L.",
-        "cuit": "30-71234567-8",
-        "figura_legal": "empresa",
-        "fecha_constitucion": date(2015, 6, 20),
-        "objeto_social": "Producción, distribución y comercialización de contenidos audiovisuales. Prestación de servicios de producción cinematográfica y televisiva.",
-        "domicilio_legal": "Av. Corrientes 1500, Piso 3",
-        "localidad": "Posadas",
-        "distrito": "sur",
-        "telefono_institucional": "+54 376 4400100",
-        "email_contacto": "contacto@prodlitoral.com.ar",
-        "web_redes": [
-            "https://prodlitoral.com.ar",
-            "https://instagram.com/prodlitoral",
-        ],
-        "nombre_representante": "María González",
-        "dni_representante": "30123456",
-        "cargo_representante": "Socia Gerente",
-        "telefono_representante": "+54 376 4123456",
-        "email_representante": "maria@prodlitoral.com.ar",
-        "vincular_personas": "si",
-        "actividades_principales": ["produccion", "distribucion", "formacion"],
-        "lineas_trabajo": "Largometrajes documentales, series web, contenido institucional, capacitaciones en producción audiovisual",
-        "apoyo_iaavim": "si",
-        "descripcion_apoyo": "Subsidio para producción documental 2023, Participación en mercado regional 2024",
-        "otros_registros": "si",
-        "cuales_registros": "INCAA - Productora registrada",
-        "consentimiento": True,
-        "declaracion_inicial": True,
-    },
     "usuario1@repa.gob.ar": {
         "nombre_pj": "Cooperativa de Trabajo Audiovisual Oberá Ltda.",
         "cuit": "30-71567890-2",
@@ -246,10 +268,10 @@ TEST_PERSONA_JURIDICA = {
         "otros_registros": "no",
         "consentimiento": True,
         "declaracion_inicial": True,
+        "estado": "vigente",
     },
 }
 
-# Datos de prueba para Asociación/Colectivo (usuario2 y usuario3)
 TEST_ASOCIACION = {
     "usuario2@repa.gob.ar": {
         "nombre_asociacion": "Colectivo Audiovisual Misiones",
@@ -280,47 +302,9 @@ TEST_ASOCIACION = {
         "descripcion_articulacion": "Participación en festivales organizados por IAAviM, difusión de convocatorias",
         "consentimiento": True,
         "declaracion_inicial": True,
-    },
-    "usuario3@repa.gob.ar": {
-        "nombre_asociacion": "Asociación de Investigadores del Audiovisual Misionero",
-        "anio_creacion": 2016,
-        "personeria_juridica": "si",
-        "tipo_personeria": "asociacion_civil",
-        "cuit": "30-71890123-5",
-        "domicilio": "Av. Mitre 789",
-        "localidad": "Apóstoles",
-        "distrito": "sur",
-        "telefono": "+54 3758 422000",
-        "email": "aiam.misiones@gmail.com",
-        "web": "https://aiam.org.ar",
-        "nombre_referente": "Pedro Martínez",
-        "rol_referente": "Presidente",
-        "telefono_referente": "+54 376 4345678",
-        "email_referente": "pedro@aiam.org.ar",
-        "ambito_produccion": False,
-        "ambito_formacion": True,
-        "ambito_exhibicion": False,
-        "ambito_comunicacion": True,
-        "ambito_distribucion": False,
-        "ambito_comunidad": False,
-        "ambito_investigacion": True,
-        "ambito_otro": True,
-        "otro_ambito": "Archivo y preservación audiovisual",
-        "objetivos": "Investigar, documentar y preservar la historia del audiovisual misionero. Publicar estudios académicos sobre cine regional.",
-        "cantidad_integrantes": 8,
-        "articulo_iaavim": "si",
-        "descripcion_articulacion": "Convenio de investigación, acceso a archivos históricos, publicaciones conjuntas",
-        "consentimiento": True,
-        "declaracion_inicial": True,
+        "estado": "enviado",
     },
 }
-
-# Datos de prueba para ESA (Estudiantes del Audiovisual) - usuarios adicionales
-# Nota: ESA es para estudiantes que NO están en RePA, así que creamos usuarios extra
-TEST_ESA_USERS = [
-    {"email": "estudiante1@esa.repa.gob.ar", "password": "Test1234", "role": "user"},
-    {"email": "estudiante2@esa.repa.gob.ar", "password": "Test1234", "role": "user"},
-]
 
 TEST_ESA = {
     "estudiante1@esa.repa.gob.ar": {
@@ -346,6 +330,7 @@ TEST_ESA = {
         "vigencia_un_anio": True,
         "autoriza_datos": True,
         "activo": True,
+        "estado": "vigente",
     },
     "estudiante2@esa.repa.gob.ar": {
         "nombre_completo": "Tomás Acuña",
@@ -371,8 +356,12 @@ TEST_ESA = {
         "vigencia_un_anio": True,
         "autoriza_datos": True,
         "activo": True,
+        "estado": "aprobado",
     },
 }
+
+
+# === RBAC ===
 
 
 def sync_rbac(db):
@@ -380,7 +369,6 @@ def sync_rbac(db):
     Sincroniza el catálogo de permisos y los roles del sistema desde src.rbac.
     Idempotente: se ejecuta tanto en producción como en desarrollo.
     """
-    # 1) Upsert de permisos
     existing_perms = {p.code: p for p in db.query(Permission).all()}
     for code, descripcion in PERMISSIONS.items():
         perm = existing_perms.get(code)
@@ -392,10 +380,8 @@ def sync_rbac(db):
             perm.descripcion = descripcion
     db.commit()
 
-    # Refrescar mapa de permisos por código
     perms_by_code = {p.code: p for p in db.query(Permission).all()}
 
-    # 2) Upsert de roles del sistema con sus permisos
     for nombre, definicion in SYSTEM_ROLES.items():
         role = db.query(Role).filter(Role.rol == nombre).first()
         if role is None:
@@ -418,8 +404,6 @@ def backfill_estudiante_role(db):
     arranque del backend, tanto en desarrollo como en producción, y no hace
     nada si ya está todo al día.
     """
-    from src.models.esa_model import EstudianteESA
-
     estudiante_role = db.query(Role).filter(Role.rol == "estudiante").first()
     if not estudiante_role:
         return
@@ -441,168 +425,514 @@ def backfill_estudiante_role(db):
         logger.info(f"Backfill rol 'estudiante': {asignados} usuario(s) actualizados")
 
 
+# === USUARIOS DE PRUEBA ===
+
+
+def _crear_usuario(db, email, password, role=None):
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        return existing
+    user = User(
+        email=email,
+        hashed_password=pwd_context.hash(password),
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    if role:
+        db.add(UserRole(user_id=user.id, role_id=role.id))
+        db.commit()
+    print(f"✓ Usuario creado: {email}" + (f" ({role.rol})" if role else ""))
+    return user
+
+
+def seed_test_users(db):
+    """Crea 2 usuarios de prueba por cada rol del sistema (14 en total)."""
+    roles_by_name = {r.rol: r for r in db.query(Role).all()}
+
+    for rol, usuarios in TEST_ROLE_USERS.items():
+        role = roles_by_name.get(rol)
+        for email, password in usuarios:
+            _crear_usuario(db, email, password, role=role)
+
+    # Los usuarios ESA no reciben el rol acá: se crean sin rol y
+    # backfill_estudiante_role() se lo asigna en cuanto exista su
+    # EstudianteESA (ver seed_padron_data), ejercitando ese mismo camino
+    # que corre en producción.
+    for email, password in TEST_ESA_USERS:
+        _crear_usuario(db, email, password, role=None)
+
+
+# === PADRÓN ===
+
+
+def _asegurar_codigo(db, registro, tipo_codigo, revisor, ahora, data=None):
+    """Si un registro quedó incompleto (p. ej. un borrador que la propia app
+    creó de forma automática al loguearse por primera vez, antes de que
+    este seed le asignara datos) o de una corrida anterior del seed quedó
+    sin código RePA, lo completa: rellena los campos que todavía estén en
+    None con los del dict de referencia (sin pisar nada que ya tenga un
+    valor real) y, si le falta, le emite el código y lo pasa a 'aprobado'.
+    Todos los usuarios de prueba deben terminar con su formulario de
+    Persona Física completo y su código RePA."""
+    if data:
+        for campo, valor in data.items():
+            if campo == "estado":
+                continue
+            if getattr(registro, campo, None) is None:
+                setattr(registro, campo, valor)
+    if not registro.codigo_repa:
+        registro.estado = "aprobado"
+        registro.codigo_repa = generar_codigo_repa(db, tipo_codigo)
+        registro.fecha_vigencia_desde = ahora
+        if revisor:
+            registro.revisado_por = revisor.id
+            registro.fecha_revision = ahora
+    db.commit()
+
+
+def seed_padron_data(db):
+    revisor = db.query(User).filter(User.email == "revisor1@repa.gob.ar").first()
+    ahora = datetime.now(timezone.utc)
+
+    for email, pf_data in TEST_PERSONA_FISICA.items():
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            continue
+        existing = db.query(PersonaFisica).filter(PersonaFisica.user_id == user.id).first()
+        if existing:
+            _asegurar_codigo(db, existing, "PF", revisor, ahora, data=pf_data)
+            continue
+        data = dict(pf_data)
+        estado = data.pop("estado")
+        pf = PersonaFisica(user_id=user.id, estado=estado, **data)
+        if estado in ("vigente", "aprobado"):
+            pf.codigo_repa = generar_codigo_repa(db, "PF")
+            pf.fecha_vigencia_desde = ahora
+        if estado != "borrador" and revisor:
+            pf.revisado_por = revisor.id
+            pf.fecha_revision = ahora
+        db.add(pf)
+        db.commit()
+        print(f"✓ Persona Física creada para: {email}")
+
+    for email, pj_data in TEST_PERSONA_JURIDICA.items():
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            continue
+        existing = (
+            db.query(PersonaJuridica).filter(PersonaJuridica.user_id == user.id).first()
+        )
+        if existing:
+            _asegurar_codigo(db, existing, "PJ", revisor, ahora, data=pj_data)
+            continue
+        data = dict(pj_data)
+        estado = data.pop("estado")
+        pj = PersonaJuridica(user_id=user.id, estado=estado, **data)
+        if estado in ("vigente", "aprobado"):
+            pj.codigo_repa = generar_codigo_repa(db, "PJ")
+            pj.fecha_vigencia_desde = ahora
+        if estado != "borrador" and revisor:
+            pj.revisado_por = revisor.id
+            pj.fecha_revision = ahora
+        db.add(pj)
+        db.commit()
+        print(f"✓ Persona Jurídica creada para: {email}")
+
+    for email, as_data in TEST_ASOCIACION.items():
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            continue
+        existing = db.query(Asociacion).filter(Asociacion.user_id == user.id).first()
+        if existing:
+            continue
+        data = dict(as_data)
+        estado = data.pop("estado")
+        asoc = Asociacion(user_id=user.id, estado=estado, **data)
+        if estado != "borrador" and revisor:
+            asoc.revisado_por = revisor.id
+            asoc.fecha_revision = ahora
+        db.add(asoc)
+        db.commit()
+        print(f"✓ Asociación creada para: {email}")
+
+    for email, esa_data in TEST_ESA.items():
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            continue
+        existing = (
+            db.query(EstudianteESA).filter(EstudianteESA.user_id == user.id).first()
+        )
+        if existing:
+            _asegurar_codigo(db, existing, "ESA", revisor, ahora, data=esa_data)
+            continue
+        data = dict(esa_data)
+        estado = data.pop("estado")
+        esa = EstudianteESA(
+            user_id=user.id,
+            estado=estado,
+            fecha_alta=ahora,
+            fecha_vencimiento=ahora + timedelta(days=365),
+            **data,
+        )
+        if estado in ("vigente", "aprobado"):
+            esa.codigo_repa = generar_codigo_repa(db, "ESA")
+            esa.fecha_vigencia_desde = ahora
+        if estado != "borrador" and revisor:
+            esa.revisado_por = revisor.id
+            esa.fecha_revision = ahora
+        db.add(esa)
+        db.commit()
+        print(f"✓ Estudiante ESA creado para: {email}")
+
+
+# === FOMENTO: eventos, líneas, evaluadores, trámites, comités, semillero ===
+
+# Un trámite por tipo requiere valores válidos según los CheckConstraints de
+# TramiteFomento.estado_tramite (distintos subconjuntos por tipo).
+TRAMITE_ESTADOS_POR_TIPO = {
+    "convocatoria_competitiva": ["presentado", "admisible"],
+    "convocatoria_especial": ["evaluado", "seleccionado"],
+    "ventanilla_continua": ["ingresado", "en_evaluacion"],
+    "cash_rebate": ["ingresado", "verificacion"],
+    "semillero": ["inscripto", "en_curso"],
+}
+
+
+def _get_or_create(db, model, lookup, defaults=None):
+    instance = db.query(model).filter_by(**lookup).first()
+    if instance:
+        return instance, False
+    params = dict(lookup)
+    params.update(defaults or {})
+    instance = model(**params)
+    db.add(instance)
+    db.commit()
+    db.refresh(instance)
+    return instance, True
+
+
+def seed_fomento_data(db):
+    ahora = datetime.now(timezone.utc)
+
+    # --- Eventos y líneas ---
+    evento1, _ = _get_or_create(
+        db,
+        EventoFomento,
+        {"nombre": "Convocatoria General de Fomento Audiovisual 2025", "anio_edicion": 2025},
+        {
+            "tipo": "competitiva",
+            "estado": "activo",
+            "fecha_apertura": ahora - timedelta(days=30),
+            "fecha_cierre": ahora + timedelta(days=30),
+            "presupuesto_global": 50_000_000,
+        },
+    )
+    evento2, _ = _get_or_create(
+        db,
+        EventoFomento,
+        {"nombre": "Convocatoria Especial Documental NEA 2025", "anio_edicion": 2025},
+        {
+            "tipo": "especial",
+            "estado": "cerrado",
+            "fecha_apertura": ahora - timedelta(days=90),
+            "fecha_cierre": ahora - timedelta(days=10),
+            "presupuesto_global": 15_000_000,
+        },
+    )
+
+    lineas = {}
+    for evento, nombres in (
+        (evento1, ["Línea Largometrajes", "Línea Series Web"]),
+        (evento2, ["Línea Documental Regional", "Línea Coproducción NEA"]),
+    ):
+        for nombre in nombres:
+            linea, _ = _get_or_create(
+                db,
+                LineaFomento,
+                {"evento_id": evento.id, "nombre": nombre},
+                {
+                    "vigente": True,
+                    "tope_por_proyecto": 5_000_000,
+                    "moneda_tope": "ARS",
+                    "cupo": 10,
+                    "requiere_evaluacion": True,
+                    "tipo_comite": "tecnico",
+                    "documentacion_requerida": [
+                        {"tipo": "dossier", "descripcion": "Dossier del proyecto", "obligatorio": True},
+                        {"tipo": "presupuesto", "descripcion": "Presupuesto detallado", "obligatorio": True},
+                        {"tipo": "plan_financiamiento", "descripcion": "Plan de financiamiento", "obligatorio": False},
+                    ],
+                    "campos_especificos": [],
+                },
+            )
+            lineas[nombre] = linea
+
+    # --- Evaluadores (uno por usuario del rol evaluador) ---
+    evaluadores = []
+    for i, (email, _password) in enumerate(TEST_ROLE_USERS["evaluador"], start=1):
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            continue
+        evaluador, _ = _get_or_create(
+            db,
+            Evaluador,
+            {"user_id": user.id},
+            {
+                "nombre_completo": f"Evaluador de Prueba {i}",
+                "dni": f"3000000{i}",
+                "email": email,
+                "telefono": "+54 376 4000000",
+                "localidad": "Posadas",
+                "provincia_pais": "Misiones, Argentina",
+                "vinculo_repa": "externo",
+                "formacion_academica": "Licenciatura en Comunicación Audiovisual",
+                "experiencia_audiovisual": "10 años de experiencia en evaluación de proyectos audiovisuales",
+                "areas_especializacion": ["documental", "ficcion"],
+                "cv_path": None,
+                "roles_habilitados": ["tecnico", "deliberativo"],
+                "rol": "evaluador_tecnico" if i == 1 else "jurado_deliberativo",
+                "disponible_convocatorias": True,
+                "tipos_convocatoria": ["convocatoria_competitiva", "convocatoria_especial"],
+                "borrador": False,
+            },
+        )
+        evaluadores.append(evaluador)
+
+    # --- Cohortes de Semillero (antes de los trámites tipo semillero) ---
+    cohortes = []
+    for nombre, estado, offset_inicio in (
+        ("Semillero de Productores - Cohorte 2025-1", "en_curso", -60),
+        ("Semillero de Productores - Cohorte 2025-2", "inscripcion_abierta", 30),
+    ):
+        cohorte, _ = _get_or_create(
+            db,
+            CohorteSemillero,
+            {"nombre": nombre, "anio_edicion": 2025},
+            {
+                "fecha_inicio": ahora + timedelta(days=offset_inicio),
+                "fecha_fin": ahora + timedelta(days=offset_inicio + 120),
+                "descripcion": "Programa de acompañamiento a productoras emergentes de Misiones.",
+                "cupo": 15,
+                "estado": estado,
+            },
+        )
+        cohortes.append(cohorte)
+
+    # --- Trámites: 2 por cada uno de los 5 tipos ---
+    usuarios_solicitantes = [
+        db.query(User).filter(User.email == email).first()
+        for email, _ in TEST_ROLE_USERS["user"]
+    ]
+    usuarios_solicitantes = [u for u in usuarios_solicitantes if u]
+
+    tramites_convocatoria = []
+    for tipo, (evento, linea_nombres) in (
+        ("convocatoria_competitiva", (evento1, ["Línea Largometrajes", "Línea Series Web"])),
+        ("convocatoria_especial", (evento2, ["Línea Documental Regional", "Línea Coproducción NEA"])),
+    ):
+        estados = TRAMITE_ESTADOS_POR_TIPO[tipo]
+        for idx, (linea_nombre, estado) in enumerate(zip(linea_nombres, estados)):
+            user = usuarios_solicitantes[idx % len(usuarios_solicitantes)]
+            titulo = f"Proyecto {tipo} #{idx + 1}"
+            tramite, _ = _get_or_create(
+                db,
+                TramiteFomento,
+                {"user_id": user.id, "tipo_tramite": tipo, "titulo_proyecto": titulo},
+                {
+                    "evento_id": evento.id,
+                    "linea_id": lineas[linea_nombre].id,
+                    "tipo_productora": "productora_misionera",
+                    "distrito_presentante": "sur",
+                    "contacto_email": user.email,
+                    "medio": "cine",
+                    "genero": "documental",
+                    "extension": "largo",
+                    "formato_narrativo": "unitario",
+                    "duracion_estimada_min": 80,
+                    "sinopsis": "Proyecto audiovisual de prueba cargado por el seed de QA.",
+                    "moneda_principal": "ARS",
+                    "presupuesto_total": 8_000_000,
+                    "monto_solicitado_iaavim": 4_000_000,
+                    "estado_tramite": estado,
+                    "fecha_ingreso": ahora,
+                    "borrador": False,
+                },
+            )
+            tramites_convocatoria.append(tramite)
+
+    for tipo in ("ventanilla_continua", "cash_rebate"):
+        estados = TRAMITE_ESTADOS_POR_TIPO[tipo]
+        for idx, estado in enumerate(estados):
+            user = usuarios_solicitantes[idx % len(usuarios_solicitantes)]
+            titulo = f"Proyecto {tipo} #{idx + 1}"
+            _get_or_create(
+                db,
+                TramiteFomento,
+                {"user_id": user.id, "tipo_tramite": tipo, "titulo_proyecto": titulo},
+                {
+                    "tipo_productora": "productora_asociada",
+                    "distrito_presentante": "norte",
+                    "contacto_email": user.email,
+                    "medio": "tv",
+                    "genero": "ficcion",
+                    "extension": "corto",
+                    "formato_narrativo": "serie",
+                    "duracion_estimada_min": 30,
+                    "sinopsis": "Proyecto audiovisual de prueba cargado por el seed de QA.",
+                    "moneda_principal": "ARS",
+                    "presupuesto_total": 3_000_000,
+                    "monto_estimado_reintegro": 900_000 if tipo == "cash_rebate" else None,
+                    "estado_tramite": estado,
+                    "fecha_ingreso": ahora,
+                    "borrador": False,
+                },
+            )
+
+    for idx, (cohorte, estado) in enumerate(zip(cohortes, TRAMITE_ESTADOS_POR_TIPO["semillero"])):
+        user = usuarios_solicitantes[idx % len(usuarios_solicitantes)]
+        titulo = f"Proyecto semillero #{idx + 1}"
+        _get_or_create(
+            db,
+            TramiteFomento,
+            {"user_id": user.id, "tipo_tramite": "semillero", "titulo_proyecto": titulo},
+            {
+                "cohorte_semillero_id": cohorte.id,
+                "tipo_productora": "productora_misionera",
+                "distrito_presentante": "sur",
+                "contacto_email": user.email,
+                "medio": "cine",
+                "genero": "animacion",
+                "extension": "corto",
+                "formato_narrativo": "unitario",
+                "duracion_estimada_min": 15,
+                "sinopsis": "Proyecto audiovisual de prueba cargado por el seed de QA.",
+                "estado_tramite": estado,
+                "fecha_ingreso": ahora,
+                "borrador": False,
+            },
+        )
+
+    # --- Comités, integrantes y dictámenes ---
+    if evaluadores:
+        comite, _ = _get_or_create(
+            db,
+            ComiteFomento,
+            {"evento_id": evento1.id, "tipo": "tecnico"},
+            {"nombre": "Comité Técnico 2025", "activo": True},
+        )
+        for evaluador in evaluadores:
+            existing = (
+                db.query(IntegranteComite)
+                .filter_by(comite_id=comite.id, evaluador_id=evaluador.id)
+                .first()
+            )
+            if not existing:
+                db.add(
+                    IntegranteComite(
+                        comite_id=comite.id, evaluador_id=evaluador.id, rol="titular"
+                    )
+                )
+        db.commit()
+
+        for tramite in tramites_convocatoria[:2]:
+            existing = (
+                db.query(DictamenFomento).filter_by(tramite_id=tramite.id).first()
+            )
+            if not existing:
+                db.add(
+                    DictamenFomento(
+                        tramite_id=tramite.id,
+                        comite_id=comite.id,
+                        evaluador_id=evaluadores[0].id,
+                        tipo_dictamen="tecnico",
+                        fecha=ahora,
+                        observaciones="Dictamen de prueba generado por el seed de QA.",
+                        puntaje=85,
+                    )
+                )
+        db.commit()
+
+    # --- Participantes y acompañamientos del Semillero ---
+    for cohorte, nombres in zip(
+        cohortes,
+        (
+            ["María Torres", "Diego Benítez"],
+            ["Sofía Ramírez", "Nicolás Duarte"],
+        ),
+    ):
+        existentes = (
+            db.query(ParticipanteSemillero).filter_by(cohorte_id=cohorte.id).count()
+        )
+        if existentes >= len(nombres):
+            continue
+        for nombre in nombres:
+            participante = ParticipanteSemillero(
+                cohorte_id=cohorte.id,
+                nombre_completo=nombre,
+                distrito="sur",
+                formacion_previa="Taller de realización audiovisual básica.",
+                proyectos_en_desarrollo="Cortometraje documental en etapa de guion.",
+                participacion_capacitaciones_iaavim="si",
+                diagnostico_inicial="Perfil emergente con formación técnica inicial.",
+                objetivos="Desarrollar y presentar un proyecto a convocatoria de fomento.",
+                estado="activo",
+            )
+            db.add(participante)
+            db.commit()
+            db.refresh(participante)
+            db.add(
+                AcompanamientoSemillero(
+                    participante_id=participante.id,
+                    tipo="tutoria",
+                    fecha=ahora,
+                    responsable="Equipo Semillero IAAviM",
+                    observaciones="Primera sesión de tutoría de prueba generada por el seed de QA.",
+                )
+            )
+        db.commit()
+
+    logger.info("Datos de Fomento sembrados: eventos, líneas, evaluadores, trámites, comités y semillero")
+
+
+# === ORQUESTADOR ===
+
+
 def seed_data():
     """
-    Carga datos en la base de datos. Asume que el esquema ya existe
-    (gestionado por Alembic en dev/prod o por create_all en tests).
+    Sincroniza RBAC (permisos + roles del sistema) y aplica el backfill del
+    rol 'estudiante' — corre siempre, incluso en producción.
 
-    IMPORTANTE: Los datos de prueba NO se cargan si ENVIRONMENT=production;
-    en producción solo se sincroniza el RBAC (permisos + roles del sistema).
+    En desarrollo/QA, además crea 14 usuarios de prueba (2 por rol), datos
+    de Padrón (Persona Física/Jurídica/Asociación/ESA), datos de Fomento
+    (convocatorias, líneas, trámites, comités, semillero) y genera los
+    documentos adjuntos de prueba. Todo es idempotente: correr esto en cada
+    arranque del contenedor no duplica filas.
     """
-    if IS_PRODUCTION:
-        # En producción, sincronizar RBAC (permisos + roles del sistema)
-        db = SessionLocal()
-        try:
-            sync_rbac(db)
-            backfill_estudiante_role(db)
-        finally:
-            db.close()
-        return  # No cargar datos de prueba en producción
-
-    # Desarrollo: cargar todos los datos de prueba
     db = SessionLocal()
     try:
-        # Sincronizar RBAC (permisos + roles del sistema)
         sync_rbac(db)
         backfill_estudiante_role(db)
 
-        # Seed de usuarios de prueba
-        admin_role = db.query(Role).filter(Role.rol == "admin").first()
-        user_role = db.query(Role).filter(Role.rol == "user").first()
-        estudiante_role = db.query(Role).filter(Role.rol == "estudiante").first()
+        if IS_PRODUCTION:
+            return
 
-        for test_user in TEST_USERS:
-            existing = db.query(User).filter(User.email == test_user["email"]).first()
-            if not existing:
-                hashed_password = pwd_context.hash(test_user["password"])
-                new_user = User(
-                    email=test_user["email"],
-                    hashed_password=hashed_password,
-                    is_active=True,
-                )
-                db.add(new_user)
-                db.commit()
-                db.refresh(new_user)
+        seed_test_users(db)
+        seed_padron_data(db)
+        # El backfill vuelve a correr acá porque seed_padron_data recién
+        # creó los EstudianteESA de los usuarios estudiante* de este seed.
+        backfill_estudiante_role(db)
+        seed_fomento_data(db)
 
-                # Asignar rol
-                role = admin_role if test_user["role"] == "admin" else user_role
-                if role:
-                    user_role_entry = UserRole(user_id=new_user.id, role_id=role.id)
-                    db.add(user_role_entry)
-                    db.commit()
-
-                print(f"✓ Usuario creado: {test_user['email']} ({test_user['role']})")
-            else:
-                print(f"- Usuario ya existe: {test_user['email']}")
-
-        # Seed de Persona Física para usuarios de prueba
-        for email, pf_data in TEST_PERSONA_FISICA.items():
-            user = db.query(User).filter(User.email == email).first()
-            if user:
-                existing_pf = (
-                    db.query(PersonaFisica)
-                    .filter(PersonaFisica.user_id == user.id)
-                    .first()
-                )
-                if not existing_pf:
-                    pf = PersonaFisica(user_id=user.id, **pf_data)
-                    db.add(pf)
-                    db.commit()
-                    print(f"✓ Persona Física creada para: {email}")
-                else:
-                    print(f"- Persona Física ya existe para: {email}")
-
-        # Seed de Persona Jurídica
-        for email, pj_data in TEST_PERSONA_JURIDICA.items():
-            user = db.query(User).filter(User.email == email).first()
-            if user:
-                existing_pj = (
-                    db.query(PersonaJuridica)
-                    .filter(PersonaJuridica.user_id == user.id)
-                    .first()
-                )
-                if not existing_pj:
-                    pj = PersonaJuridica(user_id=user.id, **pj_data)
-                    db.add(pj)
-                    db.commit()
-                    print(f"✓ Persona Jurídica creada para: {email}")
-                else:
-                    print(f"- Persona Jurídica ya existe para: {email}")
-
-        # Seed de Asociación/Colectivo
-        for email, as_data in TEST_ASOCIACION.items():
-            user = db.query(User).filter(User.email == email).first()
-            if user:
-                existing_as = (
-                    db.query(Asociacion).filter(Asociacion.user_id == user.id).first()
-                )
-                if not existing_as:
-                    asoc = Asociacion(user_id=user.id, **as_data)
-                    db.add(asoc)
-                    db.commit()
-                    print(f"✓ Asociación creada para: {email}")
-                else:
-                    print(f"- Asociación ya existe para: {email}")
-
-        # Seed de usuarios ESA
-        for test_user in TEST_ESA_USERS:
-            existing = db.query(User).filter(User.email == test_user["email"]).first()
-            if not existing:
-                hashed_password = pwd_context.hash(test_user["password"])
-                new_user = User(
-                    email=test_user["email"],
-                    hashed_password=hashed_password,
-                    is_active=True,
-                )
-                db.add(new_user)
-                db.commit()
-                db.refresh(new_user)
-
-                if user_role:
-                    db.add(UserRole(user_id=new_user.id, role_id=user_role.id))
-                if estudiante_role:
-                    db.add(UserRole(user_id=new_user.id, role_id=estudiante_role.id))
-                db.commit()
-
-                print(f"✓ Usuario ESA creado: {test_user['email']}")
-            else:
-                print(f"- Usuario ESA ya existe: {test_user['email']}")
-
-        # Seed de Estudiantes ESA
-        for email, esa_data in TEST_ESA.items():
-            user = db.query(User).filter(User.email == email).first()
-            if user:
-                existing_esa = (
-                    db.query(EstudianteESA)
-                    .filter(EstudianteESA.user_id == user.id)
-                    .first()
-                )
-                if not existing_esa:
-                    fecha_alta = datetime.now(timezone.utc)
-                    esa = EstudianteESA(
-                        user_id=user.id,
-                        fecha_alta=fecha_alta,
-                        fecha_vencimiento=fecha_alta + timedelta(days=365),
-                        **esa_data,
-                    )
-                    db.add(esa)
-                    db.commit()
-                    print(f"✓ Estudiante ESA creado para: {email}")
-                else:
-                    print(f"- Estudiante ESA ya existe para: {email}")
-
-        # Generar documentos de prueba para todos los usuarios
         try:
             generate_test_documents(db)
+            generate_fomento_documents(db)
         except ImportError:
             print("\n⚠️  No se pudieron generar documentos: falta instalar librerías")
             print("   Ejecuta: pip install reportlab python-docx")
         except Exception as e:
             print(f"\n❌ Error generando documentos: {e}")
-
-    except IntegrityError as e:
-        db.rollback()
-        print(f"✗ Error: {e}")
     finally:
         db.close()
 
