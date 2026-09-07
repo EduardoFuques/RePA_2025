@@ -34,6 +34,7 @@ from src.schemas.user_schemas import (
 from src.search import filtro_texto
 from src.utils import (
     get_password_hash,
+    get_user_permissions,
     require_permissions,
     validar_password,
     verify_email_unique,
@@ -42,8 +43,21 @@ from src.utils import (
 admin_router = APIRouter()
 
 
-def _resolve_permissions(db: Session, codes: list[str]) -> list[Permission]:
-    """Resuelve códigos de permiso a entidades Permission; valida que existan."""
+def _resolve_permissions(
+    db: Session, codes: list[str], current_user: dict | None = None
+) -> list[Permission]:
+    """Resuelve códigos de permiso a entidades Permission; valida que existan.
+
+    Si se pasa `current_user`, exige además que quien ejecuta ya posea todos
+    los permisos que está intentando asignar (regla estándar de no-escalada).
+
+    Por qué hace falta: `update_user_roles` protege el rol admin **por nombre**
+    —solo un admin puede otorgarlo o quitarlo—, pero nada impedía que alguien
+    con `roles:manage` creara un rol nuevo con el catálogo completo de permisos
+    y se lo adjudicara: un admin en todo menos en la etiqueta. Hoy solo el rol
+    admin tiene `roles:manage`, así que no era explotable; lo sería el día que
+    ese permiso se delegue, que es exactamente cuando nadie se acuerda de esto.
+    """
     if not codes:
         return []
     unique_codes = list(set(codes))
@@ -55,7 +69,40 @@ def _resolve_permissions(db: Session, codes: list[str]) -> list[Permission]:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Permisos inválidos: {', '.join(sorted(invalid))}",
         )
+
+    if current_user is not None:
+        propios = get_user_permissions(db, current_user)
+        ajenos = set(unique_codes) - propios
+        if ajenos:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "No puede asignar permisos que usted no posee: "
+                    f"{', '.join(sorted(ajenos))}"
+                ),
+            )
+
     return perms
+
+
+def _rechazar_si_es_rol_del_sistema(role: Role) -> None:
+    """Los permisos de los roles del sistema se definen en rbac.py, no por API.
+
+    `update_role` bloqueaba el *renombre* de un rol del sistema pero dejaba
+    pasar el cambio de permisos. El cambio se guardaba, la UI decía que había
+    salido bien, y en el siguiente arranque `sync_rbac` (seed.py) reasignaba
+    los permisos desde rbac.py y lo revertía. Sin ningún aviso.
+    """
+    if role.is_system or role.rol.lower() in SYSTEM_ROLE_NAMES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Los permisos de un rol del sistema se definen en el código "
+                "(src/rbac.py) y se re-sincronizan en cada arranque, así que un "
+                "cambio hecho acá se perdería. Para otra combinación de "
+                "permisos, creá un rol nuevo."
+            ),
+        )
 
 
 # ============================================================
@@ -112,7 +159,7 @@ async def create_role(
             detail="Ya existe un rol con ese nombre",
         )
     role = Role(rol=nombre, descripcion=data.descripcion, is_system=False)
-    role.permissions = _resolve_permissions(db, data.permissions)
+    role.permissions = _resolve_permissions(db, data.permissions, current_user)
     db.add(role)
     db.commit()
     db.refresh(role)
@@ -168,7 +215,8 @@ async def update_role(
         role.descripcion = data.descripcion
 
     if data.permissions is not None:
-        role.permissions = _resolve_permissions(db, data.permissions)
+        _rechazar_si_es_rol_del_sistema(role)
+        role.permissions = _resolve_permissions(db, data.permissions, current_user)
 
     db.commit()
     db.refresh(role)
