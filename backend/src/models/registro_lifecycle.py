@@ -54,6 +54,12 @@ class RegistroLifecycleMixin:
         index=True,
     )
 
+    # Última vez que el titular modificó datos del registro. Distinta de
+    # fecha_envio (que marca el envío a revisión) y de fecha_resolucion (que
+    # marca la decisión del revisor): esta responde "¿cuán actualizado está el
+    # dato que figura en el padrón?".
+    fecha_ultima_actualizacion = Column(DateTime(timezone=True), nullable=True)
+
     # Timestamps de transición.
     fecha_envio = Column(DateTime(timezone=True), nullable=True)
     fecha_revision = Column(DateTime(timezone=True), nullable=True)

@@ -26,6 +26,10 @@ from src.routes.rodaje_routes import rodaje_router
 from src.routes.upload_routes import files_router, upload_router
 from src.routes.user_routes import user_router
 from src.seed import seed_data
+from src.services.lifecycle_service import (
+    EdicionNoPermitida,
+    TransicionInvalida,
+)
 
 
 @asynccontextmanager
@@ -137,6 +141,29 @@ Los endpoints sensibles tienen límites de solicitudes:
 # Rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+
+@app.exception_handler(EdicionNoPermitida)
+async def edicion_no_permitida_handler(request: Request, exc: EdicionNoPermitida):
+    """409 para las ediciones que el estado del registro no admite.
+
+    Va como handler global y no envuelto en cada ruta porque las cinco
+    entidades registrables (PF, PJ, AS, ESA, AGAM) llaman al mismo servicio y
+    todas necesitan la misma respuesta: repetir un try/except idéntico en cada
+    una es la clase de duplicación que después se actualiza en cuatro lugares
+    de cinco.
+    """
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+@app.exception_handler(TransicionInvalida)
+async def transicion_invalida_handler(request: Request, exc: TransicionInvalida):
+    """409 para una transición de estado no permitida.
+
+    Las rutas de revisión (admin_registros_routes) ya la capturan con su propio
+    mensaje; esto cubre el resto del sistema para que no salga como un 500.
+    """
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)

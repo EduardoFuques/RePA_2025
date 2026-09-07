@@ -74,9 +74,7 @@ async def create_estudiante_esa(
     db.add(db_estudiante)
     with integrity_as_conflict(db):
         db.flush()
-        lifecycle_service.procesar_envio_si_corresponde(
-            db, db_estudiante, data.model_dump()
-        )
+        lifecycle_service.procesar_actualizacion(db, db_estudiante, data.model_dump())
     commit_or_conflict(db)
     db.refresh(db_estudiante)
     return db_estudiante
@@ -119,7 +117,7 @@ async def update_my_estudiante_esa(
     estudiante = get_user_record(db, EstudianteESA, current_user["id"], MSG_NOT_FOUND)
     update_data = apply_update_fields(estudiante, data)
     with integrity_as_conflict(db):
-        lifecycle_service.procesar_envio_si_corresponde(db, estudiante, update_data)
+        lifecycle_service.procesar_actualizacion(db, estudiante, update_data)
     commit_or_conflict(db)
     db.refresh(estudiante)
     return estudiante

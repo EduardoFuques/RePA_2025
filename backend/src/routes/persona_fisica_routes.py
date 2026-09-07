@@ -86,9 +86,7 @@ async def create_persona_fisica(
         PersonaFisica,
         data,
         current_user["id"],
-        on_flush=lambda r, ud: lifecycle_service.procesar_envio_si_corresponde(
-            db, r, ud
-        ),
+        on_flush=lambda r, ud: lifecycle_service.procesar_actualizacion(db, r, ud),
     )
 
 
@@ -114,7 +112,7 @@ async def update_my_persona_fisica(
     persona = get_user_record(db, PersonaFisica, current_user["id"], MSG_NOT_FOUND)
     update_data = apply_update_fields(persona, data)
     with integrity_as_conflict(db):
-        lifecycle_service.procesar_envio_si_corresponde(db, persona, update_data)
+        lifecycle_service.procesar_actualizacion(db, persona, update_data)
     commit_or_conflict(db)
     db.refresh(persona)
     return persona
