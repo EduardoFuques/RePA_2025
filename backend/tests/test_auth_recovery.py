@@ -153,21 +153,30 @@ class TestLoginTokens:
 
 
 class TestUpdateMe:
-    def test_update_password_debil_es_400(self, client, cuenta):
-        _user, headers, _password = cuenta
-        resp = client.put("/users/me", headers=headers, json={"password": "debil"})
-        assert resp.status_code == 400
+    """PUT /users/me fue eliminado (AUT-02).
 
-    def test_update_email_ok(self, client, cuenta):
+    Aceptaba `password` y `email` sin pedir la contrasena actual ni validar
+    unicidad del email, asi que un access token robado alcanzaba para quedarse
+    con la cuenta. La contrasena se cambia por /users/me/password, que si exige
+    la actual.
+    """
+
+    def test_put_users_me_ya_no_existe(self, client, cuenta):
+        _user, headers, _password = cuenta
+        resp = client.put(
+            "/users/me", headers=headers, json={"password": "NuevaClave123"}
+        )
+        assert resp.status_code == 405
+
+    def test_put_users_me_tampoco_cambia_el_email(self, client, cuenta):
         _user, headers, _password = cuenta
         nuevo = f"updated_{uuid.uuid4().hex[:8]}@example.com"
         resp = client.put("/users/me", headers=headers, json={"email": nuevo})
-        assert resp.status_code == 200
-        assert resp.json()["email"] == nuevo
+        assert resp.status_code == 405
 
-    def test_update_requires_auth(self, client):
-        resp = client.put("/users/me", json={"email": "x@example.com"})
-        assert resp.status_code == 401
+        # Y el email sigue siendo el original.
+        me = client.get("/users/me", headers=headers)
+        assert me.json()["email"] != nuevo
 
 
 class TestChangeOwnPassword:
@@ -261,3 +270,89 @@ class TestDeleteMe:
             data={"username": user.email, "password": password},
         )
         assert login.status_code == 403
+
+
+
+class TestRevocacionDeSesiones:
+    """AUT-03: cambiar la contrasena invalida los tokens ya emitidos.
+
+    Antes no habia forma de revocar una sesion: quien tuviera el refresh token
+    seguia renovando durante siete dias aunque la victima cambiara la clave.
+    """
+
+    def test_cambiar_password_invalida_el_access_token_viejo(self, client, cuenta):
+        _user, headers, password = cuenta
+
+        # El token sirve antes del cambio.
+        assert client.get("/users/me", headers=headers).status_code == 200
+
+        resp = client.put(
+            "/users/me/password",
+            headers=headers,
+            json={"current_password": password, "new_password": "OtraClave123"},
+        )
+        assert resp.status_code == 200
+
+        # Y deja de servir despues.
+        assert client.get("/users/me", headers=headers).status_code == 401
+
+    def test_cambiar_password_invalida_el_refresh_token_viejo(
+        self, client, test_user_data, db_session
+    ):
+        from src.models.user_models import User
+        from src.utils import get_password_hash
+
+        email = f"revoca_{uuid.uuid4().hex[:8]}@example.com"
+        password = "ClaveInicial123"
+        user = User(
+            id=str(uuid.uuid4()),
+            email=email,
+            hashed_password=get_password_hash(password),
+            is_active=True,
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        login = client.post(
+            "/users/token", data={"username": email, "password": password}
+        )
+        assert login.status_code == 200
+        tokens = login.json()
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        # El refresh funciona antes del cambio.
+        previo = client.post(
+            "/users/refresh", json={"refresh_token": tokens["refresh_token"]}
+        )
+        assert previo.status_code == 200
+
+        client.put(
+            "/users/me/password",
+            headers=headers,
+            json={"current_password": password, "new_password": "ClaveNueva123"},
+        )
+
+        # Despues del cambio, el refresh viejo ya no renueva nada: sin esto el
+        # corte de sesiones seria inutil (dura 7 dias).
+        posterior = client.post(
+            "/users/refresh", json={"refresh_token": tokens["refresh_token"]}
+        )
+        assert posterior.status_code == 401
+
+    def test_login_nuevo_funciona_despues_de_revocar(self, client, cuenta):
+        _user, headers, password = cuenta
+        user_email = client.get("/users/me", headers=headers).json()["email"]
+
+        client.put(
+            "/users/me/password",
+            headers=headers,
+            json={"current_password": password, "new_password": "TerceraClave123"},
+        )
+
+        nuevo_login = client.post(
+            "/users/token",
+            data={"username": user_email, "password": "TerceraClave123"},
+        )
+        assert nuevo_login.status_code == 200
+        nuevos = {"Authorization": f"Bearer {nuevo_login.json()['access_token']}"}
+        assert client.get("/users/me", headers=nuevos).status_code == 200

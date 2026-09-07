@@ -69,7 +69,7 @@ async def create_asociacion(
         Asociacion,
         data,
         current_user["id"],
-        on_flush=lambda r, ud: lifecycle_service.procesar_envio_si_corresponde(
+        on_flush=lambda r, ud: lifecycle_service.procesar_actualizacion(
             db,
             r,
             ud,
@@ -104,7 +104,7 @@ async def update_my_asociacion(
     asoc = get_user_record(db, Asociacion, current_user["id"], MSG_NOT_FOUND)
     update_data = apply_update_fields(asoc, data)
     with integrity_as_conflict(db):
-        lifecycle_service.procesar_envio_si_corresponde(
+        lifecycle_service.procesar_actualizacion(
             db,
             asoc,
             update_data,

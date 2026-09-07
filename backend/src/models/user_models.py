@@ -67,6 +67,15 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_login = Column(DateTime, default=None, nullable=True)
+    # Generacion de sesiones. Cada token lleva el valor que tenia este campo
+    # cuando se emitio; cambiar la contrasena lo incrementa y con eso caen
+    # todas las sesiones abiertas, incluidos los refresh de 7 dias.
+    #
+    # Es un contador y no una marca de tiempo a proposito: el `iat` de un JWT
+    # tiene resolucion de un segundo, asi que con timestamps no se puede
+    # distinguir el token emitido justo antes del cambio del que se emite justo
+    # despues, al volver a loguearse.
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
     # Relación con roles a través de la tabla UserRole
     roles = relationship("Role", secondary="user_roles", backref="users")
 

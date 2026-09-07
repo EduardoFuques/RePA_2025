@@ -16,6 +16,8 @@ paso separado de "tomar para revisión" en la UI, alcanza con aprobar/
 observar/rechazar directamente sobre un registro "enviado".
 """
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -380,3 +382,146 @@ async def rechazar_registro(
     db.commit()
     db.refresh(registro)
     return schema.model_validate(registro)
+
+
+# ---------------------------------------------------------------------------
+# Adjuntos del registro (INT-08)
+# ---------------------------------------------------------------------------
+# Campo del modelo -> etiqueta legible, por tipo. Se enumeran a mano en vez de
+# derivarlos por sufijo "_path" para que agregar una columna nueva al modelo no
+# la exponga al backoffice sin que nadie lo haya decidido.
+_ADJUNTOS: dict[str, dict[str, str]] = {
+    "pf": {"dni_adjunto_path": "DNI"},
+    "pj": {
+        "estatuto_path": "Estatuto",
+        "constancia_cuit_path": "Constancia de CUIT",
+        "acta_autoridades_path": "Acta de autoridades",
+        "cv_institucional_path": "CV institucional",
+    },
+    "as": {
+        "acta_constitucion_path": "Acta de constitución",
+        "declaracion_objetivos_path": "Declaración de objetivos",
+    },
+    "esa": {
+        "certificado_alumno_path": "Certificado de alumno regular",
+        "copia_dni_path": "Copia del DNI",
+    },
+    "agam": {
+        "ficha_tecnica_path": "Ficha técnica",
+        "archivo_convenio_path": "Convenio",
+    },
+}
+
+
+@admin_registros_router.get(
+    "/{tipo}/{registro_id}/documentos",
+    summary="[Admin] Listar los adjuntos de un registro",
+)
+async def listar_documentos_registro(
+    tipo: str,
+    registro_id: int,
+    db: Session = Depends(get_db),
+    _: dict = Depends(require_permissions("registros:read_all")),
+):
+    """Qué adjuntos tiene cargados un registro, para que el revisor sepa qué
+    puede abrir antes de pedirlo."""
+    model, _schema, _campos = _resolve_tipo(tipo)
+    registro = _get_registro_or_404(db, model, registro_id)
+
+    campos = _ADJUNTOS.get(tipo.lower(), {})
+    documentos = []
+    for campo, etiqueta in campos.items():
+        nombre = getattr(registro, campo, None)
+        if nombre:
+            documentos.append(
+                {"campo": campo, "etiqueta": etiqueta, "nombre_archivo": nombre}
+            )
+    return {"registro_id": registro_id, "tipo": tipo.lower(), "documentos": documentos}
+
+
+@admin_registros_router.get(
+    "/{tipo}/{registro_id}/documentos/{campo}",
+    summary="[Admin] Descargar un adjunto de un registro",
+)
+async def descargar_documento_registro(
+    tipo: str,
+    registro_id: int,
+    campo: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_permissions("registros:read_all")),
+):
+    """Sirve un adjunto de CUALQUIER usuario, a quien tenga `registros:read_all`.
+
+    Es el único punto del sistema que entrega un archivo ajeno, así que deja
+    auditoría de cada descarga: son documentos de identidad de terceros y tiene
+    que quedar registrado quién los miró.
+
+    La ruta se arma con el `user_id` dueño del registro y el nombre guardado en
+    la columna, nunca con algo que venga del request: `campo` se valida contra
+    la lista blanca de arriba y `_safe_path` corta cualquier intento de salir
+    del directorio del usuario.
+    """
+    from fastapi.responses import FileResponse
+
+    from src.routes.upload_routes import (
+        MIME_MAP,
+        UPLOAD_BASE_DIR,
+        _safe_path,
+        _sanitize_filename,
+    )
+
+    model, _schema, _campos = _resolve_tipo(tipo)
+    registro = _get_registro_or_404(db, model, registro_id)
+
+    campos = _ADJUNTOS.get(tipo.lower(), {})
+    if campo not in campos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Adjunto inválido: {campo!r}. "
+                f"Válidos para {tipo}: {', '.join(campos) or '(ninguno)'}"
+            ),
+        )
+
+    nombre_archivo = getattr(registro, campo, None)
+    if not nombre_archivo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El registro no tiene ese documento adjunto",
+        )
+
+    if not registro.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El registro no tiene un usuario asociado",
+        )
+
+    ruta = _safe_path(UPLOAD_BASE_DIR, registro.user_id, nombre_archivo)
+    if not os.path.exists(ruta):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El archivo no está disponible en el servidor",
+        )
+
+    audit_log(
+        db=db,
+        action=AuditAction.DOCUMENTO_DESCARGADO,
+        user_id=current_user["id"],
+        resource_type=model.__name__,
+        resource_id=str(registro_id),
+        details={
+            "adjunto": campo,
+            "archivo": nombre_archivo,
+            "titular_user_id": registro.user_id,
+        },
+        request=request,
+    )
+    db.commit()
+
+    extension = os.path.splitext(nombre_archivo)[1].lower()
+    return FileResponse(
+        path=ruta,
+        media_type=MIME_MAP.get(extension, "application/octet-stream"),
+        filename=_sanitize_filename(nombre_archivo),
+    )

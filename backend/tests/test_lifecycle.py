@@ -1,5 +1,6 @@
 # tests/test_lifecycle.py
 """Tests de la Fase 2: máquina de estados del ciclo de vida y gating del Padrón RePA."""
+
 import uuid
 
 import pytest
@@ -171,7 +172,7 @@ def test_procesar_envio_pf_emite_codigo_propio(db_session):
     pf = _nueva_pf(db_session)
     assert pf.estado == EstadoRegistro.borrador.value
 
-    ls.procesar_envio_si_corresponde(db_session, pf, {"borrador": False})
+    ls.procesar_actualizacion(db_session, pf, {"borrador": False})
 
     assert pf.estado == EstadoRegistro.enviado.value
     assert pf.fecha_envio is not None
@@ -186,7 +187,7 @@ def test_procesar_envio_agam_hereda_codigo_titular(db_session):
     db_session.flush()
     assert obra.estado == EstadoRegistro.borrador.value
 
-    ls.procesar_envio_si_corresponde(
+    ls.procesar_actualizacion(
         db_session, obra, {"borrador": False}, get_persona_fisica_titular=lambda: pf
     )
 
@@ -199,12 +200,12 @@ def test_procesar_envio_es_idempotente(db_session):
     """Un segundo PUT con borrador:false (edición posterior al envío) no
     reenvía ni regenera nada — el estado ya no es 'borrador'."""
     pf = _nueva_pf(db_session)
-    ls.procesar_envio_si_corresponde(db_session, pf, {"borrador": False})
+    ls.procesar_actualizacion(db_session, pf, {"borrador": False})
     codigo_original = pf.codigo_repa
     fecha_envio_original = pf.fecha_envio
 
     # Segunda edición, también con borrador:false (el frontend lo manda siempre).
-    ls.procesar_envio_si_corresponde(db_session, pf, {"borrador": False, "nombre": "X"})
+    ls.procesar_actualizacion(db_session, pf, {"borrador": False, "nombre": "X"})
 
     assert pf.codigo_repa == codigo_original
     assert pf.fecha_envio == fecha_envio_original
@@ -214,11 +215,11 @@ def test_procesar_envio_no_dispara_en_guardado_de_borrador(db_session):
     """Guardar un borrador intermedio (borrador:true, o borrador ausente del
     payload) no debe emitir código ni cambiar el estado."""
     pf = _nueva_pf(db_session)
-    ls.procesar_envio_si_corresponde(db_session, pf, {"borrador": True, "nombre": "X"})
+    ls.procesar_actualizacion(db_session, pf, {"borrador": True, "nombre": "X"})
     assert pf.estado == EstadoRegistro.borrador.value
     assert pf.codigo_repa is None
 
-    ls.procesar_envio_si_corresponde(db_session, pf, {"nombre": "Y"})
+    ls.procesar_actualizacion(db_session, pf, {"nombre": "Y"})
     assert pf.estado == EstadoRegistro.borrador.value
     assert pf.codigo_repa is None
 
@@ -283,7 +284,9 @@ async def test_gating_on_con_pf_solo_enviada_pasa(db_session, monkeypatch):
     # Código distintivo (no el formato real PFxxxxxx) para no colisionar con
     # códigos reales que la suite completa ya haya emitido en esta misma DB.
     pf = PersonaFisica(
-        user_id=user.id, estado=EstadoRegistro.enviado.value, codigo_repa="PF-TEST-GATING"
+        user_id=user.id,
+        estado=EstadoRegistro.enviado.value,
+        codigo_repa="PF-TEST-GATING",
     )
     db_session.add(pf)
     db_session.flush()
@@ -309,3 +312,113 @@ async def test_gating_on_con_pf_en_borrador_da_403(db_session, monkeypatch):
     with pytest.raises(HTTPException) as exc:
         await utils.require_pf_aprobado(current_user=current_user, db=db_session)
     assert exc.value.status_code == 403
+
+
+# --------------------------------------------------------------------------- #
+# INT-09 / INT-10: un dato publicado no cambia sin que alguien lo apruebe      #
+# --------------------------------------------------------------------------- #
+
+
+def _aprobada(db):
+    """Una PF que recorrio el circuito completo hasta quedar aprobada."""
+    pf = _nueva_pf(db)
+    pf.nombre = "Nombre"
+    pf.apellido = "Apellido"
+    db.flush()
+    ls.enviar_a_revision(db, pf)
+    ls.emitir_codigo_repa_propio(db, pf)
+    ls.tomar_para_revision(db, pf)
+    ls.aprobar(db, pf)
+    return pf
+
+
+def test_editar_registro_aprobado_vuelve_a_enviado(db_session):
+    """Si al titular le aprueban el formulario y despues cambia su apellido o
+    su domicilio, eso tiene que volver a pasar por un revisor."""
+    pf = _aprobada(db_session)
+    codigo = pf.codigo_repa
+    vigencia = pf.fecha_vigencia_hasta
+
+    pf.apellido = "Apellido Corregido"
+    ls.procesar_actualizacion(db_session, pf, {"apellido": "Apellido Corregido"})
+
+    assert pf.estado == EstadoRegistro.enviado.value
+    # El codigo es inmutable, y la inscripcion previa sigue en pie mientras la
+    # correccion espera resolucion: corregir un dato no da de baja a nadie.
+    assert pf.codigo_repa == codigo
+    assert pf.fecha_vigencia_hasta == vigencia
+    assert pf.fecha_ultima_actualizacion is not None
+
+
+def test_editar_aprobado_limpia_la_resolucion_anterior(db_session):
+    pf = _aprobada(db_session)
+    pf.motivo_observacion = "Faltaba el domicilio"
+    db_session.flush()
+
+    pf.domicilio = "Otra calle 123"
+    ls.procesar_actualizacion(db_session, pf, {"domicilio": "Otra calle 123"})
+
+    # El motivo hablaba de una version de los datos que ya no existe.
+    assert pf.motivo_observacion is None
+    assert pf.fecha_resolucion is None
+    assert pf.revisado_por is None
+
+
+def test_guardar_sin_cambios_no_devuelve_a_revision(db_session):
+    """Los formularios autoguardan: mandan el mismo contenido cada pocos
+    segundos. Tomar "vino en el payload" como "cambio" haria que un registro
+    aprobado volviera a la cola solo por tenerlo abierto en pantalla."""
+    pf = _aprobada(db_session)
+    apellido_actual = pf.apellido
+
+    pf.apellido = apellido_actual  # mismo valor
+    ls.procesar_actualizacion(db_session, pf, {"apellido": apellido_actual})
+
+    assert pf.estado == EstadoRegistro.aprobado.value
+
+
+def test_no_se_puede_volver_a_borrador_despues_de_enviar(db_session):
+    """INT-09: era la via por la que el booleano y el estado se
+    desincronizaban. Un registro aprobado con borrador=True desaparecia del
+    buscador sin dejar de figurar como aprobado."""
+    pf = _aprobada(db_session)
+
+    with pytest.raises(ls.EdicionNoPermitida):
+        ls.procesar_actualizacion(db_session, pf, {"borrador": True})
+
+
+def test_el_booleano_borrador_sigue_al_estado(db_session):
+    pf = _aprobada(db_session)
+
+    pf.apellido = "Otro Apellido"
+    ls.procesar_actualizacion(db_session, pf, {"apellido": "Otro Apellido"})
+
+    assert pf.borrador is False
+
+
+def test_editar_en_revision_reinicia_la_revision(db_session):
+    """El titular corrigio mientras el revisor lo tenia abierto: el revisor
+    tiene que volver a mirarlo sobre los datos nuevos."""
+    pf = _nueva_pf(db_session)
+    ls.enviar_a_revision(db_session, pf)
+    ls.tomar_para_revision(db_session, pf)
+    assert pf.estado == EstadoRegistro.en_revision.value
+
+    pf.domicilio = "Calle nueva 456"
+    ls.procesar_actualizacion(db_session, pf, {"domicilio": "Calle nueva 456"})
+
+    assert pf.estado == EstadoRegistro.enviado.value
+    assert pf.fecha_revision is None
+
+
+def test_primer_envio_sigue_funcionando_igual(db_session):
+    """El circuito de alta no cambia: borrador -> enviado con codigo emitido."""
+    pf = _nueva_pf(db_session)
+    assert pf.estado == EstadoRegistro.borrador.value
+
+    pf.borrador = False
+    ls.procesar_actualizacion(db_session, pf, {"borrador": False})
+
+    assert pf.estado == EstadoRegistro.enviado.value
+    assert pf.codigo_repa is not None
+    assert pf.borrador is False

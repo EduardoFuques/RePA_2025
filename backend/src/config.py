@@ -63,6 +63,42 @@ if ENVIRONMENT not in _VALID_ENVIRONMENTS:
     )
 IS_PRODUCTION = ENVIRONMENT == "production"
 
+# =============================================================================
+# Interruptores de entorno (QA-31)
+# =============================================================================
+# Antes estas tres cosas se deducian de ENVIRONMENT y viajaban juntas. Ahora
+# cada una tiene su variable, con el default puesto en el valor que ya tenia,
+# de modo que ningun entorno cambia de comportamiento al actualizar.
+
+# Datos de demostracion: usuarios de prueba (2 por rol), padron y fomento de
+# ejemplo, documentos generados. QA los necesita: el dueno de la aplicacion
+# trabaja con esos usuarios y con las pantallas de test.
+# La suite de tests lo ignora y nunca siembra (arma sus propios fixtures).
+SEED_DEMO_DATA = os.getenv("SEED_DEMO_DATA", str(not IS_PRODUCTION)).lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
+# Rate limiting de los endpoints sensibles (login, registro, recuperacion).
+# Estaba atado a produccion para no interferir con los E2E, que repiten logins.
+# Separarlo permite tenerlo encendido en QA aunque QA siembre datos de prueba.
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", str(IS_PRODUCTION)).lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
+# /docs, /redoc y /openapi.json. Publicarlos expone el mapa completo de la API;
+# en un servidor accesible desde internet conviene cerrarlos aunque el entorno
+# no sea produccion.
+DOCS_ENABLED = os.getenv("DOCS_ENABLED", str(not IS_PRODUCTION)).lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
+
 # Base de datos
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -71,11 +107,29 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"  # Fijo para mayor seguridad
 
 _DEFAULT_SECRET = "your-secret-key-change-in-production"
+_MSG_SECRET = (
+    "SECRET_KEY no configurada o usa el valor por defecto. "
+    'Generar una clave segura con: python -c "import secrets; print(secrets.token_hex(32))"'
+)
+
 if IS_PRODUCTION and (not SECRET_KEY or SECRET_KEY == _DEFAULT_SECRET):
-    raise RuntimeError(
-        "SECRET_KEY no configurada o usa el valor por defecto. "
-        'Generar una clave segura con: python -c "import secrets; print(secrets.token_hex(32))"'
-    )
+    raise RuntimeError(_MSG_SECRET)
+
+if not SECRET_KEY:
+    if IS_TESTING:
+        # La suite tiene que poder correr sin preparar el entorno. Una clave
+        # al azar por corrida es ademas mas correcta que una constante
+        # compartida entre ejecuciones.
+        import secrets
+
+        SECRET_KEY = secrets.token_hex(32)
+    else:
+        # Sin esto, la app arrancaba bien, servia el frontend, y recien
+        # reventaba al firmar el primer JWT: un
+        # `TypeError: Expected a string value` desde adentro de PyJWT, que no
+        # nombra la variable ni el archivo. Fallar aca, al arrancar, con el
+        # nombre de la variable, ahorra una tarde de depuracion.
+        raise RuntimeError(_MSG_SECRET)
 ACCESS_TOKEN_EXPIRE = int(os.getenv("ACCESS_TOKEN_EXPIRE", "30"))
 REFRESH_TOKEN_EXPIRE = int(os.getenv("REFRESH_TOKEN_EXPIRE", "10080"))
 

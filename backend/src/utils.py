@@ -73,6 +73,13 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if token_revocado(db_user, payload):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión expirada, volvé a iniciar sesión",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     user_data = {
         "id": db_user.id,
         "email": db_user.email,
@@ -82,6 +89,39 @@ async def get_current_user(
     # No registrar el payload completo para evitar fuga de PII en logs
     logger.debug(f"get_current_user - user_id: {user_data['id']}")
     return user_data
+
+
+def token_revocado(db_user: User, payload: dict) -> bool:
+    """Indica si el token pertenece a una generacion de sesiones ya revocada.
+
+    Cada token lleva en el claim `tv` la version que tenia el usuario cuando se
+    emitio. Cambiar la contrasena la incrementa, con lo cual todo token anterior
+    deja de valer — que es lo que permite que un cambio de clave expulse a una
+    sesion robada (ver AUT-03).
+
+    Se usa un contador y no una marca de tiempo porque el `iat` de un JWT tiene
+    resolucion de un segundo: con timestamps es imposible distinguir el token
+    emitido justo antes del cambio del que se emite justo despues, al volver a
+    loguearse. Con un contador no hay ventana ambigua.
+
+    Los tokens emitidos antes de este cambio no traen `tv`; se los acepta para
+    no desloguear a todo el mundo en el deploy. Cuando expiren (30 minutos los
+    de acceso, 7 dias los de refresco) el hueco se cierra solo.
+    """
+    tv_token = payload.get("tv")
+    if tv_token is None:
+        return False
+    return int(tv_token) != int(db_user.token_version or 0)
+
+
+def revocar_sesiones(db_user: User) -> None:
+    """Invalida todos los tokens vigentes del usuario.
+
+    Se llama al cambiar la contrasena. Incrementar la version deja fuera a todo
+    token emitido antes, sin la ventana ambigua que tendria una comparacion por
+    tiempo (ver token_revocado).
+    """
+    db_user.token_version = (db_user.token_version or 0) + 1
 
 
 def validar_password(password: str):

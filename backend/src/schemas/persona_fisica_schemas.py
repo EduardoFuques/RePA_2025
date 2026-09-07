@@ -356,12 +356,21 @@ class InvestigadorOut(InvestigadorBase):
 
 
 class PersonaFisicaSearchOut(BaseModel):
-    """Schema reducido para resultados de búsqueda (buscador de integrantes)"""
+    """Schema reducido para resultados de búsqueda (buscador de integrantes).
+
+    Deliberadamente SIN dni ni email. El buscador sirve para elegir a alguien de
+    una lista y vincularlo por ``id``; el documento y el correo de esa persona no
+    hacen falta para eso, y exponerlos convertía al endpoint en una API de
+    cosecha del padrón: diez resultados por consulta, con dos caracteres de
+    búsqueda, disponible para cualquier usuario registrado.
+
+    Si en algún momento hace falta desambiguar entre homónimos, agregar acá un
+    campo derivado (por ejemplo los últimos tres dígitos del documento), nunca
+    el dato completo.
+    """
 
     id: int
     nombre: str | None = None
     apellido: str | None = None
-    dni: str | None = None
-    email: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

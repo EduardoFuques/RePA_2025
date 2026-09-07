@@ -12,7 +12,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from src.config import IS_PRODUCTION
+from src.config import RATE_LIMIT_ENABLED
 
 # IPs de proxies reversos confiables (ej: nginx interno en Docker).
 # Configurar vía variable de entorno TRUSTED_PROXY_IPS (separadas por coma).
@@ -62,10 +62,12 @@ def get_client_ip(request: Request) -> str:
 
 
 # Crear instancia del limiter.
-# Solo se habilita en PRODUCCIÓN: en desarrollo y testing se desactiva para no
-# interferir con flujos automatizados (p.ej. E2E con múltiples workers que
-# repiten logins). Las imágenes de producción corren sin estos tests.
-limiter = Limiter(key_func=get_client_ip, enabled=IS_PRODUCTION)
+# Controlado por RATE_LIMIT_ENABLED (ver config.py), cuyo default sigue siendo
+# "solo en produccion": en desarrollo y testing se desactiva para no interferir
+# con flujos automatizados (p.ej. E2E con multiples workers que repiten logins).
+# Tenerlo como variable propia permite encenderlo en un QA expuesto a internet
+# sin tener que cambiarle el ENVIRONMENT.
+limiter = Limiter(key_func=get_client_ip, enabled=RATE_LIMIT_ENABLED)
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):

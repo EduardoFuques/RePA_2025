@@ -130,7 +130,7 @@ def integrity_as_conflict(db: Session, conflict_message: str = MSG_CONFLICT):
     Context manager: cualquier `db.flush()` (o `db.commit()`) que ocurra
     dentro del bloque y viole una constraint de unicidad/integridad se
     mapea a 409 en vez de propagar un 500. Pensado para envolver los
-    `db.flush()` intermedios de `lifecycle_service.procesar_envio_si_corresponde`
+    `db.flush()` intermedios de `lifecycle_service.procesar_actualizacion`
     (que corren ANTES del commit final) — sin esto, un DNI/CUIT duplicado
     detectado ahí escapa como IntegrityError crudo.
     """
@@ -148,7 +148,7 @@ def apply_update_fields(record: ModelType, data: UpdateSchemaType) -> dict:
     Aplica vía setattr los campos presentes en `data` sobre `record`, SIN
     commitear. Devuelve el dict aplicado para que el caller pueda
     inspeccionarlo antes de guardar (p. ej. detectar una transición de
-    ``borrador`` a enviado y disparar `lifecycle_service.procesar_envio_si_corresponde`)
+    ``borrador`` a enviado y disparar `lifecycle_service.procesar_actualizacion`)
     y decidir side-effects adicionales antes de `commit_or_conflict`.
 
     Es lo que hace `update_record` por dentro; se expone aparte para los
@@ -177,7 +177,7 @@ def create_registrable_record(
     """
     Como `create_record`, pero hace `flush` antes de commitear y, si se pasa
     `on_flush(record, data_dict)`, le da la chance de reaccionar — pensado
-    para `lifecycle_service.procesar_envio_si_corresponde`, por si un
+    para `lifecycle_service.procesar_actualizacion`, por si un
     registro se crea directamente con `borrador: false` (sin pasar antes por
     un PUT de borrador), caso poco común pero posible (clientes que no usan
     el flujo multi-paso del frontend, o el propio create con default False).

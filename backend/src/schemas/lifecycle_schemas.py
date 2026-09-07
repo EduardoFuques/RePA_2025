@@ -11,6 +11,7 @@ class RegistroLifecycleOut(BaseModel):
 
     codigo_repa: str | None = None
     estado: str | None = None
+    fecha_ultima_actualizacion: datetime | None = None
     fecha_envio: datetime | None = None
     fecha_revision: datetime | None = None
     fecha_resolucion: datetime | None = None

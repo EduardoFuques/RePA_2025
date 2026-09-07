@@ -78,3 +78,7 @@ class AuditAction:
     # "USER_REGISTER", fuera de esta clase, así que no aparecía en el catálogo
     # que puebla el filtro de la pantalla de auditoría.
     USER_REGISTER = "USER_REGISTER"
+    # Descarga de un adjunto ajeno desde el backoffice del padrón. Es el único
+    # punto del sistema que entrega el documento de identidad de un tercero, así
+    # que cada acceso queda registrado (ver admin_registros_routes).
+    DOCUMENTO_DESCARGADO = "DOCUMENTO_DESCARGADO"

@@ -63,7 +63,7 @@ async def create_obra(
     db.add(db_obra)
     with integrity_as_conflict(db):
         db.flush()
-        lifecycle_service.procesar_envio_si_corresponde(
+        lifecycle_service.procesar_actualizacion(
             db,
             db_obra,
             obra_data,
@@ -124,7 +124,7 @@ async def update_my_obra(
 
     update_data = apply_update_fields(obra, data)
     with integrity_as_conflict(db):
-        lifecycle_service.procesar_envio_si_corresponde(
+        lifecycle_service.procesar_actualizacion(
             db,
             obra,
             update_data,
@@ -182,7 +182,7 @@ async def update_obra(
     obra = _get_obra(db, obra_id, current_user["id"])
     update_data = apply_update_fields(obra, data)
     with integrity_as_conflict(db):
-        lifecycle_service.procesar_envio_si_corresponde(
+        lifecycle_service.procesar_actualizacion(
             db,
             obra,
             update_data,

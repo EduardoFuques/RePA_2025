@@ -86,9 +86,7 @@ async def create_persona_fisica(
         PersonaFisica,
         data,
         current_user["id"],
-        on_flush=lambda r, ud: lifecycle_service.procesar_envio_si_corresponde(
-            db, r, ud
-        ),
+        on_flush=lambda r, ud: lifecycle_service.procesar_actualizacion(db, r, ud),
     )
 
 
@@ -114,7 +112,7 @@ async def update_my_persona_fisica(
     persona = get_user_record(db, PersonaFisica, current_user["id"], MSG_NOT_FOUND)
     update_data = apply_update_fields(persona, data)
     with integrity_as_conflict(db):
-        lifecycle_service.procesar_envio_si_corresponde(db, persona, update_data)
+        lifecycle_service.procesar_actualizacion(db, persona, update_data)
     commit_or_conflict(db)
     db.refresh(persona)
     return persona
@@ -145,10 +143,13 @@ async def search_personas_fisicas(
     Buscar personas físicas registradas en el RePA por nombre, apellido o DNI.
     Retorna resultados parciales (máximo 10) para uso en buscador de integrantes.
 
-    Limitado por IP (30/min): expone DNI y email del padrón a cualquier
-    usuario autenticado (necesario para el buscador de integrantes), así que
-    sin límite un usuario podría scrapear el padrón completo con consultas
-    de 2 caracteres en secuencia.
+    Se puede buscar POR documento, pero la respuesta no lo devuelve: sale solo
+    id, nombre y apellido (ver PersonaFisicaSearchOut). Quien ya conoce un DNI
+    puede confirmar a quién pertenece, que es inherente a un buscador; lo que
+    ya no se puede es recorrer el padrón juntando documentos y correos ajenos.
+
+    El límite de 30/min por IP se mantiene como segunda barrera contra el
+    barrido sistemático de nombres.
     """
     if not q or len(q.strip()) < 2:
         return []

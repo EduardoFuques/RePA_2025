@@ -39,6 +39,8 @@ from src.utils import (
     get_current_user,
     get_password_hash,
     get_user_permissions,
+    revocar_sesiones,
+    token_revocado,
     update_last_login,
     validar_password,
 )
@@ -46,6 +48,12 @@ from src.utils import (
 user_router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Hash de una contrasena que nadie usa. Sirve para gastar el mismo tiempo de
+# bcrypt cuando el email no existe (ver login), de modo que la duracion de la
+# respuesta no revele si la cuenta esta registrada. Se calcula una sola vez al
+# importar el modulo.
+_HASH_DESCARTABLE = pwd_context.hash("no-such-user-placeholder")
 
 
 # Crear un usuario nuevo
@@ -312,6 +320,11 @@ def login(
     # Buscar el usuario en la base de datos
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user:
+        # Se verifica contra un hash descartable para que la respuesta tarde lo
+        # mismo que con un email real. Sin esto, bcrypt solo corria cuando el
+        # usuario existia y la diferencia de tiempo —decenas de ms, medibles de
+        # forma remota— permitia enumerar que direcciones estan registradas.
+        pwd_context.verify(form_data.password, _HASH_DESCARTABLE)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Correo electrónico o contraseña incorrectos",
@@ -352,13 +365,18 @@ def login(
             "sub": user.id,
             "email": user.email,
             "roles": [{"id": role.id, "rol": role.rol} for role in user.roles],
+            # Generación de sesión: cambiar la contraseña la incrementa y este
+            # token deja de valer (ver token_revocado en utils.py).
+            "tv": user.token_version or 0,
         },
         expires_delta=30,  # 30 minutos
     )
-    # Generar refresh token (7 días) — contiene solo sub y type para minimizar exposición de datos
+    # Generar refresh token (7 días) — contiene solo sub, tv y type para
+    # minimizar exposición de datos
     refresh_token = create_refresh_token(
         data={
             "sub": user.id,
+            "tv": user.token_version or 0,
         }
     )
 
@@ -413,11 +431,22 @@ def refresh_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Sin esto el corte de sesiones sería inútil: el refresh token dura 7 días
+    # y permitiría seguir emitiendo access tokens nuevos después del cambio de
+    # contraseña (AUT-03).
+    if token_revocado(user, payload):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión expirada, volvé a iniciar sesión",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     access_token = create_access_token(
         data={
             "sub": user.id,
             "email": user.email,
             "roles": [{"id": role.id, "rol": role.rol} for role in user.roles],
+            "tv": user.token_version or 0,
         },
         expires_delta=30,
     )
@@ -526,6 +555,9 @@ async def recovery_passwd(
         )
     validar_password(user_in.password)
     user.hashed_password = get_password_hash(user_in.password)
+    # Cortar las sesiones abiertas: si alguien se metió con la cuenta, este es
+    # justamente el momento en que hay que echarlo (AUT-03).
+    revocar_sesiones(user)
     # Invalidar el token de recuperación (misma transacción que el cambio)
     db.query(TokenRecovery).filter(TokenRecovery.token_payload == token).update(
         {"is_active": False}
@@ -679,43 +711,20 @@ async def become_estudiante(
     return user
 
 
-# Actualizar usuario
-@user_router.put(
-    "/me",
-    response_model=UserUpdate,
-    description="Actualizar los datos del usuario actual",
-)
-async def update_user(
-    user_in: UserUpdate,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Actualizar los datos del usuario actual.
-    """
-    # Buscar el usuario en la base de datos
-    user = db.query(User).filter(User.id == current_user["id"]).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Usuario no encontrado",
-        )
-
-    # Actualizar los datos del usuario
-    if user_in.email:
-        user.email = (
-            user_in.email
-        )  # Actualizar el correo electrónico si se proporciona y no hay duplicados
-    if user_in.password:
-        validar_password(user_in.password)
-        user.hashed_password = get_password_hash(user_in.password)
-
-    # Guardar los cambios
-    db.commit()
-    db.refresh(user)
-
-    # Devolver el usuario actualizado
-    return user
+# NOTA — PUT /users/me fue eliminado a proposito.
+#
+# Aceptaba `password` y `email` y los aplicaba sin verificar nada: no pedia la
+# contrasena actual (a diferencia de PUT /users/me/password y de DELETE
+# /users/me, que si la exigen) y no comprobaba unicidad del email, pese a que
+# `verify_email_unique` ya existe en utils.py y el endpoint admin si lo usa.
+# En la practica, un access token robado alcanzaba para fijar una contrasena
+# nueva y quedarse con la cuenta de forma permanente, sin conocer la anterior.
+#
+# No tenia ningun consumidor: el frontend cambia la contrasena por
+# /users/me/password. Cambiar el email propio requiere un circuito con
+# confirmacion por correo al domicilio nuevo, que todavia no existe; hasta que
+# se implemente, el cambio lo hace un administrador por
+# PUT /admin_user/users/{id}, que si valida unicidad.
 
 
 @user_router.put(
@@ -748,6 +757,10 @@ async def change_own_password(
 
     validar_password(data.new_password)
     user.hashed_password = get_password_hash(data.new_password)
+    # Las demás sesiones de esta cuenta dejan de valer. La que está haciendo el
+    # cambio también, así que el frontend tiene que pedir login de nuevo: es el
+    # precio de que un token robado no sobreviva a un cambio de contraseña.
+    revocar_sesiones(user)
     db.commit()
 
     audit_log(

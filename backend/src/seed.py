@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from passlib.context import CryptContext
 
-from src.config import IS_PRODUCTION, IS_TESTING
+from src.config import IS_TESTING, SEED_DEMO_DATA
 from src.database import SessionLocal
 from src.document_generator import generate_fomento_documents, generate_test_documents
 from src.logger import logger
@@ -1047,7 +1047,12 @@ def seed_data():
         sync_rbac(db)
         backfill_estudiante_role(db)
 
-        if IS_PRODUCTION or IS_TESTING:
+        # La suite de tests nunca siembra: arma sus propios fixtures y este
+        # seed le dejaba registros huerfanos que chocaban por DNI/CUIL unicos.
+        # Fuera de eso, manda SEED_DEMO_DATA (ver config.py): antes esto
+        # dependia de que IS_PRODUCTION e IS_TESTING fueran ambas False, que es
+        # una doble negacion dificil de leer y facil de romper sin querer.
+        if IS_TESTING or not SEED_DEMO_DATA:
             return
 
         seed_test_users(db)
