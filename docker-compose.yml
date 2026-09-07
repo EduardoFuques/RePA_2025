@@ -34,6 +34,9 @@ services:
       - type: volume
         source: repa-uploads
         target: /app/uploads
+      - type: volume
+        source: repa-logs
+        target: /code/logs
     environment:
       TZ: America/Argentina/Buenos_Aires
       DATABASE_URL: ${DATABASE_URL}
@@ -41,6 +44,16 @@ services:
       ALGORITHM: ${ALGORITHM:-HS256}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       ENVIRONMENT: ${ENVIRONMENT:-development}
+      # Interruptores separados de ENVIRONMENT (ver backend/src/config.py).
+      # Los defaults son los valores que ya regian, asi que no cambia nada
+      # salvo que se los defina explicitamente en el .env.
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
+      DOCS_ENABLED: ${DOCS_ENABLED:-true}
+      # Los logs de aplicacion se escribian dentro del contenedor y el
+      # `docker compose down` de cada deploy se los llevaba. Con el volumen
+      # sobreviven entre despliegues (rotacion diaria, 7 dias, ya configurada).
+      LOGS_PATH: /code/logs
       API_ROOT_PATH: ${API_ROOT_PATH:-/api}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
       SMTP_HOST: ${SMTP_HOST:-}
@@ -99,4 +112,6 @@ networks:
 
 volumes:
   repa-uploads:
+    driver: local
+  repa-logs:
     driver: local

@@ -63,6 +63,42 @@ if ENVIRONMENT not in _VALID_ENVIRONMENTS:
     )
 IS_PRODUCTION = ENVIRONMENT == "production"
 
+# =============================================================================
+# Interruptores de entorno (QA-31)
+# =============================================================================
+# Antes estas tres cosas se deducian de ENVIRONMENT y viajaban juntas. Ahora
+# cada una tiene su variable, con el default puesto en el valor que ya tenia,
+# de modo que ningun entorno cambia de comportamiento al actualizar.
+
+# Datos de demostracion: usuarios de prueba (2 por rol), padron y fomento de
+# ejemplo, documentos generados. QA los necesita: el dueno de la aplicacion
+# trabaja con esos usuarios y con las pantallas de test.
+# La suite de tests lo ignora y nunca siembra (arma sus propios fixtures).
+SEED_DEMO_DATA = os.getenv("SEED_DEMO_DATA", str(not IS_PRODUCTION)).lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
+# Rate limiting de los endpoints sensibles (login, registro, recuperacion).
+# Estaba atado a produccion para no interferir con los E2E, que repiten logins.
+# Separarlo permite tenerlo encendido en QA aunque QA siembre datos de prueba.
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", str(IS_PRODUCTION)).lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
+# /docs, /redoc y /openapi.json. Publicarlos expone el mapa completo de la API;
+# en un servidor accesible desde internet conviene cerrarlos aunque el entorno
+# no sea produccion.
+DOCS_ENABLED = os.getenv("DOCS_ENABLED", str(not IS_PRODUCTION)).lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
+
 # Base de datos
 DATABASE_URL = os.getenv("DATABASE_URL")
 

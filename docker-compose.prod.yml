@@ -47,6 +47,9 @@ services:
       - type: volume
         source: repa-uploads
         target: /app/uploads
+      - type: volume
+        source: repa-logs
+        target: /code/logs
     environment:
       TZ: America/Argentina/Buenos_Aires
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL es obligatoria en producción}
@@ -54,6 +57,11 @@ services:
       ALGORITHM: ${ALGORITHM:-HS256}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS es obligatorio en producción (dominios reales, sin localhost)}
       ENVIRONMENT: production
+      # En produccion los tres van cerrados salvo decision explicita.
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      DOCS_ENABLED: ${DOCS_ENABLED:-false}
+      LOGS_PATH: /code/logs
       API_ROOT_PATH: ${API_ROOT_PATH:-/api}
       FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL es obligatorio en producción (para los links de confirmación/recuperación por email)}
       SMTP_HOST: ${SMTP_HOST:-}
@@ -102,4 +110,6 @@ networks:
 
 volumes:
   repa-uploads:
+    driver: local
+  repa-logs:
     driver: local

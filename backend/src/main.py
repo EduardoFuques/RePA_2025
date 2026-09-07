@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.config import API_ROOT_PATH, CORS_ORIGINS, IS_PRODUCTION, IS_TESTING
+from src.config import API_ROOT_PATH, CORS_ORIGINS, DOCS_ENABLED, IS_TESTING
 from src.database import create_all_tables, get_db, run_migrations
 from src.logger import logger
 from src.middlewarelogg import log_requests
@@ -47,9 +47,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="API RePA - Registro Provincial del Audiovisual",
     root_path=API_ROOT_PATH,
-    docs_url=None if IS_PRODUCTION else "/docs",
-    redoc_url=None if IS_PRODUCTION else "/redoc",
-    openapi_url=None if IS_PRODUCTION else "/openapi.json",
+    docs_url="/docs" if DOCS_ENABLED else None,
+    redoc_url="/redoc" if DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if DOCS_ENABLED else None,
     description="""
 ## Sistema de Registro del Sector Audiovisual de Misiones
 
@@ -210,6 +210,11 @@ def health_check(db: Session = Depends(get_db)):
     """
     Health check endpoint para verificar el estado del servicio.
     Verifica conexión a la base de datos.
+
+    No expone la versión del backend: es un endpoint sin autenticar y publicar
+    la versión exacta le ahorra trabajo a quien busque vulnerabilidades
+    conocidas de las dependencias. La versión sigue estando en /docs cuando
+    DOCS_ENABLED lo permite, y en la imagen desplegada.
     """
     try:
         db.execute(text("SELECT 1"))
@@ -220,7 +225,6 @@ def health_check(db: Session = Depends(get_db)):
 
     return {
         "status": "healthy" if db_status == "healthy" else "degraded",
-        "version": app.version,
         "database": db_status,
     }
 
@@ -233,9 +237,18 @@ def liveness():
 
 @app.get("/health/ready", tags=["Health"])
 def readiness(db: Session = Depends(get_db)):
-    """Readiness probe - verifica que la aplicación puede recibir tráfico."""
+    """Readiness probe - verifica que la aplicación puede recibir tráfico.
+
+    Devuelve 503 cuando no está listo. Antes respondía 200 con
+    {"status": "not_ready"} en el cuerpo: un balanceador o un orquestador
+    mira el código de estado, así que nunca sacaba la instancia de rotación
+    por más que la base estuviera caída.
+    """
     try:
         db.execute(text("SELECT 1"))
         return {"status": "ready"}
     except Exception:
-        return {"status": "not_ready"}
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "not_ready"},
+        )
