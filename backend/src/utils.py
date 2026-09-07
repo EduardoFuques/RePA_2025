@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
@@ -92,51 +92,36 @@ async def get_current_user(
 
 
 def token_revocado(db_user: User, payload: dict) -> bool:
-    """Indica si el token fue emitido antes del ultimo corte de sesiones.
+    """Indica si el token pertenece a una generacion de sesiones ya revocada.
 
-    `tokens_valid_from` se adelanta cada vez que cambia la contrasena. Todo
-    token con `iat` anterior a ese instante deja de valer, que es lo que
-    permite que un cambio de clave expulse a una sesion robada (ver AUT-03).
+    Cada token lleva en el claim `tv` la version que tenia el usuario cuando se
+    emitio. Cambiar la contrasena la incrementa, con lo cual todo token anterior
+    deja de valer — que es lo que permite que un cambio de clave expulse a una
+    sesion robada (ver AUT-03).
 
-    Los tokens emitidos antes de este cambio no traen `iat`; se los acepta para
+    Se usa un contador y no una marca de tiempo porque el `iat` de un JWT tiene
+    resolucion de un segundo: con timestamps es imposible distinguir el token
+    emitido justo antes del cambio del que se emite justo despues, al volver a
+    loguearse. Con un contador no hay ventana ambigua.
+
+    Los tokens emitidos antes de este cambio no traen `tv`; se los acepta para
     no desloguear a todo el mundo en el deploy. Cuando expiren (30 minutos los
     de acceso, 7 dias los de refresco) el hueco se cierra solo.
     """
-    corte = getattr(db_user, "tokens_valid_from", None)
-    if corte is None:
+    tv_token = payload.get("tv")
+    if tv_token is None:
         return False
-
-    iat = payload.get("iat")
-    if iat is None:
-        return False
-
-    if corte.tzinfo is None:
-        corte = corte.replace(tzinfo=timezone.utc)
-
-    # `iat` viaja como epoch en SEGUNDOS enteros: el JWT no tiene resolucion
-    # sub-segundo. Por eso el corte se trunca al segundo antes de comparar; si
-    # no, un token emitido en el mismo segundo del cambio de contrasena tendria
-    # un `iat` redondeado hacia abajo y quedaria "antes" del corte.
-    #
-    # Concretamente, es lo que pasa cuando alguien cambia su clave y vuelve a
-    # entrar enseguida: el login devuelve tokens validos y el primer request
-    # los rechazaba con 401, dejando al usuario afuera de su propia cuenta.
-    #
-    # La contracara es una ventana de un segundo: un token emitido en el mismo
-    # segundo exacto del cambio sobrevive. Es el margen que impone el formato,
-    # y es preferible a expulsar a todo el que cambia su contrasena.
-    return iat < int(corte.timestamp())
+    return int(tv_token) != int(db_user.token_version or 0)
 
 
 def revocar_sesiones(db_user: User) -> None:
     """Invalida todos los tokens vigentes del usuario.
 
-    Se llama al cambiar la contrasena. El sello se pone en el instante actual,
-    sin margen hacia adelante: adelantarlo aunque sea un segundo invalidaba
-    tambien el token que el usuario obtiene al volver a loguearse enseguida
-    (ver la nota sobre la resolucion de `iat` en token_revocado).
+    Se llama al cambiar la contrasena. Incrementar la version deja fuera a todo
+    token emitido antes, sin la ventana ambigua que tendria una comparacion por
+    tiempo (ver token_revocado).
     """
-    db_user.tokens_valid_from = datetime.now(timezone.utc)
+    db_user.token_version = (db_user.token_version or 0) + 1
 
 
 def validar_password(password: str):

@@ -20,6 +20,7 @@ Revises: d4e5f6a7b8c9
 Create Date: 2026-07-19 00:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -27,14 +28,60 @@ from sqlalchemy.orm import Session
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'e5f6a7b8c9d0'
-down_revision: Union[str, Sequence[str], None] = 'd4e5f6a7b8c9'
+revision: str = "e5f6a7b8c9d0"
+down_revision: Union[str, Sequence[str], None] = "d4e5f6a7b8c9"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+# Tablas que este backfill reconcilia, en el orden en que hay que hacerlo.
+_TABLAS = (
+    "personas_fisicas",
+    "personas_juridicas",
+    "estudiantes_esa",
+    "asociaciones",
+    "obras_audiovisuales",
+)
+
+
+def _hay_filas_inconsistentes(bind) -> bool:
+    """Chequeo previo en SQL crudo, sin tocar los modelos ORM.
+
+    Existe porque el backfill de abajo consulta los modelos, y SQLAlchemy arma
+    el SELECT con las columnas mapeadas HOY: cualquier columna agregada al
+    modelo despues de escrita esta migracion hace que correr las migraciones
+    desde cero falle con UndefinedColumn. En una base nueva no hay nada que
+    reconciliar, asi que ni siquiera hace falta llegar ahi; y en una base que ya
+    aplico esta revision, no vuelve a ejecutarse.
+    """
+    import sqlalchemy as sa
+
+    for tabla in _TABLAS:
+        existe = bind.execute(
+            sa.text(
+                "SELECT 1 FROM information_schema.tables WHERE table_name = :t LIMIT 1"
+            ),
+            {"t": tabla},
+        ).first()
+        if not existe:
+            continue
+        fila = bind.execute(
+            sa.text(
+                f"SELECT 1 FROM {tabla} "  # noqa: S608 - nombre de una lista fija
+                "WHERE borrador IS false AND estado = 'borrador' LIMIT 1"
+            )
+        ).first()
+        if fila:
+            return True
+    return False
+
+
 def upgrade() -> None:
     """Upgrade schema — backfill de datos, no cambia el esquema."""
+    if not _hay_filas_inconsistentes(op.get_bind()):
+        # Base nueva (o ya reconciliada): nada que hacer.
+        return
+
     from src.models.asociacion_model import Asociacion
     from src.models.esa_model import EstudianteESA
     from src.models.obra_audiovisual_model import ObraAudiovisual
@@ -50,7 +97,9 @@ def upgrade() -> None:
     for model in (PersonaFisica, PersonaJuridica, EstudianteESA):
         inconsistentes = (
             db.query(model)
-            .filter(model.borrador.is_(False), model.estado == EstadoRegistro.borrador.value)
+            .filter(
+                model.borrador.is_(False), model.estado == EstadoRegistro.borrador.value
+            )
             .all()
         )
         for registro in inconsistentes:
@@ -62,7 +111,9 @@ def upgrade() -> None:
     for model in (Asociacion, ObraAudiovisual):
         inconsistentes = (
             db.query(model)
-            .filter(model.borrador.is_(False), model.estado == EstadoRegistro.borrador.value)
+            .filter(
+                model.borrador.is_(False), model.estado == EstadoRegistro.borrador.value
+            )
             .all()
         )
         for registro in inconsistentes:

@@ -365,13 +365,18 @@ def login(
             "sub": user.id,
             "email": user.email,
             "roles": [{"id": role.id, "rol": role.rol} for role in user.roles],
+            # Generación de sesión: cambiar la contraseña la incrementa y este
+            # token deja de valer (ver token_revocado en utils.py).
+            "tv": user.token_version or 0,
         },
         expires_delta=30,  # 30 minutos
     )
-    # Generar refresh token (7 días) — contiene solo sub y type para minimizar exposición de datos
+    # Generar refresh token (7 días) — contiene solo sub, tv y type para
+    # minimizar exposición de datos
     refresh_token = create_refresh_token(
         data={
             "sub": user.id,
+            "tv": user.token_version or 0,
         }
     )
 
@@ -441,6 +446,7 @@ def refresh_access_token(
             "sub": user.id,
             "email": user.email,
             "roles": [{"id": role.id, "rol": role.rol} for role in user.roles],
+            "tv": user.token_version or 0,
         },
         expires_delta=30,
     )
