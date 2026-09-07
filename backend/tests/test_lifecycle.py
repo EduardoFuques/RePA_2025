@@ -172,7 +172,7 @@ def test_procesar_envio_pf_emite_codigo_propio(db_session):
     pf = _nueva_pf(db_session)
     assert pf.estado == EstadoRegistro.borrador.value
 
-    ls.procesar_envio_si_corresponde(db_session, pf, {"borrador": False})
+    ls.procesar_actualizacion(db_session, pf, {"borrador": False})
 
     assert pf.estado == EstadoRegistro.enviado.value
     assert pf.fecha_envio is not None
@@ -187,7 +187,7 @@ def test_procesar_envio_agam_hereda_codigo_titular(db_session):
     db_session.flush()
     assert obra.estado == EstadoRegistro.borrador.value
 
-    ls.procesar_envio_si_corresponde(
+    ls.procesar_actualizacion(
         db_session, obra, {"borrador": False}, get_persona_fisica_titular=lambda: pf
     )
 
@@ -200,12 +200,12 @@ def test_procesar_envio_es_idempotente(db_session):
     """Un segundo PUT con borrador:false (edición posterior al envío) no
     reenvía ni regenera nada — el estado ya no es 'borrador'."""
     pf = _nueva_pf(db_session)
-    ls.procesar_envio_si_corresponde(db_session, pf, {"borrador": False})
+    ls.procesar_actualizacion(db_session, pf, {"borrador": False})
     codigo_original = pf.codigo_repa
     fecha_envio_original = pf.fecha_envio
 
     # Segunda edición, también con borrador:false (el frontend lo manda siempre).
-    ls.procesar_envio_si_corresponde(db_session, pf, {"borrador": False, "nombre": "X"})
+    ls.procesar_actualizacion(db_session, pf, {"borrador": False, "nombre": "X"})
 
     assert pf.codigo_repa == codigo_original
     assert pf.fecha_envio == fecha_envio_original
@@ -215,11 +215,11 @@ def test_procesar_envio_no_dispara_en_guardado_de_borrador(db_session):
     """Guardar un borrador intermedio (borrador:true, o borrador ausente del
     payload) no debe emitir código ni cambiar el estado."""
     pf = _nueva_pf(db_session)
-    ls.procesar_envio_si_corresponde(db_session, pf, {"borrador": True, "nombre": "X"})
+    ls.procesar_actualizacion(db_session, pf, {"borrador": True, "nombre": "X"})
     assert pf.estado == EstadoRegistro.borrador.value
     assert pf.codigo_repa is None
 
-    ls.procesar_envio_si_corresponde(db_session, pf, {"nombre": "Y"})
+    ls.procesar_actualizacion(db_session, pf, {"nombre": "Y"})
     assert pf.estado == EstadoRegistro.borrador.value
     assert pf.codigo_repa is None
 
