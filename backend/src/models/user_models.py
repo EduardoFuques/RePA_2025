@@ -67,6 +67,11 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_login = Column(DateTime, default=None, nullable=True)
+    # Sello de invalidacion de sesiones: cualquier token emitido ANTES de este
+    # instante se rechaza. Se adelanta al cambiar la contrasena, de modo que un
+    # cambio de clave corta las sesiones abiertas (incluidos los refresh de 7
+    # dias). NULL = nunca se revoco nada, todos los tokens vigentes valen.
+    tokens_valid_from = Column(DateTime, default=None, nullable=True)
     # Relación con roles a través de la tabla UserRole
     roles = relationship("Role", secondary="user_roles", backref="users")
 

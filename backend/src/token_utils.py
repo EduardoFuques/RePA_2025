@@ -92,9 +92,11 @@ def create_access_token(
         expires_delta = timedelta(minutes=expires_delta)
     # ACCESS_TOKEN_EXPIRE y REFRESH_TOKEN_EXPIRE provienen de la configuración
 
-    expire = datetime.now(timezone.utc) + (expires_delta)
-    # Se añade el tipo de token para distinguirlo en el refresh endpoint
-    to_encode.update({"exp": expire, "type": type, "jti": str(uuid4())})
+    ahora = datetime.now(timezone.utc)
+    expire = ahora + (expires_delta)
+    # `iat` es lo que permite revocar: get_current_user compara este instante
+    # contra users.tokens_valid_from (ver AUT-03).
+    to_encode.update({"exp": expire, "iat": ahora, "type": type, "jti": str(uuid4())})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -111,7 +113,10 @@ def create_refresh_token(
     """
     to_encode = data.copy()
     # REFRESH_TOKEN_EXPIRE está expresado en minutos en la configuración
-    expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE)
-    to_encode.update({"exp": expire, "type": "refresh", "jti": str(uuid4())})
+    ahora = datetime.now(timezone.utc)
+    expire = ahora + timedelta(minutes=REFRESH_TOKEN_EXPIRE)
+    to_encode.update(
+        {"exp": expire, "iat": ahora, "type": "refresh", "jti": str(uuid4())}
+    )
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
