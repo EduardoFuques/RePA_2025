@@ -128,6 +128,27 @@ jobs:
         working-directory: ./backend
         run: ruff check src/ --ignore E501
 
+  seguridad:
+    name: Auditoría de dependencias
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar pip-audit
+        run: pip install pip-audit
+
+      - name: Buscar CVEs en las dependencias
+        working-directory: ./backend
+        continue-on-error: true
+        run: pip-audit -r requirements.txt --desc
+
   build:
     name: Build Docker
     runs-on: ubuntu-latest

@@ -33,15 +33,28 @@ Esto iniciará los contenedores docker con:
 ### Variables de entorno declaradas 
 | Variable                    | Valor                                          |
 |-----------------------------|------------------------------------------------|
-| POSTGRES_USER               | 'postgres'                                     |
-| POSTGRES_PASSWORD           | 'example'                                      |
+| POSTGRES_USER               | usuario de PostgreSQL                          |
+| POSTGRES_PASSWORD           | contraseña de PostgreSQL                       |
 | POSTGRES_PORT               | 5432                                           |
-| POSTGRES_DB                 | 'iaavim'                                       |
-| POSTGRES_DBHOST             | repa2024-db-1                                  |
-| DATABASE_URL                | 'postgresql://postgres:example@db:5432/iaavim' |
-| SECRET_KEY                  | '09d25e094faa6cad3e7'                          |
+| POSTGRES_DB                 | nombre de la base                              |
+| POSTGRES_DBHOST             | host de la base (`db` dentro de compose)       |
+| DATABASE_URL                | `postgresql://<user>:<pass>@db:5432/<base>`    |
+| SECRET_KEY                  | 32 bytes al azar — ver abajo                   |
 | ALGORITHM                   | 'HS256'                                        |
-| ACCESS_TOKEN_EXPIRE_MINUTES | 30                                             |
+| ACCESS_TOKEN_EXPIRE         | 30 (minutos)                                   |
+| ENVIRONMENT                 | development \| testing \| production           |
 | NODE_ENV                    | 'develop'                                      |
 | PORT                        | '3000'                                         |
+
+> [!warning]
+> Esta tabla describe **qué significa** cada variable, no qué valor ponerle.
+> Antes traía valores concretos (`POSTGRES_PASSWORD='example'`,
+> `SECRET_KEY='09d25e094faa6cad3e7'`) que se copiaban tal cual a los entornos
+> reales. Generá la clave con:
+>
+> ```bash
+> python -c "import secrets; print(secrets.token_hex(32))"
+> ```
+>
+> El listado completo y comentado está en `.env.example`.
 

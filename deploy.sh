@@ -30,7 +30,19 @@ fi
 # nada. Docker sí puede montarlo (el daemon corre como root), así que se
 # deja que `docker compose up` sea el que falle fuerte y claro si
 # SSL_DOMAIN está mal configurado o el certificado no existe.
-COMPOSE_FILES=(-f docker-compose.yml)
+# Que compose usar. COMPOSE_ENV=prod selecciona docker-compose.prod.yml
+# (ENVIRONMENT=production, sin --reload, sin bind mount del codigo, SECRET_KEY y
+# CORS_ORIGINS obligatorios, frontend sin usuarios de prueba). Cualquier otro
+# valor —incluido no definirlo— usa el compose de desarrollo, que es lo que
+# necesita QA para tener el seed y las pantallas de prueba.
+if [ "$COMPOSE_ENV" = "prod" ] || [ "$COMPOSE_ENV" = "production" ]; then
+  echo "✓ COMPOSE_ENV=$COMPOSE_ENV — usando docker-compose.prod.yml"
+  COMPOSE_FILES=(-f docker-compose.prod.yml)
+else
+  echo "ℹ COMPOSE_ENV no es 'prod' — usando docker-compose.yml (dev/QA)"
+  COMPOSE_FILES=(-f docker-compose.yml)
+fi
+
 if [ -n "$SSL_DOMAIN" ]; then
   echo "✓ SSL_DOMAIN=$SSL_DOMAIN — habilitando HTTPS"
   COMPOSE_FILES+=(-f docker-compose.ssl.yml)
@@ -134,6 +146,5 @@ echo "=== Deploy completado ==="
 echo "Versiones: Backend=$BACKEND_VERSION Frontend=$FRONTEND_VERSION"
 echo "Frontend: http://localhost (puerto 80)"
 echo "API: http://localhost/api (proxy al backend)"
-echo "Adminer: http://localhost:8081 (solo desde el servidor)"
 echo ""
 echo "Backend y PostgreSQL NO están expuestos externamente."
