@@ -5,9 +5,6 @@
 
 set -e
 
-FRONTEND_REPO="git@github.com:EduardoFuques/Repa2025-Frontend.git"
-FRONTEND_BRANCH="main"
-
 echo "=== Deploy RePA ==="
 echo ""
 
@@ -70,20 +67,29 @@ docker compose "${COMPOSE_FILES[@]}" down
 echo "Actualizando backend..."
 git pull
 
-# Clonar o actualizar el frontend
-echo "Actualizando frontend..."
-if [ -d "frontend/.git" ]; then
-  # Es un repo git clonado, actualizar
-  cd frontend
-  git fetch origin
-  git checkout $FRONTEND_BRANCH
-  git pull origin $FRONTEND_BRANCH
-  cd ..
-else
-  # No es un repo git, eliminar y clonar
+# Actualizar el frontend al commit pineado en el submodulo.
+#
+# Antes esto clonaba el repo a mano y hacia `git pull origin main`, con lo cual
+# el puntero del submodulo se ignoraba y se desplegaba siempre el HEAD de main:
+# backend y frontend nunca salian de forma atomica, y `git status` reportaba el
+# submodulo como modificado de forma permanente.
+#
+# Ahora manda el puntero. Consecuencia practica del cambio: mergear algo en el
+# frontend YA NO ALCANZA para que llegue al servidor — hay que bumpear el
+# puntero en este repo (git add frontend && commit), que es justamente lo que
+# vuelve reproducible un despliegue.
+echo "Actualizando frontend (submodulo)..."
+git submodule sync --recursive
+if ! git submodule update --init --recursive; then
+  # Primera corrida despues de declarar el submodulo: frontend/ todavia es el
+  # clon suelto que dejaba el deploy anterior y git no lo reconoce como
+  # submodulo registrado. Se rehace desde cero — no hay nada local que perder,
+  # es un checkout de un repo remoto (el flujo viejo tambien hacia rm -rf aca).
+  echo "  frontend/ no era un submodulo valido; rehaciendo el checkout"
   rm -rf frontend
-  git clone -b $FRONTEND_BRANCH $FRONTEND_REPO frontend
+  git submodule update --init --recursive
 fi
+echo "  frontend en: $(git -C frontend rev-parse --short HEAD)"
 
 # Construir y iniciar los contenedores
 echo "Construyendo e iniciando contenedores..."
