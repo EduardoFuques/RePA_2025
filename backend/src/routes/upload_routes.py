@@ -140,7 +140,11 @@ async def upload_dni(
     user_id = current_user["id"]
     user_dir = ensure_user_dir(user_id)
 
-    # Generar nombre único para el archivo
+    # Generar nombre único para el archivo.
+    # `filename` es opcional en multipart: si el cliente no lo manda,
+    # os.path.splitext(None) levantaba TypeError y salía como 500.
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="El archivo debe incluir un nombre")
     file_extension = os.path.splitext(file.filename)[1]
     if file_extension.lower() != ".pdf":
         raise HTTPException(status_code=400, detail="El archivo debe ser un PDF")
@@ -301,7 +305,9 @@ async def upload_document(
 
     doc_config = ALLOWED_DOC_TYPES[doc_type]
 
-    # Validar extensión
+    # Validar extensión (ver nota sobre filename ausente en upload_dni)
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="El archivo debe incluir un nombre")
     file_extension = os.path.splitext(file.filename)[1].lower()
     if file_extension not in doc_config["extensions"]:
         allowed = ", ".join(doc_config["extensions"])
