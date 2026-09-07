@@ -1,6 +1,6 @@
 """revocacion de sesiones: users.tokens_valid_from
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: a8b9c0d1e2f3
 Revises: f7a8b9c0d1e2
 Create Date: 2026-09-07
 
@@ -26,7 +26,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "a1b2c3d4e5f6"
+revision: str = "a8b9c0d1e2f3"
 down_revision: Union[str, Sequence[str], None] = "f7a8b9c0d1e2"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

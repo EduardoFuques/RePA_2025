@@ -110,21 +110,33 @@ def token_revocado(db_user: User, payload: dict) -> bool:
     if iat is None:
         return False
 
-    # PyJWT devuelve `iat` como epoch; la columna es un DateTime naive en UTC.
-    emitido = datetime.fromtimestamp(iat, tz=timezone.utc)
     if corte.tzinfo is None:
         corte = corte.replace(tzinfo=timezone.utc)
-    return emitido < corte
+
+    # `iat` viaja como epoch en SEGUNDOS enteros: el JWT no tiene resolucion
+    # sub-segundo. Por eso el corte se trunca al segundo antes de comparar; si
+    # no, un token emitido en el mismo segundo del cambio de contrasena tendria
+    # un `iat` redondeado hacia abajo y quedaria "antes" del corte.
+    #
+    # Concretamente, es lo que pasa cuando alguien cambia su clave y vuelve a
+    # entrar enseguida: el login devuelve tokens validos y el primer request
+    # los rechazaba con 401, dejando al usuario afuera de su propia cuenta.
+    #
+    # La contracara es una ventana de un segundo: un token emitido en el mismo
+    # segundo exacto del cambio sobrevive. Es el margen que impone el formato,
+    # y es preferible a expulsar a todo el que cambia su contrasena.
+    return iat < int(corte.timestamp())
 
 
 def revocar_sesiones(db_user: User) -> None:
     """Invalida todos los tokens vigentes del usuario.
 
-    Se llama al cambiar la contrasena. Usa un segundo de margen hacia adelante
-    para que un token emitido en el mismo instante del cambio no sobreviva por
-    la resolucion de `iat`, que es de un segundo.
+    Se llama al cambiar la contrasena. El sello se pone en el instante actual,
+    sin margen hacia adelante: adelantarlo aunque sea un segundo invalidaba
+    tambien el token que el usuario obtiene al volver a loguearse enseguida
+    (ver la nota sobre la resolucion de `iat` en token_revocado).
     """
-    db_user.tokens_valid_from = datetime.now(timezone.utc) + timedelta(seconds=1)
+    db_user.tokens_valid_from = datetime.now(timezone.utc)
 
 
 def validar_password(password: str):

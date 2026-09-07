@@ -1,7 +1,7 @@
 """padron: fecha_ultima_actualizacion en las entidades registrables
 
-Revision ID: b2c3d4e5f6a7
-Revises: a1b2c3d4e5f6
+Revision ID: b9c0d1e2f3a4
+Revises: a8b9c0d1e2f3
 Create Date: 2026-09-07
 
 Hasta ahora no habia forma de responder "cuan al dia esta el dato que figura en
@@ -23,8 +23,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "b2c3d4e5f6a7"
-down_revision: Union[str, Sequence[str], None] = "a1b2c3d4e5f6"
+revision: str = "b9c0d1e2f3a4"
+down_revision: Union[str, Sequence[str], None] = "a8b9c0d1e2f3"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
