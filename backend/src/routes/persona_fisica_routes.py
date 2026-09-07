@@ -145,10 +145,13 @@ async def search_personas_fisicas(
     Buscar personas físicas registradas en el RePA por nombre, apellido o DNI.
     Retorna resultados parciales (máximo 10) para uso en buscador de integrantes.
 
-    Limitado por IP (30/min): expone DNI y email del padrón a cualquier
-    usuario autenticado (necesario para el buscador de integrantes), así que
-    sin límite un usuario podría scrapear el padrón completo con consultas
-    de 2 caracteres en secuencia.
+    Se puede buscar POR documento, pero la respuesta no lo devuelve: sale solo
+    id, nombre y apellido (ver PersonaFisicaSearchOut). Quien ya conoce un DNI
+    puede confirmar a quién pertenece, que es inherente a un buscador; lo que
+    ya no se puede es recorrer el padrón juntando documentos y correos ajenos.
+
+    El límite de 30/min por IP se mantiene como segunda barrera contra el
+    barrido sistemático de nombres.
     """
     if not q or len(q.strip()) < 2:
         return []
