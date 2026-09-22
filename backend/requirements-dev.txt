@@ -13,7 +13,7 @@ ruff>=0.16.8,<1.0.0
 
 # Testing
 pytest>=8.0.0,<10.0.0
-pytest-asyncio>=0.23.0,<1.0.0
+pytest-asyncio>=1.4.0,<2.0.0
 # httpx no se importa directo en ningun test, pero es lo que usa por debajo
 # el TestClient de FastAPI (5 archivos de tests). Sin el, fallan todos.
 httpx>=0.27.0,<1.0.0
