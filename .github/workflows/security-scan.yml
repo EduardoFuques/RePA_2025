@@ -43,12 +43,12 @@ jobs:
   escaneo:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Si la imagen es privada, sin login el scan falla con un 401 que
       # parece un problema de Trivy y no lo es.
       - name: Login a GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -57,7 +57,7 @@ jobs:
       # --- La imagen publicada: SO + runtime de Python ------------------
       # Es el escaneo que ninguna otra herramienta del pipeline hace hoy.
       - name: Trivy — imagen Docker (SARIF)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: ${{ env.IMAGEN }}
@@ -80,7 +80,7 @@ jobs:
       # via pip-audit, GHSA via Dependabot, Trivy) mirando lo mismo no es
       # redundancia — es no depender de una sola para enterarse.
       - name: Trivy — filesystem del repo (SARIF)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .

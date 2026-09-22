@@ -38,7 +38,7 @@ jobs:
       # workflows (proteccion anti-loop de GitHub Actions) — por eso se usa
       # un PAT (RELEASE_TOKEN) y no GITHUB_TOKEN, asi el push del tag
       # "cuenta" como un push real y si dispara docker-publish.yml.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           # semantic-release necesita todo el historial y los tags para
@@ -47,7 +47,7 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
