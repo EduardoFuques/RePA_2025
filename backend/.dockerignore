@@ -1,0 +1,44 @@
+# Que NO viaja al contexto de build de la imagen del backend.
+#
+# El Dockerfile solo copia requirements.txt, src/, alembic/ y alembic.ini.
+# Sin este archivo, igual se le mandaba al daemon todo el resto del
+# directorio, y —lo que importa de verdad— los __pycache__ que estan DENTRO
+# de src/ y alembic/versions/ terminaban adentro de la imagen: bytecode
+# compilado por otra version de Python, en una imagen que ahora corre 3.14.
+# Python lo ignora y recompila, asi que no rompia nada; es basura, no un bug.
+#
+# En CI no pasaba (el checkout viene limpio), solo en builds locales — que
+# son justo los que hace alguien apurado, sin mirar.
+
+# Bytecode y cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Entornos virtuales locales
+.venv/
+venv/
+env/
+
+# Tests y herramientas: no se instalan en la imagen desde que
+# requirements-dev.txt existe, asi que tampoco tienen por que viajar.
+tests/
+pytest.ini
+ruff.toml
+requirements-dev.txt
+
+# Logs de la aplicacion: en produccion van a un volumen, no a la imagen.
+logs/
+
+# Documentacion y scripts sueltos
+README.md
+update_document_paths.sql
+
+# Nada de git ni de secretos
+.git/
+.gitignore
+.env
+.env.*
