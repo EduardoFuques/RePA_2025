@@ -46,10 +46,12 @@ if [ "$RUN_BACKEND" -eq 1 ]; then
     
     cd backend
     
-    # Verificar si ruff está instalado
+    # Verificar si ruff está instalado. Se instala la version que declara
+    # requirements-dev.txt y no la ultima publicada, para que lintee igual
+    # que el CI (ver el job `lint` de .github/workflows/ci.yml).
     if ! command -v ruff &> /dev/null; then
         echo -e "${YELLOW}Instalando ruff...${NC}"
-        pip install ruff
+        pip install "$(grep -E '^ruff' requirements-dev.txt)"
     fi
     
     # Ejecutar ruff check con autofix
