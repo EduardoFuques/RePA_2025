@@ -206,7 +206,12 @@ jobs:
     if: github.event_name == 'push' && github.ref_name == 'main'
 
     steps:
+      # GH_REPO es obligatorio, no decorativo: este job no hace checkout (no
+      # necesita el codigo, solo dispara), y sin repositorio git en el disco
+      # `gh` no tiene contra que repo actuar. Falla con "fatal: not a git
+      # repository", que parece un problema del runner y no lo es.
       - name: Disparar release.yml
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: gh workflow run release.yml --ref main -f ref="${{ github.sha }}"
