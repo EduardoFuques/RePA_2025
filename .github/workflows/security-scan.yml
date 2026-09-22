@@ -1,0 +1,140 @@
+name: Escaneo de CVEs (Trivy)
+
+# Capa 2 de deteccion de CVEs.
+#
+# QUE TAPA QUE NO TAPA NADA MAS. `pip-audit` (ci.yml) y las alertas de
+# Dependabot miran el MANIFIESTO de dependencias: backend/requirements.txt.
+# Ninguno de los dos mira el CONTENIDO de la imagen Docker que
+# efectivamente se despliega — los paquetes del sistema operativo de
+# python:3.13-slim, OpenSSL, las libs de sistema contra las que linkean las
+# ruedas compiladas. Un CVE ahi hoy no lo detecta nada del pipeline. Eso es
+# lo que escanea este workflow.
+#
+# POR QUE ACA SI VA AL TAB DE SECURITY (y en turno-app no). Subir el
+# resultado en SARIF a Code Scanning requiere GitHub Advanced Security en
+# repos PRIVADOS, que es paga — por eso en turno-app el resultado va a un
+# issue fijo. Este repo es publico, donde Code Scanning es gratis, asi que
+# los hallazgos van al lugar que corresponde: Security > Code scanning, con
+# historial, deduplicacion y estado por hallazgo, en vez de un issue que hay
+# que leer a mano. Si el repo se hiciera privado, este workflow deja de
+# poder subir el SARIF y hay que volver al mecanismo de issue.
+#
+# ES SOLO DETECCION. No bloquea el CI, no abre PRs de fix, no falla el
+# build (`exit-code: 0`). Por eso vive en su propio workflow programado y no
+# dentro de ci.yml: un escaneo de CVEs que corta el deploy convierte un
+# advisory publicado un martes cualquiera en una urgencia, y no es eso lo
+# que se busca.
+
+on:
+  schedule:
+    # Lunes 09:00 UTC = 06:00 en Argentina (UTC-3).
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+  security-events: write
+
+env:
+  IMAGEN: ghcr.io/eduardofuques/repa-backend:latest
+
+jobs:
+  escaneo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Si la imagen es privada, sin login el scan falla con un 401 que
+      # parece un problema de Trivy y no lo es.
+      - name: Login a GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- La imagen publicada: SO + runtime de Python ------------------
+      # Es el escaneo que ninguna otra herramienta del pipeline hace hoy.
+      - name: Trivy — imagen Docker (SARIF)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGEN }}
+          format: sarif
+          output: trivy-imagen.sarif
+          severity: HIGH,CRITICAL
+          # Un CVE sin parche disponible no es accionable, y meterlo en el
+          # reporte semanal solo entrena a ignorar el reporte.
+          ignore-unfixed: true
+          exit-code: "0"
+
+      - name: Subir hallazgos de la imagen
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-imagen.sarif
+          category: trivy-imagen
+
+      # --- El repo: las mismas dependencias, otra base de datos ---------
+      # requirements.txt contra la base de Trivy. Tres bases distintas (PyPI
+      # via pip-audit, GHSA via Dependabot, Trivy) mirando lo mismo no es
+      # redundancia — es no depender de una sola para enterarse.
+      - name: Trivy — filesystem del repo (SARIF)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-repo.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+
+      - name: Subir hallazgos del repo
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-repo.sarif
+          category: trivy-repo
+
+      # --- Resumen legible en la corrida -------------------------------
+      # El tab de Security es el registro; esto es para poder mirar una
+      # corrida y saber como salio sin navegar a otro lado.
+      - name: Armar el resumen
+        if: always()
+        run: |
+          set -euo pipefail
+
+          filas() {
+            jq -r --arg origen "$2" '
+              (.runs // [])[]
+              | (.results // [])[]
+              | [$origen, (.level // "?"), (.ruleId // "?"),
+                 ((.message.text // "") | gsub("[\n\t]"; " ") | .[0:100])]
+              | @tsv
+            ' "$1" 2>/dev/null || true
+          }
+
+          filas trivy-imagen.sarif imagen > hallazgos.tsv
+          filas trivy-repo.sarif repo >> hallazgos.tsv
+
+          # Un mismo CVE puede aparecer en los dos escaneos (una dependencia
+          # de pip esta en el repo Y adentro de la imagen). Se deduplica por
+          # ruleId para no inflar el conteo.
+          sort -u -k3,3 hallazgos.tsv -o hallazgos.tsv
+          TOTAL=$(wc -l < hallazgos.tsv)
+
+          {
+            echo "## Escaneo de CVEs — $(date -u -d '3 hours ago' '+%d/%m/%Y %H:%M') (hora de Argentina)"
+            echo
+            echo "Imagen escaneada: \`${IMAGEN}\`"
+            echo
+            if [ "$TOTAL" -eq 0 ]; then
+              echo "Sin vulnerabilidades HIGH o CRITICAL con parche disponible."
+            else
+              echo "**$TOTAL** con parche disponible. Detalle completo en **Security > Code scanning**."
+              echo
+              echo "| Donde | Nivel | Advisory | Detalle |"
+              echo "|---|---|---|---|"
+              awk -F'\t' '{printf "| %s | %s | %s | %s |\n", $1,$2,$3,$4}' hallazgos.tsv
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,73 @@
+# Dependabot — actualizaciones de version.
+#
+# QUE CUBRE CADA ECOSISTEMA ACA:
+#
+#   docker          las imagenes base (python:3.13-slim del backend,
+#                   postgres:17-alpine, node/nginx del frontend). El tag
+#                   `3.13-slim` ya trae los parches de la 3.13 en cada build,
+#                   pero un MAYOR nuevo (3.14, 3.15...) no llega solo: eso es
+#                   lo que abre Dependabot como PR, para que alguien lo mire
+#                   antes de que entre.
+#
+#   github-actions  las acciones pineadas en los workflows (checkout,
+#                   build-push-action, trivy-action...). Sin esto quedan
+#                   congeladas en la version del dia que se escribieron.
+#
+#   pip             backend/requirements.txt. Complementa a pip-audit de
+#                   ci.yml: pip-audit AVISA que hay un CVE, Dependabot abre
+#                   el PR que lo sube.
+#
+# POR QUE SI SE HABILITA pip ACA (a diferencia de turno-app, donde npm quedo
+# afuera): los tests de RePA corren contra un postgres efimero levantado como
+# `service` del propio job — cada PR de Dependabot tiene su base aislada y no
+# se pisan entre si. En turno-app los tests de integracion pegan contra la
+# base compartida de staging, y por eso tres PRs en paralelo se veian los
+# datos entre si; aca ese problema no existe.
+#
+# POR QUE NO ESTA npm: el frontend vive en otro repositorio
+# (Repa2025-Frontend, incluido aca como submodulo). Dependabot solo mira el
+# repo donde esta este archivo — no entra a los submodulos. Las dependencias
+# de npm del frontend hay que cubrirlas con un dependabot.yml en ESE repo.
+version: 2
+updates:
+  - package-ecosystem: docker
+    # Los Dockerfile no estan en la raiz: backend/ tiene el suyo y el
+    # frontend es un submodulo. `directories` (plural) permite listar varios.
+    directories:
+      - "/backend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Argentina/Buenos_Aires
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore"
+    labels:
+      - dependencias
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Argentina/Buenos_Aires
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore"
+    labels:
+      - dependencias
+
+  - package-ecosystem: pip
+    directory: "/backend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Argentina/Buenos_Aires
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+    labels:
+      - dependencias
