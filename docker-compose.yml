@@ -23,7 +23,11 @@ services:
 
   backend:
     build: ./backend
-    image: repa-backend:${BACKEND_VERSION:-latest}
+    # La imagen del backend la resuelve deploy.sh: si BACKEND_REGISTRY_IMAGE
+    # esta definida, apunta a GHCR (imagen ya construida por el CI); si no,
+    # al tag local de siempre. El default de abajo es el que aplica cuando
+    # se levanta compose a mano, sin deploy.sh.
+    image: ${BACKEND_IMAGE:-repa-backend:latest}
     restart: unless-stopped
     # --reload solo para desarrollo local (el Dockerfile base NO incluye --reload)
     command: ["src.main:app", "--reload", "--host", "0.0.0.0", "--port", "80"]

@@ -1,0 +1,57 @@
+name: Release (tag de version)
+
+# Analiza los commits de cada push a main y, si corresponde, crea un tag +
+# GitHub Release nuevo (vX.Y.Z). Ese tag es lo que dispara
+# docker-publish.yml, que buildea la imagen, la publica en GHCR y despliega
+# QA.
+#
+# LO DISPARA ci.yml AL FINAL DE SU JOB, solo si todo paso — nunca se
+# releasea algo que no paso CI. No se usa `workflow_run` porque ese trigger
+# se resuelve contra la copia del workflow en la rama DEFAULT del repo, no
+# contra la del commit que lo disparo; con `workflow_dispatch` llamado
+# explicitamente desde ci.yml (pasandole el ref real) no hay esa
+# dependencia oculta.
+#
+# POR QUE npx Y NO package.json: este es un repo de Python. Los tres
+# plugins que usa .releaserc.json (commit-analyzer, release-notes-generator,
+# github) vienen incluidos en el paquete `semantic-release`, asi que no hace
+# falta instalar nada aparte — y meter un package.json + lockfile en la raiz
+# solo para esto seria ruido. La version va pineada exacta para que una
+# release no cambie de comportamiento sola; Dependabot no puede seguirla
+# (no hay manifiesto), asi que subirla es manual y deliberado.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama/commit a releasear"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # Un tag creado con el GITHUB_TOKEN por defecto NO dispara otros
+      # workflows (proteccion anti-loop de GitHub Actions) — por eso se usa
+      # un PAT (RELEASE_TOKEN) y no GITHUB_TOKEN, asi el push del tag
+      # "cuenta" como un push real y si dispara docker-publish.yml.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          # semantic-release necesita todo el historial y los tags para
+          # saber desde donde analizar.
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: npx --yes semantic-release@24.2.3

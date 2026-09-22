@@ -1,2 +1,7 @@
+# BACKEND_VERSION quedo informativo: la imagen del backend ahora se etiqueta
+# con el tag de git que crea semantic-release (vX.Y.Z) y el servidor la baja
+# de GHCR. Ver .releaserc.README.md y docs/deploy-registry.md.
 BACKEND_VERSION=1.9.0
+# FRONTEND_VERSION sigue vivo y se bumpea a mano: el frontend todavia se
+# construye en el servidor. Cambia cuando se haga la Etapa 2.
 FRONTEND_VERSION=1.14.2

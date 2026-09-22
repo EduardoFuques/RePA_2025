@@ -40,7 +40,11 @@ services:
 
   backend:
     build: ./backend
-    image: repa-backend:${BACKEND_VERSION:-latest}
+    # La imagen del backend la resuelve deploy.sh: si BACKEND_REGISTRY_IMAGE
+    # esta definida, apunta a GHCR (imagen ya construida por el CI); si no,
+    # al tag local de siempre. El default de abajo es el que aplica cuando
+    # se levanta compose a mano, sin deploy.sh.
+    image: ${BACKEND_IMAGE:-repa-backend:latest}
     restart: unless-stopped
     # Sin --reload ni bind mount: corre el código copiado en la imagen.
     volumes:

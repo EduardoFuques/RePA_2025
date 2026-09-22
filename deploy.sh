@@ -10,10 +10,20 @@ echo ""
 
 # Cargar .env para leer SSL_DOMAIN (docker compose ya lo hace solo al
 # correr, pero acá lo necesitamos ANTES, para decidir qué -f pasarle).
+#
+# BACKEND_REGISTRY_IMAGE se guarda antes y se restaura despues: el .env del
+# servidor tiene escrita la version que corre HOY, y sourcearlo pisaria la
+# que pasa docker-publish.yml en el deploy — el servidor se quedaria
+# desplegando eternamente la version anterior. Lo que viene del entorno
+# manda; el .env es el valor por defecto.
+BACKEND_REGISTRY_IMAGE_ENTORNO="$BACKEND_REGISTRY_IMAGE"
 if [ -f .env ]; then
   set -a
   source .env
   set +a
+fi
+if [ -n "$BACKEND_REGISTRY_IMAGE_ENTORNO" ]; then
+  BACKEND_REGISTRY_IMAGE="$BACKEND_REGISTRY_IMAGE_ENTORNO"
 fi
 
 # HTTPS es opt-in: si configuraste SSL_DOMAIN en .env, se agrega el
@@ -59,13 +69,47 @@ else
 fi
 echo ""
 
+# De donde sale la imagen del backend.
+#
+# Si BACKEND_REGISTRY_IMAGE esta definida (la setea docker-publish.yml en
+# cada deploy, o vos a mano en el .env para volver a una version anterior),
+# el backend se BAJA de GHCR ya construido. Si no, se construye acá como
+# siempre — el modo viejo sigue funcionando para desarrollo local y como
+# salida de emergencia si el registry no esta disponible.
+#
+# Por que importa: el build del backend en el servidor medido tardaba 11,8
+# minutos, y 254 segundos de eso eran una sola capa (el apt-get). Bajar el
+# manifest son segundos. Y ademas la imagen es EXACTAMENTE la que paso el
+# CI, no una reconstruccion que `pip install` podria resolver a versiones
+# distintas (hallazgo DEP-16 de la auditoria).
+if [ -n "$BACKEND_REGISTRY_IMAGE" ]; then
+  export BACKEND_IMAGE="$BACKEND_REGISTRY_IMAGE"
+  USAR_REGISTRY=1
+  echo "✓ Backend desde el registry: $BACKEND_IMAGE"
+else
+  export BACKEND_IMAGE="repa-backend:${BACKEND_VERSION:-latest}"
+  USAR_REGISTRY=0
+  echo "ℹ BACKEND_REGISTRY_IMAGE no definida — el backend se construye acá"
+fi
+echo ""
+
 # Detener contenedores existentes
 echo "Deteniendo contenedores..."
 docker compose "${COMPOSE_FILES[@]}" down
 
-# Pullear ultima version del backend
+# Pullear ultima version del backend.
+#
+# El `git pull` se saltea si el repo esta en HEAD detached, que es como lo
+# deja docker-publish.yml: el workflow hace `git checkout vX.Y.Z` para que
+# el codigo del servidor sea exactamente el del tag que se publico. Un
+# `git pull` ahi falla ("You are not currently on a branch") y cortaba el
+# deploy por `set -e`.
 echo "Actualizando backend..."
-git pull
+if git symbolic-ref -q HEAD >/dev/null; then
+  git pull
+else
+  echo "  HEAD detached en $(git rev-parse --short HEAD) — no se hace pull"
+fi
 
 # Actualizar el frontend al commit pineado en el submodulo.
 #
@@ -91,9 +135,44 @@ if ! git submodule update --init --recursive; then
 fi
 echo "  frontend en: $(git -C frontend rev-parse --short HEAD)"
 
-# Construir y iniciar los contenedores
-echo "Construyendo e iniciando contenedores..."
-docker compose "${COMPOSE_FILES[@]}" up -d --build
+# Construir y/o bajar las imagenes, y levantar.
+#
+# Ojo con el `up` sin `--build`: compose solo construye un servicio si la
+# imagen que declara su `image:` NO esta presente localmente. Por eso los
+# dos pasos de abajo (pull del backend, build del frontend) alcanzan — al
+# llegar al `up`, ambas imagenes ya existen y compose las usa tal cual.
+if [ "$USAR_REGISTRY" = "1" ]; then
+  echo "Bajando la imagen del backend..."
+  if ! docker compose "${COMPOSE_FILES[@]}" pull backend; then
+    echo ""
+    echo "❌ No se pudo bajar $BACKEND_IMAGE"
+    echo "   Si es un 401/denied: el servidor no esta logueado en GHCR."
+    echo "   Ver 'docker login ghcr.io' en docs/deploy-registry.md."
+    exit 1
+  fi
+
+  # El frontend todavia se construye acá: su bundle hornea las variables
+  # VITE_* en build-time, asi que una sola imagen no sirve para QA y prod
+  # (Etapa 2, anotada en BACKLOG.md).
+  echo "Construyendo el frontend..."
+  docker compose "${COMPOSE_FILES[@]}" build frontend
+
+  echo "Iniciando contenedores..."
+  docker compose "${COMPOSE_FILES[@]}" up -d
+
+  # Queda escrito en el servidor que version corre. Es lo que se edita para
+  # volver atras: cambiar el tag acá y correr deploy.sh de nuevo.
+  if [ -f .env ]; then
+    if grep -q '^BACKEND_REGISTRY_IMAGE=' .env; then
+      sed -i "s|^BACKEND_REGISTRY_IMAGE=.*|BACKEND_REGISTRY_IMAGE=${BACKEND_REGISTRY_IMAGE}|" .env
+    else
+      printf '\nBACKEND_REGISTRY_IMAGE=%s\n' "$BACKEND_REGISTRY_IMAGE" >> .env
+    fi
+  fi
+else
+  echo "Construyendo e iniciando contenedores..."
+  docker compose "${COMPOSE_FILES[@]}" up -d --build
+fi
 
 # Esperar a que la DB esté healthy (máx 30s)
 echo "Esperando a que PostgreSQL esté healthy..."
@@ -149,7 +228,8 @@ docker compose "${COMPOSE_FILES[@]}" logs backend --tail 10
 
 echo ""
 echo "=== Deploy completado ==="
-echo "Versiones: Backend=$BACKEND_VERSION Frontend=$FRONTEND_VERSION"
+echo "Backend:  $BACKEND_IMAGE"
+echo "Frontend: repa-frontend:${FRONTEND_VERSION:-latest} (construido acá)"
 echo "Frontend: http://localhost (puerto 80)"
 echo "API: http://localhost/api (proxy al backend)"
 echo ""
