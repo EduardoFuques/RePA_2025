@@ -159,8 +159,14 @@ jobs:
         with:
           python-version: ${{ needs.version-python.outputs.python }}
 
+      # Se instala la version que declara requirements-dev.txt, no la ultima
+      # que haya ese dia. `pip install ruff` a secas hacia que el CI linteara
+      # con una version distinta de la que usa cualquiera en su maquina, y una
+      # regla nueva de ruff podia romper el CI de un PR que no tocaba nada de
+      # eso. De paso, asi la version la maneja Dependabot como cualquier otra.
       - name: Instalar ruff
-        run: pip install ruff
+        working-directory: ./backend
+        run: pip install "$(grep -E '^ruff' requirements-dev.txt)"
 
       - name: Ejecutar linter
         working-directory: ./backend
