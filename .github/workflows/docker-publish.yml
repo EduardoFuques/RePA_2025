@@ -1,0 +1,149 @@
+name: Publicar imagen del backend (GHCR)
+
+# Dispara con los tags que crea release.yml (via semantic-release): vX.Y.Z
+# en main. No corre en cada push — si un merge a main no amerita version
+# nueva, no se publica nada ni se toca QA.
+#
+# QUE PROBLEMA RESUELVE. Hasta ahora el costo de build se pagaba dos veces:
+# GitHub Actions construia la imagen del backend para verificar que compilaba
+# y la tiraba, y despues el servidor de QA la volvia a construir desde cero
+# durante el deploy. Ese build en el servidor medido tardaba 11,8 minutos, de
+# los cuales 254 segundos eran una sola capa (el apt-get del backend). Ahora
+# se construye una vez, aca, con cache entre corridas, y el servidor solo
+# baja el manifest.
+#
+# EFECTO COLATERAL IMPORTANTE — EL ROLLBACK. Antes volver a una version
+# anterior significaba rebuildear ese commit en el servidor: otros 12
+# minutos. Ahora es cambiar a que tag apunta BACKEND_REGISTRY_IMAGE en el
+# .env del servidor y volver a correr deploy.sh: segundos, y ademas es
+# exactamente el mismo binario que ya habia corrido, no una reconstruccion
+# que podria traer dependencias distintas (esto ultimo es el hallazgo DEP-16
+# de la auditoria: `pip install` en el servidor con rangos abiertos en
+# requirements.txt).
+#
+# EL FRONTEND NO ESTA ACA, A PROPOSITO. Su bundle hornea las variables
+# VITE_* en build-time (VITE_SHOW_TEST_USERS, datos de contacto de la
+# landing), asi que una sola imagen no sirve para QA y prod a la vez:
+# publicarlo hoy obligaria a mantener un tag por entorno, que es la
+# duplicacion que este cambio viene a sacar. Sigue construyendose en el
+# servidor hasta que esas variables se lean en runtime (Etapa 2, anotada en
+# BACKLOG.md). El backend no tiene ese acoplamiento: lee toda su
+# configuracion del entorno al arrancar, por eso puede publicarse ya.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+env:
+  REGISTRY: ghcr.io
+  # Siempre en minusculas y hardcodeado: el owner del repo es
+  # "EduardoFuques" y GHCR rechaza mayusculas en el nombre de la imagen.
+  # No usar github.repository ni github.repository_owner directo en ningun
+  # paso — usar env.IMAGE_NAME.
+  IMAGE_NAME: eduardofuques/repa-backend
+
+jobs:
+  publicar:
+    name: Build y push a GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Login a GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata (tags y labels)
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # {{raw}} publica el tag tal cual (v1.9.1). Los labels OCI que
+          # agrega esta accion son lo que despues deja saber, mirando la
+          # imagen que corre en el servidor, de que commit salio.
+          tags: |
+            type=semver,pattern={{raw}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build y push
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # El cache de Actions es lo que hace que la capa del apt-get
+          # (254s medidos en el servidor) no se pague en cada release.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Alias flotante sobre la misma imagen ya publicada, sin rebuildear.
+      # Sirve para que alguien pueda hacer `docker pull ...:latest` sin
+      # averiguar el numero de version. El deploy NO lo usa: usa el tag
+      # exacto, para que quede escrito en el .env del servidor cual es la
+      # version que esta corriendo.
+      - name: Mover el alias `latest`
+        run: |
+          IMAGEN="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          docker buildx imagetools create \
+            -t "${IMAGEN}:latest" \
+            "${IMAGEN}:${{ github.ref_name }}"
+
+  deploy-qa:
+    name: Deploy a QA
+    needs: publicar
+    runs-on: ubuntu-latest
+    environment: qa
+    steps:
+      # BACKEND_REGISTRY_IMAGE con el tag EXACTO, no `latest`: deploy.sh lo
+      # persiste en el .env del servidor, asi que despues de cada deploy el
+      # servidor tiene escrito que version corre — y volver atras es editar
+      # esa linea y correr deploy.sh de nuevo.
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.QA_HOST }}
+          username: ${{ secrets.QA_USER }}
+          key: ${{ secrets.QA_SSH_KEY }}
+          port: ${{ secrets.QA_SSH_PORT }}
+          envs: GHCR_USER,GHCR_TOKEN
+          script: |
+            set -e
+            cd ~/RePA_2025
+
+            # La imagen es privada: sin login, el pull falla con un 401
+            # que parece un problema de red y no lo es.
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            git fetch origin --tags
+            git checkout ${{ github.ref_name }}
+
+            export BACKEND_REGISTRY_IMAGE="ghcr.io/eduardofuques/repa-backend:${{ github.ref_name }}"
+            ./deploy.sh
+
+            echo "Verificando health..."
+            for i in $(seq 1 12); do
+              if curl -sf http://localhost/api/health > /dev/null 2>&1; then
+                echo "Backend healthy — ${{ github.ref_name }}"
+                exit 0
+              fi
+              echo "esperando backend... ($i/12)"
+              sleep 5
+            done
+            echo "::error::el backend no respondio en 60s"
+            docker compose logs backend --tail=50
+            exit 1
+        env:
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
