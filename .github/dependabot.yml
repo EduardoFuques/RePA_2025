@@ -13,7 +13,8 @@
 #                   build-push-action, trivy-action...). Sin esto quedan
 #                   congeladas en la version del dia que se escribieron.
 #
-#   pip             backend/requirements.txt. Complementa a pip-audit de
+#   pip             backend/requirements.txt y requirements-dev.txt.
+#                   Complementa a pip-audit de
 #                   ci.yml: pip-audit AVISA que hay un CVE, Dependabot abre
 #                   el PR que lo sube.
 #

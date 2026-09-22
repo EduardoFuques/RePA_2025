@@ -190,7 +190,10 @@ Ejecución
     Instala las dependencias:
 
 ```
-pip install -r requirements.txt
+# requirements.txt son las de runtime (las unicas que van en la imagen
+# Docker); requirements-dev.txt agrega pytest, ruff y el resto de las
+# herramientas. Para trabajar en local hacen falta las dos.
+pip install -r requirements.txt -r requirements-dev.txt
 
 ```
 
