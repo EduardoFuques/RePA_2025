@@ -424,3 +424,77 @@ def test_alta_queda_auditada(client, juridico_headers, db_session, instrumento):
     )
     assert registro is not None
     assert registro.action == "CREATE"
+
+
+# ---------------------------------------------------------------------------
+# Borrador: lo que habilita el autoguardado del formulario
+# ---------------------------------------------------------------------------
+
+
+class TestInstrumentoBorrador:
+    """
+    El formulario del area autoguarda desde el primer campo, igual que los del
+    Padron. Eso exige poder crear una fila incompleta — y exigir los campos
+    obligatorios recien al darla por cargada.
+    """
+
+    def test_se_puede_crear_un_borrador_casi_vacio(self, client, admin_headers):
+        # Lo que manda el autoguardado apenas se escribe el titulo.
+        resp = client.post(
+            BASE + "/", headers=admin_headers, json={"borrador": True, "titulo": "Sin terminar"}
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["borrador"] is True
+        assert resp.json()["tipo_documento"] is None
+
+    def test_no_se_puede_crear_uno_no_borrador_incompleto(self, client, admin_headers):
+        resp = client.post(BASE + "/", headers=admin_headers, json={"titulo": "Sin terminar"})
+        assert resp.status_code == 422, resp.text
+        # El mensaje tiene que decir QUE falta, no solo que algo falta.
+        detalle = resp.json()["detail"]
+        assert "tipo de documento" in detalle and "resumen" in detalle
+
+    def test_un_put_puede_completar_y_enviar_en_una_sola_llamada(
+        self, client, admin_headers
+    ):
+        creado = client.post(
+            BASE + "/", headers=admin_headers, json={"borrador": True, "titulo": "A medias"}
+        ).json()
+
+        # Se valida contra el estado RESULTANTE: el mismo PUT completa lo que
+        # falta y saca el borrador.
+        resp = client.put(
+            f"{BASE}/{creado['id']}",
+            headers=admin_headers,
+            json={
+                "borrador": False,
+                "tipo_documento": "resolucion",
+                "resumen": "Un resumen.",
+                "archivo_pdf_path": "u1/instrumento_abc.pdf",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["borrador"] is False
+
+    def test_no_se_puede_sacar_el_borrador_sin_completar(self, client, admin_headers):
+        creado = client.post(
+            BASE + "/", headers=admin_headers, json={"borrador": True, "titulo": "A medias"}
+        ).json()
+        resp = client.put(
+            f"{BASE}/{creado['id']}", headers=admin_headers, json={"borrador": False}
+        )
+        assert resp.status_code == 422, resp.text
+
+    def test_un_borrador_se_puede_seguir_guardando_incompleto(
+        self, client, admin_headers
+    ):
+        creado = client.post(
+            BASE + "/", headers=admin_headers, json={"borrador": True, "titulo": "Paso 1"}
+        ).json()
+        resp = client.put(
+            f"{BASE}/{creado['id']}",
+            headers=admin_headers,
+            json={"borrador": True, "titulo": "Paso 2"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["titulo"] == "Paso 2"

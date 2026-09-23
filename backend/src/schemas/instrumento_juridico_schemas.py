@@ -53,18 +53,22 @@ class ActaConsejoOut(BaseModel):
 # === INSTRUMENTO CREATE ===
 class InstrumentoCreate(BaseModel):
     """Schema para dar de alta un instrumento jurídico"""
+    borrador: bool = False
 
     # 1. Datos generales
-    tipo_documento: str = Field(..., max_length=50)
+    # Los campos que el formulario marca obligatorios son opcionales en el
+    # ESQUEMA y se validan al ENVIAR (borrador=False), en la ruta. Si no,
+    # el autoguardado no podria crear la fila con el primer campo escrito.
+    tipo_documento: str | None = Field(None, max_length=50)
     otro_tipo_documento: str | None = Field(None, max_length=100)
     numero_instrumento: str | None = Field(None, max_length=100)
     version: str | None = Field(None, max_length=50)
     fecha_emision: date | None = None
-    titulo: str = Field(..., max_length=500)
-    resumen: str  # obligatorio según el formulario
+    titulo: str | None = Field(None, max_length=500)
+    resumen: str | None = None
     palabras_clave: list[str] | None = Field(None, max_length=5)
     ambito_aplicacion: str | None = Field(None, max_length=30)
-    archivo_pdf_path: str = Field(..., max_length=500)
+    archivo_pdf_path: str | None = Field(None, max_length=500)
     # Path devuelto por upload_routes; acá solo se guarda la referencia.
 
     # 2. Vigencia y cumplimiento
@@ -102,6 +106,7 @@ class InstrumentoCreate(BaseModel):
 # === INSTRUMENTO UPDATE ===
 class InstrumentoUpdate(BaseModel):
     """Schema para actualizar un instrumento jurídico (todos los campos opcionales)"""
+    borrador: bool | None = None
 
     tipo_documento: str | None = Field(None, max_length=50)
     otro_tipo_documento: str | None = Field(None, max_length=100)
@@ -142,19 +147,20 @@ class InstrumentoUpdate(BaseModel):
 # === INSTRUMENTO OUT ===
 class InstrumentoOut(BaseModel):
     """Schema de salida completo de un instrumento jurídico"""
+    borrador: bool = False
 
     id: int
 
-    tipo_documento: str
+    tipo_documento: str | None = None
     otro_tipo_documento: str | None = None
     numero_instrumento: str | None = None
     version: str | None = None
     fecha_emision: date | None = None
-    titulo: str
-    resumen: str
+    titulo: str | None = None
+    resumen: str | None = None
     palabras_clave: Any | None = None  # JSON
     ambito_aplicacion: str | None = None
-    archivo_pdf_path: str
+    archivo_pdf_path: str | None = None
 
     fecha_inicio_vigencia: date | None = None
     fecha_expiracion: date | None = None
@@ -189,11 +195,12 @@ class InstrumentoOut(BaseModel):
 # === LISTADO ===
 class InstrumentoListOut(BaseModel):
     """Schema resumido para el listado paginado del digesto"""
+    borrador: bool = False
 
     id: int
-    tipo_documento: str
+    tipo_documento: str | None = None
     numero_instrumento: str | None = None
-    titulo: str
+    titulo: str | None = None
     fecha_emision: date | None = None
     ambito_aplicacion: str | None = None
     tematica_principal: str | None = None

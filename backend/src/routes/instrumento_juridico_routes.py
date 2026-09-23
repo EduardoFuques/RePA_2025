@@ -75,6 +75,36 @@ def _aplicar_acta(db: Session, instrumento: InstrumentoJuridico, acta_data) -> N
     db.flush()
 
 
+# Campos que el formulario del area declara obligatorios. Se exigen al ENVIAR
+# (borrador=False) y no en el esquema: si el esquema los exigiera, el
+# autoguardado no podria crear la fila con el primer campo escrito — que es
+# justamente como funcionan los formularios del Padron.
+_OBLIGATORIOS_AL_ENVIAR = {
+    "tipo_documento": "el tipo de documento",
+    "titulo": "el título o denominación",
+    "resumen": "el resumen descriptivo",
+    "archivo_pdf_path": "el archivo PDF del instrumento",
+}
+
+
+def _validar_para_envio(instrumento) -> None:
+    """422 con los campos que faltan si se intenta dejar de ser borrador."""
+    faltan = [
+        etiqueta
+        for campo, etiqueta in _OBLIGATORIOS_AL_ENVIAR.items()
+        if not getattr(instrumento, campo, None)
+    ]
+    if faltan:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "No se puede dar por cargado el instrumento: falta "
+                + ", ".join(faltan)
+                + "."
+            ),
+        )
+
+
 def _validar_acta_permitida(tipo_documento: str | None, acta_data) -> None:
     """El bloque de acta es condicional: si el tipo no lo habilita, es un 400."""
     if acta_data is not None and tipo_documento != TIPO_ACTA_CONSEJO:
@@ -123,6 +153,8 @@ async def create_instrumento(
         payload["estado_revision"] = "en_revision"
 
     instrumento = InstrumentoJuridico(**payload, usuario_carga_id=current_user["id"])
+    if not instrumento.borrador:
+        _validar_para_envio(instrumento)
     db.add(instrumento)
     db.flush()
 
@@ -374,6 +406,12 @@ async def update_instrumento(
 
     for key, value in update_data.items():
         setattr(instrumento, key, value)
+
+    # Se valida DESPUES de aplicar los cambios, contra el estado resultante:
+    # el mismo PUT puede completar el ultimo campo que faltaba y sacar el
+    # borrador en una sola llamada.
+    if not instrumento.borrador:
+        _validar_para_envio(instrumento)
 
     if data.acta is not None:
         _aplicar_acta(db, instrumento, data.acta)
