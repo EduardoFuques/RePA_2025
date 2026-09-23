@@ -27,7 +27,8 @@ if [ -n "$BACKEND_REGISTRY_IMAGE_ENTORNO" ]; then
 fi
 
 # HTTPS es opt-in: si configuraste SSL_DOMAIN en .env, se agrega el
-# override docker-compose.ssl.yml (puerto 443 + nginx-ssl.conf). Si no,
+# override docker-compose.ssl.yml (puerto 443 + certificados montados en
+# /certs; la imagen del frontend activa sola su config HTTPS). Si no,
 # sigue siendo HTTP-only como siempre.
 #
 # A propósito NO se valida acá que el certificado exista: certbot deja
@@ -276,6 +277,29 @@ for i in {1..12}; do
     exit 1
   fi
   echo "  Esperando Backend... ($i/12)"
+  sleep 5
+done
+
+# Esperar a que el Frontend esté healthy (máx 60s). La imagen trae un
+# HEALTHCHECK contra /healthz, que responde nginx sin pasar por el backend.
+# Se lee el estado exacto con `docker inspect` y no con grep sobre `ps`:
+# "unhealthy" tambien contiene "healthy".
+echo "Esperando a que el Frontend esté healthy..."
+FRONTEND_ID=$(docker compose "${COMPOSE_FILES[@]}" ps -q frontend)
+for i in {1..12}; do
+  ESTADO_FRONTEND=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}sin-healthcheck{{end}}' "$FRONTEND_ID" 2>/dev/null || echo "no-existe")
+  if [ "$ESTADO_FRONTEND" = "healthy" ] || [ "$ESTADO_FRONTEND" = "sin-healthcheck" ]; then
+    echo "✓ Frontend $ESTADO_FRONTEND"
+    break
+  fi
+  if [ $i -eq 12 ]; then
+    echo "❌ Frontend no alcanzó estado healthy ($ESTADO_FRONTEND)"
+    echo ""
+    echo "=== Logs del frontend ==="
+    docker compose "${COMPOSE_FILES[@]}" logs frontend --tail=50
+    exit 1
+  fi
+  echo "  Esperando Frontend ($ESTADO_FRONTEND)... ($i/12)"
   sleep 5
 done
 

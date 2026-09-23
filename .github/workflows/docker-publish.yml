@@ -21,13 +21,10 @@ name: Publicar imagen del backend (GHCR)
 # de la auditoria: `pip install` en el servidor con rangos abiertos en
 # requirements.txt).
 #
-# EL FRONTEND NO ESTA ACA, A PROPOSITO. Su bundle hornea las variables
-# VITE_* en build-time (VITE_SHOW_TEST_USERS, datos de contacto de la
-# landing), asi que una sola imagen no sirve para QA y prod a la vez:
-# publicarlo hoy obligaria a mantener un tag por entorno, que es la
-# duplicacion que este cambio viene a sacar. Sigue construyendose en el
-# servidor hasta que esas variables se lean en runtime (Etapa 2, anotada en
-# BACKLOG.md). El backend no tiene ese acoplamiento: lee toda su
+# EL FRONTEND NO ESTA ACA. Desde la Etapa 2 su imagen ya es una sola para
+# todos los entornos (la config se lee al arrancar el contenedor), pero se
+# publica desde su propio repositorio (Etapa 3) y hasta entonces se sigue
+# construyendo en el servidor. El backend lee toda su
 # configuracion del entorno al arrancar, por eso puede publicarse ya.
 
 on:

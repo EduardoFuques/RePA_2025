@@ -6,8 +6,8 @@
 # Diferencias deliberadas contra docker-compose.yml (desarrollo):
 #   - ENVIRONMENT=production hardcodeado (no heredable de un .env incompleto).
 #   - Backend sin --reload y sin bind mount del código fuente.
-#   - Frontend buildeado con VITE_SHOW_TEST_USERS=false (sin usuarios de prueba
-#     ni credenciales embebidas en el bundle).
+#   - Frontend sin usuarios de prueba: la imagen ya no los trae (los entrega
+#     el backend en /users/demo-accounts, que en produccion responde 404).
 #   - SECRET_KEY y DATABASE_URL sin default: el deploy falla si faltan.
 #   - FRONTEND_URL obligatorio (arma los links de los emails de verificación
 #     de cuenta y recuperación de contraseña). SMTP_* son opcionales a nivel
@@ -91,18 +91,27 @@ services:
       - repa-network
 
   frontend:
+    # Misma imagen que QA (ver docker-compose.yml): la config por entorno va
+    # en `environment`, no en build args. Sin usuarios de prueba: el backend
+    # de produccion responde 404 en /users/demo-accounts.
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        VITE_API_URL: /api
-        VITE_SHOW_TEST_USERS: "false"
     image: repa-frontend:${FRONTEND_VERSION:-latest}
     restart: unless-stopped
     ports:
       - "80:80"
     environment:
       TZ: America/Argentina/Buenos_Aires
+      VITE_CONTACT_EMAIL: ${VITE_CONTACT_EMAIL:-}
+      VITE_CONTACT_PHONE: ${VITE_CONTACT_PHONE:-}
+      VITE_CONTACT_WHATSAPP: ${VITE_CONTACT_WHATSAPP:-}
+      VITE_CONTACT_WHATSAPP_LABEL: ${VITE_CONTACT_WHATSAPP_LABEL:-}
+      VITE_SOCIAL_INSTAGRAM: ${VITE_SOCIAL_INSTAGRAM:-}
+      VITE_SOCIAL_FACEBOOK: ${VITE_SOCIAL_FACEBOOK:-}
+      VITE_CONTACT_SEDE: ${VITE_CONTACT_SEDE:-}
+      VITE_CONTACT_PORTAL: ${VITE_CONTACT_PORTAL:-}
+      VITE_CONTACT_PORTAL_URL: ${VITE_CONTACT_PORTAL_URL:-}
     depends_on:
       - backend
     networks:
