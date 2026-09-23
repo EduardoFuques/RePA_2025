@@ -69,11 +69,10 @@ echo ""
 # resumen de este mismo script anunciaba 1.14.2.
 if [ -f .version ]; then
   source .version
-  export BACKEND_VERSION FRONTEND_VERSION
-  echo "Versiones: Backend=$BACKEND_VERSION Frontend=$FRONTEND_VERSION"
+  export FRONTEND_VERSION
+  echo "Frontend: $FRONTEND_VERSION"
 else
-  echo "⚠ Archivo .version no encontrado, usando 'latest'"
-  export BACKEND_VERSION=latest
+  echo "⚠ Archivo .version no encontrado, usando 'latest' para el frontend"
   export FRONTEND_VERSION=latest
 fi
 echo ""
@@ -96,7 +95,9 @@ if [ -n "$BACKEND_REGISTRY_IMAGE" ]; then
   USAR_REGISTRY=1
   echo "✓ Backend desde el registry: $BACKEND_IMAGE"
 else
-  export BACKEND_IMAGE="repa-backend:${BACKEND_VERSION:-latest}"
+  # Sin registry el backend se construye acá, y la imagen queda con un tag
+  # fijo: la version del backend la define el tag de git, no este script.
+  export BACKEND_IMAGE="repa-backend:local"
   USAR_REGISTRY=0
   echo "ℹ BACKEND_REGISTRY_IMAGE no definida — el backend se construye acá"
 fi
