@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from src.config import IS_TESTING, SEED_DEMO_DATA
 from src.database import SessionLocal
+from src.demo_users import TEST_ESA_USERS, TEST_ROLE_USERS
 from src.document_generator import generate_fomento_documents, generate_test_documents
 from src.logger import logger
 from src.models.asociacion_model import Asociacion
@@ -34,40 +35,9 @@ from src.rbac import PERMISSIONS, SYSTEM_ROLES
 from src.services.repa_code_service import generar_codigo_repa
 from src.utils import get_password_hash
 
-# === USUARIOS DE PRUEBA: 2 por cada rol del sistema ===
-# admin1/admin2 usan Admin1234; el resto Test1234. estudiante* se crea aparte
-# (vía EstudianteESA + backfill_estudiante_role, no se les asigna el rol acá).
-TEST_ROLE_USERS = {
-    "admin": [
-        ("admin1@repa.gob.ar", "Admin1234"),
-        ("admin2@repa.gob.ar", "Admin1234"),
-    ],
-    "gestor_fomento": [
-        ("gestor1@repa.gob.ar", "Test1234"),
-        ("gestor2@repa.gob.ar", "Test1234"),
-    ],
-    "evaluador": [
-        ("evaluador1@repa.gob.ar", "Test1234"),
-        ("evaluador2@repa.gob.ar", "Test1234"),
-    ],
-    "revisor_padron": [
-        ("revisor1@repa.gob.ar", "Test1234"),
-        ("revisor2@repa.gob.ar", "Test1234"),
-    ],
-    "lectura": [
-        ("lectura1@repa.gob.ar", "Test1234"),
-        ("lectura2@repa.gob.ar", "Test1234"),
-    ],
-    "user": [
-        ("usuario1@repa.gob.ar", "Test1234"),
-        ("usuario2@repa.gob.ar", "Test1234"),
-    ],
-}
-
-TEST_ESA_USERS = [
-    ("estudiante1@esa.repa.gob.ar", "Test1234"),
-    ("estudiante2@esa.repa.gob.ar", "Test1234"),
-]
+# Los usuarios de prueba (TEST_ROLE_USERS, TEST_ESA_USERS) viven en
+# src/demo_users.py: los usa este seed para crearlos y /users/demo-accounts
+# para el acceso rapido del login.
 
 # === DATOS DE PADRÓN ===
 
