@@ -41,11 +41,13 @@ if "%RUN_BACKEND%"=="1" (
     
     cd backend
     
-    :: Verificar si ruff está instalado
+    :: Verificar si ruff está instalado. Se instala la version que declara
+    :: requirements-dev.txt y no la ultima publicada, para que lintee igual
+    :: que el CI (ver el job `lint` de .github/workflows/ci.yml).
     python -m ruff --version >nul 2>&1
     if errorlevel 1 (
         echo %YELLOW%Instalando ruff...%RESET%
-        pip install ruff
+        for /f "tokens=*" %%r in ('findstr /b "ruff" requirements-dev.txt') do pip install "%%r"
     )
     
     :: Ejecutar ruff check con autofix (usando python -m para evitar problemas de PATH)

@@ -7,9 +7,45 @@ on:
     branches: [main]
 
 jobs:
+  # UNA sola fuente de verdad para la version de Python: el Dockerfile, que
+  # es lo que efectivamente se despliega. Los jobs de abajo la leen de aca en
+  # vez de tenerla hardcodeada.
+  #
+  # Por que existe este job. Hasta el 22/09 la version estaba escrita cuatro
+  # veces en este archivo. Cuando Dependabot subio la imagen base a
+  # python:3.14-slim (PR #24), ci.yml se quedo en 3.13 y nadie se entero: los
+  # tests pasaban en una version y la imagen corria otra. El unico job que
+  # tocaba 3.14 era build-check, que compila la imagen pero no ejecuta nada
+  # adentro, asi que su tilde verde no probaba nada al respecto.
+  #
+  # Con esto, el proximo PR de Dependabot que suba la imagen base mueve los
+  # tests solo. No hay nada que acordarse de actualizar a mano.
+  version-python:
+    name: Version de Python
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.leer.outputs.python }}
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v7
+
+      - name: Leer la version de backend/Dockerfile
+        id: leer
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -nE 's/^FROM python:([0-9]+\.[0-9]+).*/\1/p' backend/Dockerfile | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::no se pudo leer la version de Python de backend/Dockerfile"
+            exit 1
+          fi
+          echo "python=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Los tests corren en Python $VERSION (leido de backend/Dockerfile)"
+
   test:
     name: Tests Backend
     runs-on: ubuntu-latest
+    needs: [version-python]
     
     services:
       postgres:
@@ -33,7 +69,7 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.13'
+          python-version: ${{ needs.version-python.outputs.python }}
           cache: 'pip'
 
       - name: Instalar dependencias
@@ -53,6 +89,7 @@ jobs:
   migrations:
     name: Validar migraciones Alembic
     runs-on: ubuntu-latest
+    needs: [version-python]
 
     services:
       postgres:
@@ -76,7 +113,7 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.13'
+          python-version: ${{ needs.version-python.outputs.python }}
           cache: 'pip'
 
       - name: Instalar dependencias
@@ -111,6 +148,7 @@ jobs:
   lint:
     name: Linting
     runs-on: ubuntu-latest
+    needs: [version-python]
     
     steps:
       - name: Checkout código
@@ -119,10 +157,16 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.13'
+          python-version: ${{ needs.version-python.outputs.python }}
 
+      # Se instala la version que declara requirements-dev.txt, no la ultima
+      # que haya ese dia. `pip install ruff` a secas hacia que el CI linteara
+      # con una version distinta de la que usa cualquiera en su maquina, y una
+      # regla nueva de ruff podia romper el CI de un PR que no tocaba nada de
+      # eso. De paso, asi la version la maneja Dependabot como cualquier otra.
       - name: Instalar ruff
-        run: pip install ruff
+        working-directory: ./backend
+        run: pip install "$(grep -E '^ruff' requirements-dev.txt)"
 
       - name: Ejecutar linter
         working-directory: ./backend
@@ -131,6 +175,7 @@ jobs:
   seguridad:
     name: Auditoría de dependencias
     runs-on: ubuntu-latest
+    needs: [version-python]
 
     steps:
       - name: Checkout código
@@ -139,7 +184,7 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.13'
+          python-version: ${{ needs.version-python.outputs.python }}
 
       - name: Instalar pip-audit
         run: pip install pip-audit

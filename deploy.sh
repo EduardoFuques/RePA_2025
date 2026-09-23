@@ -59,8 +59,17 @@ fi
 echo ""
 
 # Cargar versiones desde .version
+#
+# El `export` no es decorativo. `source .version` a secas deja las variables
+# como variables de shell, y docker compose —que es otro proceso— no las ve:
+# `image: repa-frontend:${FRONTEND_VERSION:-latest}` caia siempre al default
+# y CADA deploy pisaba `repa-frontend:latest`, sin forma de saber despues que
+# version de frontend estaba corriendo. Se veia en el log del deploy de
+# v1.10.0: `naming to docker.io/library/repa-frontend:latest` mientras el
+# resumen de este mismo script anunciaba 1.14.2.
 if [ -f .version ]; then
   source .version
+  export BACKEND_VERSION FRONTEND_VERSION
   echo "Versiones: Backend=$BACKEND_VERSION Frontend=$FRONTEND_VERSION"
 else
   echo "⚠ Archivo .version no encontrado, usando 'latest'"

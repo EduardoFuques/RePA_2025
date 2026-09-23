@@ -23,6 +23,21 @@ Si los commits desde el ultimo tag son todos `chore:`/`ci:`/`docs:`, no hay
 version nueva: no se publica imagen y **no se toca QA**. Eso es deliberado —
 un merge que no cambia comportamiento no deberia mover un entorno.
 
+## Lo que tarda de verdad
+
+Medido en el primer deploy real por registry (v1.10.0, 22/09/2026):
+
+| Etapa | |
+| --- | --- |
+| Pull de la imagen | 1m 16s (en frio, sin capas previas en el servidor) |
+| Build del frontend | 54s (con cache) |
+| Arranque de contenedores | ~1m 6s |
+| **Deploy completo** | **4m 6s** |
+
+Contra los 11,8 minutos que tardaba **solo el build del backend**. El 1m 16s
+del pull baja bastante en los deploys siguientes, porque las capas base
+quedan en el servidor.
+
 ## Como volver atras (rollback)
 
 Antes: rebuildear el commit anterior en el servidor, otros ~12 minutos.
@@ -44,9 +59,19 @@ Los tags publicados se ven en la pestaña **Packages** del repo, o con
 
 ---
 
-# Lo que hay que configurar UNA VEZ
+# Configuracion (hecha el 22/09/2026)
 
-Nada de esto lo puede hacer el codigo — son credenciales y permisos.
+Nada de esto lo puede hacer el codigo — son credenciales y permisos. Queda
+documentado para cuando haya que rehacerlo, o replicarlo en produccion.
+
+> **El error que costo dos corridas.** El secret se habia cargado como
+> `GHRC_USER` en vez de `GHCR_USER` (las letras cambiadas). No fallaba donde
+> uno esperaria: el `docker login` era el segundo sintoma, pero el primero
+> fue que el paso de SSH ni siquiera llegaba a conectarse, cortando con
+> `username is empty` — una variable vacia listada en `envs:` le corrompe el
+> manejo de entorno a drone-ssh, y el mensaje apunta al secret equivocado.
+> Si algun dia aparece ese error, **revisar primero que todos los secrets
+> listados en `envs:` existan y esten bien escritos.**
 
 ## 1. Secrets del repositorio
 
@@ -70,20 +95,15 @@ que no hace falta cambiarlo — pero si se lo hace publico
 servidor deja de ser necesario. Decision de Eduardo; el default privado es
 el mas conservador y es el que asume este setup.
 
-## 3. Sembrar el primer tag
+## 3. Sembrar el primer tag — hecho
 
 El repo no tenia ningun tag, y sin un punto de partida semantic-release
 empieza en `1.0.0` — hacia atras respecto del `1.9.0` que ya declaraba
-`.version`. Por eso hay que sembrar el tag una vez:
+`.version`. Se sembro `v1.9.0` sobre el commit `15ba4c2` (el merge del PR
+#22), y la primera version que salio de la cadena fue **v1.10.0**.
 
-```bash
-git tag v1.9.0 <commit de main previo a este cambio>
-git push origin v1.9.0
-```
-
-Ese tag **no** dispara `docker-publish.yml` si se pushea con credenciales de
-usuario normales antes de que el workflow exista en `main`; si llegara a
-dispararlo, no hace daño: publica la imagen de esa version.
+No hay que repetirlo. Queda anotado por si alguna vez se arranca de cero en
+otro repositorio.
 
 ## 4. Login de GHCR en el servidor (persistente)
 
@@ -126,12 +146,19 @@ alguien toca archivos a mano en el servidor, en QA eso se ve y en produccion
 no (`docker-compose.prod.yml` no tiene el bind mount). Conviene tenerlo
 presente al diagnosticar una diferencia entre entornos.
 
-## El repositorio del frontend no es accesible con la cuenta actual
+## Para la Etapa 2 hace falta un token que llegue al repo del frontend
 
-`git@github.com:EduardoFuques/Repa2025-Frontend.git` responde *"Repository
-not found"* por SSH y 404 por API con la cuenta `edu6565`. Hoy no bloquea
-nada, porque el frontend se construye en el servidor con el submodulo que ya
-esta clonado ahi. **Pero bloquea la Etapa 2**: para que Actions construya el
-frontend hace falta que pueda hacer checkout del submodulo, y el
-`GITHUB_TOKEN` por defecto no da acceso a otro repositorio — hay que agregar
-un deploy key o un PAT con acceso a ese repo.
+El frontend vive en `EduardoFuques/Repa2025-Frontend`, que es privado y
+entra aca como submodulo. Hoy eso no molesta, porque se construye en el
+servidor con el submodulo ya clonado.
+
+**Pero es lo primero que hay que resolver para la Etapa 2**: para que
+Actions construya el frontend tiene que poder hacer checkout del submodulo,
+y el `GITHUB_TOKEN` por defecto **no da acceso a otro repositorio**, por
+privado o publico que sea. Hace falta un deploy key o un PAT con acceso a
+ese repo, pasado a `actions/checkout` con `submodules: recursive` y `token:`.
+
+(Durante el 22/09 esto aparecia ademas como *"Repository not found"* al
+operar a mano, porque la cuenta que se estaba usando no era colaboradora del
+repo del frontend. Eso ya se resolvio; la limitacion del `GITHUB_TOKEN`
+dentro de Actions es aparte y sigue en pie.)
