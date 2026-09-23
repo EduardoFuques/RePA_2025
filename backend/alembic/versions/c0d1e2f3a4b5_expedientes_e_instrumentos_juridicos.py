@@ -131,7 +131,9 @@ def upgrade() -> None:
         sa.Column("areas_vinculadas", sa.JSON(), nullable=True),
         sa.Column("tematica_principal", sa.String(length=50), nullable=True),
         sa.Column("otra_tematica", sa.String(length=100), nullable=True),
-        sa.Column("vinculado_resolucion_previa", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        # default= del modelo es del lado de Python, no del servidor: poner un
+        # server_default aca hace que `alembic check` detecte drift.
+        sa.Column("vinculado_resolucion_previa", sa.Boolean(), nullable=False),
         sa.Column("resolucion_previa_id", sa.String(length=100), nullable=True),
         sa.Column("codigo_repa_vinculado", sa.String(length=50), nullable=True),
         sa.Column("vinculado_proyecto", sa.String(length=20), nullable=True),
@@ -141,7 +143,7 @@ def upgrade() -> None:
         sa.Column("notas_internas", sa.Text(), nullable=True),
         sa.Column("observaciones_adicionales", sa.Text(), nullable=True),
         sa.Column("usuario_carga_id", sa.String(), nullable=False),
-        sa.Column("estado_revision", sa.String(length=20), nullable=False, server_default="en_revision"),
+        sa.Column("estado_revision", sa.String(length=20), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
         sa.CheckConstraint(
@@ -203,13 +205,16 @@ def upgrade() -> None:
             ["instrumento_id"], ["instrumentos_juridicos.id"], ondelete="CASCADE"
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("instrumento_id"),
     )
     op.create_index("ix_actas_consejo_directivo_id", "actas_consejo_directivo", ["id"])
+    # unique=True: el modelo declara unique + index sobre la misma columna, y
+    # SQLAlchemy eso lo resuelve como un unico indice unico — no como una
+    # UniqueConstraint separada mas un indice comun.
     op.create_index(
         "ix_actas_consejo_directivo_instrumento_id",
         "actas_consejo_directivo",
         ["instrumento_id"],
+        unique=True,
     )
 
 
