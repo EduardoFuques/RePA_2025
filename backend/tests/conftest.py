@@ -2,14 +2,11 @@
 import os
 
 import pytest
-from passlib.context import CryptContext
 from testcontainers.postgres import PostgresContainer
 
 # Configurar variables de entorno ANTES de importar cualquier módulo
 os.environ["TESTING"] = "true"
 os.environ["CI"] = "true"
-
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Variable global para el engine (se configura en el fixture de sesión)
 _engine = None
@@ -166,11 +163,16 @@ def _crear_usuario(db, email, password, roles=None):
     """Crea (idempotente) un usuario activo y le asigna los roles indicados."""
     from src.models.user_models import Role, User, UserRole
 
+    # Import adentro de la funcion, no arriba: el contenedor de postgres se
+    # levanta a nivel de modulo y DATABASE_URL tiene que estar seteada antes
+    # de que se importe cualquier cosa de src.
+    from src.password import get_password_hash
+
     user = db.query(User).filter(User.email == email).first()
     if not user:
         user = User(
             email=email,
-            hashed_password=_pwd_context.hash(password),
+            hashed_password=get_password_hash(password),
             is_active=True,
         )
         db.add(user)

@@ -11,47 +11,46 @@ class TestAdmin:
     @pytest.fixture
     def admin_headers(self, client: TestClient, db_session):
         """Fixture para obtener headers de admin."""
-        from src.models.user_models import User, Role, UserRole
-        from passlib.context import CryptContext
-        
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        
+        from src.models.user_models import Role, User, UserRole
+        from src.password import get_password_hash
+
+
         # Crear rol admin si no existe
         admin_role = db_session.query(Role).filter(Role.rol == "admin").first()
         if not admin_role:
             admin_role = Role(rol="admin")
             db_session.add(admin_role)
             db_session.commit()
-        
+
         # Crear usuario admin
         admin_email = "admin_test@example.com"
         admin_user = db_session.query(User).filter(User.email == admin_email).first()
-        
+
         if not admin_user:
             admin_user = User(
                 email=admin_email,
-                hashed_password=pwd_context.hash("AdminTest123!"),
+                hashed_password=get_password_hash("AdminTest123!"),
                 is_active=True
             )
             db_session.add(admin_user)
             db_session.commit()
             db_session.refresh(admin_user)
-            
+
             # Asignar rol admin
             user_role = UserRole(user_id=admin_user.id, role_id=admin_role.id)
             db_session.add(user_role)
             db_session.commit()
-        
+
         # Login
         response = client.post(
             "/users/token",
             data={"username": admin_email, "password": "AdminTest123!"}
         )
-        
+
         if response.status_code == 200:
             token = response.json()["access_token"]
             return {"Authorization": f"Bearer {token}"}
-        
+
         return {}
 
     def test_get_users_as_admin(self, client: TestClient, admin_headers: dict):
@@ -127,7 +126,7 @@ class TestAdmin:
         """Test que usuario normal no puede obtener lista de usuarios."""
         if not auth_headers:
             pytest.skip("No se pudo obtener token de autenticación")
-        
+
         response = client.get("/admin_user/users", headers=auth_headers)
         assert response.status_code == 403
 
@@ -135,14 +134,14 @@ class TestAdmin:
         """Test obtener usuario por ID como admin."""
         if not admin_headers:
             pytest.skip("No se pudo obtener token de admin")
-        
+
         from src.models.user_models import User
-        
+
         # Obtener cualquier usuario
         user = db_session.query(User).first()
         if not user:
             pytest.skip("No hay usuarios en la BD")
-        
+
         response = client.get(f"/admin_user/users/{user.id}", headers=admin_headers)
         assert response.status_code == 200
         assert response.json()["id"] == user.id
@@ -151,7 +150,7 @@ class TestAdmin:
         """Test obtener usuario inexistente."""
         if not admin_headers:
             pytest.skip("No se pudo obtener token de admin")
-        
+
         response = client.get("/admin_user/users/nonexistent-id", headers=admin_headers)
         assert response.status_code == 404
 
@@ -159,17 +158,17 @@ class TestAdmin:
         """Test actualizar usuario como admin."""
         if not admin_headers:
             pytest.skip("No se pudo obtener token de admin")
-        
+
         from src.models.user_models import User
-        
+
         # Obtener usuario que no sea admin
         user = db_session.query(User).filter(User.email != "admin_test@example.com").first()
         if not user:
             pytest.skip("No hay usuarios para actualizar")
-        
+
         update_data = {"email": f"updated_{user.email}"}
         response = client.put(f"/admin_user/users/{user.id}", json=update_data, headers=admin_headers)
-        
+
         # Puede ser 200 o 400 si el email ya existe
         assert response.status_code in [200, 400]
 
@@ -177,14 +176,14 @@ class TestAdmin:
         """Test cambiar estado activo de usuario."""
         if not admin_headers:
             pytest.skip("No se pudo obtener token de admin")
-        
+
         from src.models.user_models import User
-        
+
         # Obtener usuario que no sea admin
         user = db_session.query(User).filter(User.email != "admin_test@example.com").first()
         if not user:
             pytest.skip("No hay usuarios para desactivar")
-        
+
         # Nuevo endpoint explícito e idempotente: PATCH /users/{id}/status
         nuevo_estado = not user.is_active
         response = client.patch(
@@ -198,9 +197,9 @@ class TestAdmin:
         """Test actualizar roles de usuario."""
         if not admin_headers:
             pytest.skip("No se pudo obtener token de admin")
-        
-        from src.models.user_models import User, Role
-        
+
+        from src.models.user_models import Role, User
+
         # Obtener usuario y rol. Excluye el rol "admin" a propósito: designar
         # admin exige que el usuario ya tenga una Persona Física en el Padrón
         # (ver admin_routes.py update_user_roles) — esa regla ya tiene su
@@ -213,7 +212,7 @@ class TestAdmin:
 
         if not user or not role:
             pytest.skip("No hay usuarios o roles para actualizar")
-        
+
         response = client.put(
             f"/admin_user/users/{user.id}/roles",
             json={"add": [role.id], "remove": []},
