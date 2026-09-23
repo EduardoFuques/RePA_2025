@@ -2,12 +2,17 @@
 #
 # QUE CUBRE CADA ECOSISTEMA ACA:
 #
-#   docker          las imagenes base (python:3.13-slim del backend,
-#                   postgres:17-alpine, node/nginx del frontend). El tag
-#                   `3.13-slim` ya trae los parches de la 3.13 en cada build,
-#                   pero un MAYOR nuevo (3.14, 3.15...) no llega solo: eso es
+#   docker          la imagen base del backend (backend/Dockerfile). El tag
+#                   `3.14-slim` ya trae los parches de la 3.14 en cada build,
+#                   pero un MAYOR nuevo (3.15, 3.16...) no llega solo: eso es
 #                   lo que abre Dependabot como PR, para que alguien lo mire
 #                   antes de que entre.
+#
+#   docker-compose  las imagenes que se declaran en los compose de la raiz,
+#                   que el ecosistema `docker` NO mira porque solo lee
+#                   Dockerfiles. Hoy eso es postgres:17-alpine, que hasta
+#                   ahora no vigilaba nadie: la base de datos era la unica
+#                   pieza del stack sin quien le avisara de una version nueva.
 #
 #   github-actions  las acciones pineadas en los workflows (checkout,
 #                   build-push-action, trivy-action...). Sin esto quedan
@@ -68,6 +73,19 @@ updates:
       time: "06:00"
       timezone: America/Argentina/Buenos_Aires
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+    labels:
+      - dependencias
+
+  - package-ecosystem: docker-compose
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Argentina/Buenos_Aires
+    open-pull-requests-limit: 3
     commit-message:
       prefix: "chore"
     labels:

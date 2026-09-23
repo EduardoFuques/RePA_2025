@@ -1,0 +1,40 @@
+# Finales de linea. Sin este archivo, git guarda lo que le den: 73 de los 147
+# archivos versionados quedaron con CRLF (editados desde Windows) y el resto
+# con LF. El sintoma practico era que abrir un archivo desde WSL y guardarlo
+# lo convertia entero, y `git status` reportaba 4000 lineas cambiadas donde
+# no se habia tocado nada — diffs imposibles de revisar, que esconden el
+# cambio real en medio del ruido.
+#
+# `text=auto` hace que en el REPOSITORIO todo texto se guarde con LF, sin
+# importar desde donde se haya escrito. Lo que cada uno ve en su disco sigue
+# dependiendo de su editor y su plataforma; lo que se unifica es lo que viaja
+# en los commits, que es lo que importa para que un diff sea legible.
+* text=auto
+
+# Lo que corre en Linux va con LF si o si, tambien en el disco: estos
+# archivos terminan adentro de un contenedor o los ejecuta un shell, y un
+# CR de mas al final de la linea rompe un shebang o un comando.
+*.sh        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+Dockerfile  text eol=lf
+*.py        text eol=lf
+
+# Batch de Windows: al reves. cmd.exe puede portarse raro con archivos que
+# solo tienen LF, sobre todo dentro de bloques entre parentesis.
+*.bat       text eol=crlf
+
+# Binarios: que git no intente convertir nada. Si los tocara, los corrompe.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.eot       binary
+*.zip       binary
+*.docx      binary
+*.xlsx      binary

@@ -23,20 +23,33 @@ Si los commits desde el ultimo tag son todos `chore:`/`ci:`/`docs:`, no hay
 version nueva: no se publica imagen y **no se toca QA**. Eso es deliberado —
 un merge que no cambia comportamiento no deberia mover un entorno.
 
-## Lo que tarda de verdad
+## Lo que tarda, y cuanto de eso es corte
 
-Medido en el primer deploy real por registry (v1.10.0, 22/09/2026):
+Son dos cosas distintas y conviene no confundirlas: lo que tarda el deploy
+entero, y cuanto tiempo el sistema no atiende.
 
-| Etapa | |
+El orden de `deploy.sh` esta pensado para que casi nada de lo lento caiga
+dentro del corte:
+
+| Etapa | Hay corte? |
 | --- | --- |
-| Pull de la imagen | 1m 16s (en frio, sin capas previas en el servidor) |
-| Build del frontend | 54s (con cache) |
-| Arranque de contenedores | ~1m 6s |
-| **Deploy completo** | **4m 6s** |
+| 1. Actualizar codigo y submodulo | no |
+| 2. Bajar la imagen del backend (1m 16s en frio) | **no** |
+| 3. Construir el frontend (54s con cache) | **no** |
+| 4. Verificar que la base responda | no (no se la toca) |
+| 5. `docker compose up -d` reconcilia | **si**, ~20s |
 
-Contra los 11,8 minutos que tardaba **solo el build del backend**. El 1m 16s
-del pull baja bastante en los deploys siguientes, porque las capas base
-quedan en el servidor.
+Todo lo caro pasa con la version anterior en pie y atendiendo. El corte es
+solo el paso 5, y dura lo que tarde en reiniciar el servicio que
+efectivamente cambio.
+
+**Como era antes.** El script arrancaba con `docker compose down`, asi que
+bajaba todo —base de datos incluida— y recien despues bajaba la imagen: el
+pull de 1m 16s ocurria con el servicio caido. El corte era practicamente el
+deploy completo, unos 4 minutos, para actualizar un solo contenedor.
+
+Y todo esto contra los **11,8 minutos** que tardaba, antes del registry,
+solo el build del backend en el servidor.
 
 ## Como volver atras (rollback)
 
@@ -121,6 +134,40 @@ Docker lo guarda en `~/.docker/config.json` y sobrevive reinicios. Si falta,
 ---
 
 # Cosas que conviene saber
+
+## El deploy no baja nada: `up -d` es declarativo
+
+`docker compose up -d` compara lo que esta corriendo contra lo que declara el
+compose y recrea **unicamente** los contenedores cuya imagen o configuracion
+cambio. Si cambio el tag del backend, recrea el backend; la base de datos y
+el frontend ni se enteran.
+
+Por eso `deploy.sh` ya no hace `down`. No es una optimizacion arriesgada: es
+dejar de hacer a mano —y de forma destructiva— algo que compose resuelve
+solo.
+
+Dos consecuencias que conviene tener presentes:
+
+- **Si cambia el spec de la base** (por ejemplo un PR de Dependabot que suba
+  `postgres:17-alpine`), `up -d` **si** va a recrear ese contenedor, porque
+  corresponde. Los datos no se pierden: viven en el bind mount `./pgdata`,
+  no en el contenedor. Pero ese deploy va a tener un corte mas largo.
+- **`--remove-orphans`** borra los contenedores que pertenecen al proyecto
+  pero ya no estan declarados en ningun compose. Es lo que saco el
+  `repa_2025-adminer-1` que alguien habia levantado a mano, y lo que evita
+  que se vuelva a acumular algo asi sin que nadie lo note. Si alguna vez hace
+  falta un contenedor auxiliar, va declarado en un compose — si no, el
+  proximo deploy se lo lleva.
+
+Para forzar el comportamiento viejo (bajar todo, por ejemplo para descartar
+un estado raro de red o de volumenes):
+
+```bash
+DEPLOY_RECREAR_TODO=1 ./deploy.sh
+```
+
+Es deliberadamente explicito: que tirar la base de datos sea una decision que
+alguien toma y escribe, no el default de todos los dias.
 
 ## El frontend sigue construyendose en el servidor
 
