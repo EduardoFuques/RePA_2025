@@ -1,6 +1,6 @@
 # routes/obra_audiovisual_routes.py
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from src.crud_helpers import (
@@ -13,6 +13,7 @@ from src.crud_helpers import (
 from src.database import get_db
 from src.models.obra_audiovisual_model import EquipoTecnicoObra, ObraAudiovisual
 from src.models.persona_fisica_model import PersonaFisica
+from src.rate_limiter import limiter
 from src.schemas.obra_audiovisual_schemas import (
     EquipoTecnicoCreate,
     EquipoTecnicoOut,
@@ -148,15 +149,37 @@ async def list_obras(
 
 
 @obra_audiovisual_router.get("/search", response_model=list[ObraAudiovisualList])
+@limiter.limit("30/minute")
 async def search_obras(
+    request: Request,
     q: str = "",
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Buscar obras AGAM por título (todas las obras no-borrador del sistema)"""
+    """
+    Buscar obras AGAM por título (todas las obras no-borrador del sistema).
+
+    Dos límites que antes no estaban, por simetría con el buscador del padrón
+    (`/persona-fisica/search`), que sí los tenía:
+
+    - **Se exige un término de al menos 2 caracteres.** Antes `q` tenía
+      default `""` y no se filtraba nada: pedir `/obras/search` sin
+      parámetros devolvía las primeras 20 obras del sistema, y paginando
+      contra el orden por título se podía recorrer el catálogo entero. Un
+      buscador que con la consulta vacía devuelve todo no es un buscador, es
+      un volcado.
+    - **30 consultas por minuto por IP**, la misma barrera que el buscador de
+      personas, contra el barrido sistemático.
+
+    Acá no hay datos personales en juego —el schema devuelve título, año,
+    género y extensión— así que esto no es una corrección de PII sino de
+    enumeración: evita que el catálogo de obras se pueda cosechar entero.
+    """
+    if not q or len(q.strip()) < 2:
+        return []
+
     query = db.query(ObraAudiovisual).filter(ObraAudiovisual.borrador == False)  # noqa: E712
-    if q.strip():
-        query = query.filter(ObraAudiovisual.titulo.ilike(f"%{q.strip()}%"))
+    query = query.filter(ObraAudiovisual.titulo.ilike(f"%{q.strip()}%"))
     return query.order_by(ObraAudiovisual.titulo).limit(20).all()
 
 
