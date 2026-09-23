@@ -171,14 +171,18 @@ alguien toma y escribe, no el default de todos los dias.
 
 ## El frontend sigue construyendose en el servidor
 
-A proposito. Su bundle hornea las variables `VITE_*` en build-time
-(`VITE_SHOW_TEST_USERS`, los datos de contacto de la landing), asi que una
-sola imagen no sirve para QA y prod: publicarlo hoy obligaria a mantener un
-tag por entorno, que es justo la duplicacion que este cambio viene a sacar.
+Por ahora. El obstaculo era que su bundle horneaba las variables `VITE_*` en
+build-time (`VITE_SHOW_TEST_USERS`, los datos de contacto de la landing), asi
+que una sola imagen no servia para QA y prod.
 
-Eso queda para la **Etapa 2** (anotada en `BACKLOG.md`): que esas variables
-se lean en runtime desde el contenedor. Recien ahi el servidor deja de
-construir nada.
+La **Etapa 2** lo resolvio: los datos de contacto se leen al arrancar el
+contenedor (`environment:` del compose, que el frontend vuelca a `/env.js`) y
+los usuarios de prueba los entrega el backend (`/users/demo-accounts`, solo
+con `SEED_DEMO_DATA` y nunca en produccion). La imagen ya es una sola.
+
+Falta publicarla desde el repositorio del frontend (**Etapa 3**) y desplegarla
+desde el registry (**Etapa 4**). Recien ahi el servidor deja de construir
+nada.
 
 ## En QA, el codigo sale del bind mount, no de la imagen
 
