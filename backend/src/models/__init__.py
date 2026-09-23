@@ -10,6 +10,9 @@ from src.models.audit_model import AuditAction, AuditLog
 from src.models.esa_model import EstudianteESA
 from src.models.exhibicion_model import Exhibicion, Festival, Sala
 
+# Administracion General (expedientes y ejecucion presupuestaria)
+from src.models.expediente_model import ExpedienteAdministrativo
+
 # Modelos de Fomento
 from src.models.fomento_model import (
     AcompanamientoSemillero,
@@ -21,6 +24,12 @@ from src.models.fomento_model import (
     LineaFomento,
     ParticipanteSemillero,
     TramiteFomento,
+)
+
+# Asuntos Juridicos (digesto institucional)
+from src.models.instrumento_juridico_model import (
+    ActaConsejoDirectivo,
+    InstrumentoJuridico,
 )
 from src.models.obra_audiovisual_model import EquipoTecnicoObra, ObraAudiovisual
 
@@ -97,6 +106,11 @@ __all__ = [
     "CohorteSemillero",
     "ParticipanteSemillero",
     "AcompanamientoSemillero",
+    # Administracion General
+    "ExpedienteAdministrativo",
+    # Asuntos Juridicos
+    "InstrumentoJuridico",
+    "ActaConsejoDirectivo",
     # Audit Trail
     "AuditLog",
     "AuditAction",

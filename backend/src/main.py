@@ -18,7 +18,9 @@ from src.routes.admin_routes import admin_router
 from src.routes.asociacion_routes import asociacion_router
 from src.routes.esa_routes import esa_router
 from src.routes.exhibicion_routes import exhibicion_router
+from src.routes.expediente_routes import expediente_router
 from src.routes.fomento_routes import fomento_router
+from src.routes.instrumento_juridico_routes import instrumento_juridico_router
 from src.routes.obra_audiovisual_routes import obra_audiovisual_router
 from src.routes.persona_fisica_routes import persona_fisica_router
 from src.routes.persona_juridica_routes import persona_juridica_router
@@ -130,6 +132,14 @@ Los endpoints sensibles tienen límites de solicitudes:
             "description": "Archivo de rodajes, permisos y cartas de aval institucional",
         },
         {
+            "name": "Administración General",
+            "description": "Expedientes administrativos y ejecución presupuestaria (uso interno del área)",
+        },
+        {
+            "name": "Asuntos Jurídicos",
+            "description": "Digesto jurídico institucional: resoluciones, convenios y actas del Consejo Directivo (uso interno del área)",
+        },
+        {
             "name": "Administrator User",
             "description": "Endpoints de administración (requiere rol admin)",
         },
@@ -216,6 +226,17 @@ app.include_router(
 )
 app.include_router(rodaje_router, prefix="/rodajes", tags=["Comisión de Filmaciones"])
 app.include_router(fomento_router, tags=["Fomento"])
+
+# Modulos internos por area (no son formularios del Padron: los cargan los
+# equipos de cada gerencia, no los usuarios del RePA).
+app.include_router(
+    expediente_router, prefix="/expedientes", tags=["Administración General"]
+)
+app.include_router(
+    instrumento_juridico_router,
+    prefix="/instrumentos-juridicos",
+    tags=["Asuntos Jurídicos"],
+)
 
 # Rutas de Administración
 app.include_router(admin_router, prefix="/admin_user", tags=["Administrator User"])
