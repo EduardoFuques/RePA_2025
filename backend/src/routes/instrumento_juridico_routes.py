@@ -20,6 +20,7 @@ from src.models.instrumento_juridico_model import (
     ActaConsejoDirectivo,
     InstrumentoJuridico,
 )
+from src.routes.upload_routes import servir_adjunto_de_area
 from src.schemas.instrumento_juridico_schemas import (
     InstrumentoCreate,
     InstrumentoListOut,
@@ -367,6 +368,58 @@ async def get_instrumento(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=MSG_NOT_FOUND)
 
     return instrumento
+
+
+# Adjunto -> tipo de upload que lo genera. Lista blanca: ver
+# servir_adjunto_de_area para por que el tipo importa.
+_ADJUNTOS = {
+    "pdf": "instrumento_juridico",
+    "acta-pdf": "acta_consejo_directivo",
+}
+
+
+@instrumento_juridico_router.get(
+    "/{instrumento_id}/{adjunto}",
+    summary="Descargar el PDF del instrumento o del acta",
+)
+async def descargar_adjunto_instrumento(
+    instrumento_id: int,
+    adjunto: str,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """`adjunto` es "pdf" (el instrumento firmado) o "acta-pdf" (el acta del
+    Consejo Directivo). Cada descarga queda en el audit_log."""
+    check_permissions(db, current_user, "instrumentos:manage")
+    if adjunto not in _ADJUNTOS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Adjunto inválido")
+
+    instrumento = (
+        db.query(InstrumentoJuridico)
+        .filter(InstrumentoJuridico.id == instrumento_id)
+        .first()
+    )
+    if not instrumento:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=MSG_NOT_FOUND)
+
+    if adjunto == "pdf":
+        ruta = instrumento.archivo_pdf_path
+    else:
+        ruta = instrumento.acta.acta_pdf_path if instrumento.acta else None
+    respuesta = servir_adjunto_de_area(ruta, _ADJUNTOS[adjunto])
+
+    audit_log(
+        db=db,
+        action=AuditAction.DOCUMENTO_DESCARGADO,
+        user_id=current_user["id"],
+        resource_type="InstrumentoJuridico",
+        resource_id=str(instrumento_id),
+        details={"adjunto": adjunto},
+        request=request,
+    )
+    db.commit()
+    return respuesta
 
 
 @instrumento_juridico_router.put(

@@ -588,3 +588,39 @@ async def download_file(filepath: str, current_user: dict = Depends(get_current_
         )
 
     raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+
+def servir_adjunto_de_area(ruta_guardada: str | None, doc_type: str):
+    """FileResponse de un adjunto de los modulos de area (expedientes, digesto).
+
+    Esos registros son del area, no de quien los carga: el PDF lo sube un
+    gestor y lo tiene que poder abrir otro. Por eso no alcanza con
+    /upload/document, que solo sirve archivos del directorio propio.
+
+    La ruta la escribe el cliente (llega por el PUT del registro), asi que NO
+    se confia en ella: tiene que ser exactamente "<user_id>/<doc_type>_...pdf",
+    el formato que genera upload_document para ese tipo. Sin este chequeo,
+    quien tenga el permiso del modulo podria apuntar el campo al DNI de
+    cualquier usuario y descargarlo por aca.
+    """
+    from fastapi.responses import FileResponse
+
+    partes = (ruta_guardada or "").split("/")
+    if (
+        len(partes) != 2
+        or not all(partes)
+        or not partes[1].startswith(f"{doc_type}_")
+        or not partes[1].lower().endswith(".pdf")
+    ):
+        raise HTTPException(status_code=404, detail="El registro no tiene ese documento")
+
+    ruta = _safe_path(UPLOAD_BASE_DIR, partes[0], partes[1])
+    if not os.path.exists(ruta):
+        raise HTTPException(
+            status_code=404, detail="El archivo no está disponible en el servidor"
+        )
+    return FileResponse(
+        path=ruta,
+        media_type="application/pdf",
+        filename=_sanitize_filename(partes[1]),
+    )
