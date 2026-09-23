@@ -12,7 +12,7 @@
 # camino que corra en produccion. Si la respuesta es no, va en el otro
 # archivo.
 
-fastapi>=0.115.0,<1.0.0
+fastapi>=0.141.1,<1.0.0
 uvicorn>=0.53.0,<1.0.0
 sqlalchemy>=2.0.54,<3.0.0
 psycopg2-binary>=2.9.13,<3.0.0
