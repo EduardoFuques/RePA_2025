@@ -1,0 +1,12 @@
+# Commits que solo reformatean y no cambian comportamiento. `git blame` los
+# saltea y sigue apuntando al autor real de cada linea.
+#
+# GitHub lo usa solo en la vista de blame de la web. Para que funcione tambien
+# en la terminal, una vez por clon:
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Sin eso, blame culpa a la renormalizacion por cada linea del repositorio.
+
+# chore: unificar los finales de linea (.gitattributes + renormalizacion)
+b9dd9dd3b057e8874ee454891f751e076936b250
