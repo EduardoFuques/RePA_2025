@@ -62,7 +62,10 @@ class InstrumentoJuridico(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # === 1. DATOS GENERALES DEL INSTRUMENTO ===
-    tipo_documento = Column(String(50), nullable=False, index=True)
+    # nullable para borrador: el autoguardado crea la fila apenas se empieza
+    # a cargar, igual que en los formularios del Padron. La obligatoriedad se
+    # valida al ENVIAR (borrador=False), no en el esquema.
+    tipo_documento = Column(String(50), nullable=True, index=True)
     # Opciones: resolucion, convenio_aporte, convenio_marco,
     # acta_acuerdo_especifico, acta_consejo_directivo, dictamen, contrato,
     # carta_aval, otro
@@ -74,12 +77,12 @@ class InstrumentoJuridico(Base):
     # de "control de versiones" de la sección 6 queda para una versión posterior.
     fecha_emision = Column(Date, nullable=True, index=True)
     # Indexado: alimenta el filtro por año y el informe de volumen anual.
-    titulo = Column(String(500), nullable=False)
-    resumen = Column(Text, nullable=False)  # campo obligatorio según el formulario
+    titulo = Column(String(500), nullable=True)  # nullable para borrador
+    resumen = Column(Text, nullable=True)  # obligatorio al enviar, nullable para borrador
     palabras_clave = Column(JSON, nullable=True)  # lista de strings, max 5
     ambito_aplicacion = Column(String(30), nullable=True)
     # Opciones: local, provincial, nacional, internacional
-    archivo_pdf_path = Column(String(500), nullable=False)
+    archivo_pdf_path = Column(String(500), nullable=True)  # obligatorio al enviar
     # Adjunto obligatorio. Se guarda solo el path: la subida la resuelve
     # upload_routes, este módulo nunca recibe el binario.
 
@@ -127,6 +130,9 @@ class InstrumentoJuridico(Base):
     usuario_carga_id = Column(
         String, ForeignKey("users.id"), nullable=False, index=True
     )
+    # Borrador: la fila existe pero todavia no se declara cargada. Mismo
+    # patron que rodajes y los formularios del Padron.
+    borrador = Column(Boolean, nullable=False, default=False)
     estado_revision = Column(String(20), nullable=False, default="en_revision")
     # Opciones: en_revision, validado, archivado
     # El "historial de modificaciones" del formulario no tiene tabla propia:

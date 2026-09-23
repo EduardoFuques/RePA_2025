@@ -13,6 +13,7 @@ class ExpedienteCreate(BaseModel):
     tramite (el PM dejo fuera de esta version las validaciones de
     obligatoriedad de ID / fecha / area).
     """
+    borrador: bool = False
 
     numero_expediente_provincial: str | None = Field(None, max_length=100)
     fecha_alta: date | None = None
@@ -49,6 +50,7 @@ class ExpedienteUpdate(BaseModel):
     Mismo cuerpo que Create; se aplica con exclude_unset para poder tocar un
     solo campo (tipico: pasar el estado a 'pagado' y cargar monto_ejecutado).
     """
+    borrador: bool | None = None
 
     numero_expediente_provincial: str | None = Field(None, max_length=100)
     fecha_alta: date | None = None
@@ -80,6 +82,7 @@ class ExpedienteUpdate(BaseModel):
 
 class ExpedienteOut(BaseModel):
     """Schema de salida de un Expediente Administrativo."""
+    borrador: bool = False
 
     id: int
 
@@ -118,6 +121,7 @@ class ExpedienteOut(BaseModel):
 
 class ExpedienteListOut(BaseModel):
     """Pagina del listado de backoffice."""
+    borrador: bool = False
 
     items: list[ExpedienteOut]
     total: int

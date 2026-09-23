@@ -115,6 +115,10 @@ class ExpedienteAdministrativo(Base):
     observaciones_administrativas = Column(Text, nullable=True)
 
     # === METADATOS ===
+    # Borrador: la fila existe pero todavia no se declara cargada. Mismo
+    # patron que rodajes y los formularios del Padron; lo que habilita el
+    # autoguardado desde el primer campo.
+    borrador = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
