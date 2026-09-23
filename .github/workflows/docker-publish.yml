@@ -21,11 +21,10 @@ name: Publicar imagen del backend (GHCR)
 # de la auditoria: `pip install` en el servidor con rangos abiertos en
 # requirements.txt).
 #
-# EL FRONTEND NO ESTA ACA. Desde la Etapa 2 su imagen ya es una sola para
-# todos los entornos (la config se lee al arrancar el contenedor), pero se
-# publica desde su propio repositorio (Etapa 3) y hasta entonces se sigue
-# construyendo en el servidor. El backend lee toda su
-# configuracion del entorno al arrancar, por eso puede publicarse ya.
+# EL FRONTEND NO ESTA ACA: tiene su propio docker-publish.yml en
+# Repa2025-Frontend, con el mismo esquema (release -> imagen en GHCR ->
+# deploy a QA con FRONTEND_REGISTRY_IMAGE). Cada uno despliega lo suyo;
+# deploy.sh serializa los dos con un flock.
 
 on:
   push:
