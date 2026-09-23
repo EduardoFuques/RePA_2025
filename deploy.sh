@@ -102,11 +102,38 @@ else
 fi
 echo ""
 
-# Detener contenedores existentes
-echo "Deteniendo contenedores..."
-docker compose "${COMPOSE_FILES[@]}" down
+# =============================================================================
+# El orden de lo que sigue es lo que define cuanto dura el corte.
+# =============================================================================
+#
+# ANTES ESTO EMPEZABA CON `docker compose down`, y estaba mal por dos razones
+# independientes:
+#
+#   1. Bajaba TODO —base de datos incluida— para actualizar un solo servicio.
+#      Postgres tarda ~6s en frenar y ~18s en volver a estar healthy, y no
+#      habia ninguna razon para tocarlo: su imagen y su configuracion no
+#      cambian en un deploy del backend.
+#
+#   2. Dejaba el pull de la imagen DENTRO de la ventana de corte. El pull de
+#      v1.10.0 tardo 1m16s en frio: un minuto y cuarto de servicio caido
+#      esperando una descarga que se podria haber hecho con todo funcionando.
+#
+# Ahora: primero se trae todo lo necesario con el sistema en pie (codigo,
+# imagen del backend, build del frontend), y recien al final se reconcilia.
+#
+# LA CLAVE ES QUE `docker compose up -d` YA HACE LO QUE QUEREMOS. Es
+# declarativo: compara cada contenedor corriendo contra lo que declara el
+# compose y recrea UNICAMENTE aquellos cuya imagen o configuracion cambio.
+# Si el backend cambio de tag, recrea el backend; la base de datos y el
+# frontend ni se enteran. `down` + `up` era la forma manual —y destructiva—
+# de hacer algo que compose resuelve solo.
+#
+# CONSECUENCIA A TENER PRESENTE: si algun dia cambia el spec de la base
+# (por ejemplo un PR de Dependabot que suba postgres:17-alpine), `up -d` SI
+# va a recrear ese contenedor, porque corresponde. Los datos no se pierden:
+# viven en el bind mount ./pgdata, no en el contenedor.
 
-# Pullear ultima version del backend.
+# --- 1. Codigo. Sin corte: todavia no se toco nada que este corriendo. -----
 #
 # El `git pull` se saltea si el repo esta en HEAD detached, que es como lo
 # deja docker-publish.yml: el workflow hace `git checkout vX.Y.Z` para que
@@ -143,13 +170,12 @@ if ! git submodule update --init --recursive; then
   git submodule update --init --recursive
 fi
 echo "  frontend en: $(git -C frontend rev-parse --short HEAD)"
+echo ""
 
-# Construir y/o bajar las imagenes, y levantar.
+# --- 2. Imagenes. Sigue sin haber corte: el sistema viejo atiende igual. ---
 #
-# Ojo con el `up` sin `--build`: compose solo construye un servicio si la
-# imagen que declara su `image:` NO esta presente localmente. Por eso los
-# dos pasos de abajo (pull del backend, build del frontend) alcanzan — al
-# llegar al `up`, ambas imagenes ya existen y compose las usa tal cual.
+# Todo lo lento va aca, a proposito: la descarga de la imagen y el build del
+# frontend pasan con la version anterior en pie y sirviendo.
 if [ "$USAR_REGISTRY" = "1" ]; then
   echo "Bajando la imagen del backend..."
   if ! docker compose "${COMPOSE_FILES[@]}" pull backend; then
@@ -157,34 +183,45 @@ if [ "$USAR_REGISTRY" = "1" ]; then
     echo "❌ No se pudo bajar $BACKEND_IMAGE"
     echo "   Si es un 401/denied: el servidor no esta logueado en GHCR."
     echo "   Ver 'docker login ghcr.io' en docs/deploy-registry.md."
+    echo ""
+    echo "   No se toco nada: el sistema sigue corriendo la version anterior."
     exit 1
   fi
-
-  # El frontend todavia se construye acá: su bundle hornea las variables
-  # VITE_* en build-time, asi que una sola imagen no sirve para QA y prod
-  # (Etapa 2, anotada en BACKLOG.md).
-  echo "Construyendo el frontend..."
-  docker compose "${COMPOSE_FILES[@]}" build frontend
-
-  echo "Iniciando contenedores..."
-  docker compose "${COMPOSE_FILES[@]}" up -d
-
-  # Queda escrito en el servidor que version corre. Es lo que se edita para
-  # volver atras: cambiar el tag acá y correr deploy.sh de nuevo.
-  if [ -f .env ]; then
-    if grep -q '^BACKEND_REGISTRY_IMAGE=' .env; then
-      sed -i "s|^BACKEND_REGISTRY_IMAGE=.*|BACKEND_REGISTRY_IMAGE=${BACKEND_REGISTRY_IMAGE}|" .env
-    else
-      printf '\nBACKEND_REGISTRY_IMAGE=%s\n' "$BACKEND_REGISTRY_IMAGE" >> .env
-    fi
-  fi
 else
-  echo "Construyendo e iniciando contenedores..."
-  docker compose "${COMPOSE_FILES[@]}" up -d --build
+  echo "Construyendo el backend..."
+  docker compose "${COMPOSE_FILES[@]}" build backend
 fi
 
-# Esperar a que la DB esté healthy (máx 30s)
-echo "Esperando a que PostgreSQL esté healthy..."
+# El frontend se construye acá siempre: su bundle hornea las variables VITE_*
+# en build-time, asi que una sola imagen no sirve para QA y prod (Etapa 2,
+# anotada en BACKLOG.md).
+echo "Construyendo el frontend..."
+docker compose "${COMPOSE_FILES[@]}" build frontend
+echo ""
+
+# --- 3. Escotilla de emergencia: forzar un reinicio completo. --------------
+#
+# El flujo normal NO baja nada. Si hiciera falta el comportamiento viejo
+# —por ejemplo para descartar un estado raro de red o de volumenes— se corre
+# el deploy con DEPLOY_RECREAR_TODO=1. Es deliberadamente explicito: que
+# tirar la base de datos sea una decision que alguien toma y escribe, no el
+# default de todos los dias.
+if [ "$DEPLOY_RECREAR_TODO" = "1" ]; then
+  echo "⚠ DEPLOY_RECREAR_TODO=1 — bajando TODO, base de datos incluida"
+  docker compose "${COMPOSE_FILES[@]}" down --remove-orphans
+  echo ""
+fi
+
+# --- 4. Base de datos: no se toca, solo se verifica que responda. ---------
+#
+# `up -d db` es idempotente: si ya esta corriendo y su spec no cambio, no
+# hace absolutamente nada y devuelve al instante. Si esta caida, la levanta.
+# Esta explicito —y no delegado al depends_on del backend— para que, cuando
+# la base sea el problema, el deploy lo diga con todas las letras en vez de
+# fallar mas adelante con un error de conexion.
+echo "Verificando la base de datos..."
+docker compose "${COMPOSE_FILES[@]}" up -d db
+
 for i in {1..6}; do
   if docker compose "${COMPOSE_FILES[@]}" ps db | grep -q "healthy"; then
     echo "✓ PostgreSQL healthy"
@@ -198,6 +235,30 @@ for i in {1..6}; do
   echo "  Esperando DB... ($i/6)"
   sleep 5
 done
+echo ""
+
+# --- 5. Reconciliar. Acá, y solo acá, hay corte. --------------------------
+#
+# Dura lo que tarde en reiniciar el servicio que efectivamente cambio
+# (~20s el backend), no los ~4 minutos que tardaba el ciclo completo.
+#
+# --remove-orphans borra los contenedores que pertenecen a este proyecto
+# pero ya no estan declarados en ningun compose. Es lo que saca el
+# `repa_2025-adminer-1` que alguien levanto a mano y quedo dando vueltas —
+# un cliente web de base de datos suelto en un servidor con datos de padron.
+# Y es lo que evita que vuelva a acumularse algo asi sin que nadie lo note.
+echo "Aplicando cambios..."
+docker compose "${COMPOSE_FILES[@]}" up -d --remove-orphans
+
+# Queda escrito en el servidor que version corre. Es lo que se edita para
+# volver atras: cambiar el tag acá y correr deploy.sh de nuevo.
+if [ "$USAR_REGISTRY" = "1" ] && [ -f .env ]; then
+  if grep -q '^BACKEND_REGISTRY_IMAGE=' .env; then
+    sed -i "s|^BACKEND_REGISTRY_IMAGE=.*|BACKEND_REGISTRY_IMAGE=${BACKEND_REGISTRY_IMAGE}|" .env
+  else
+    printf '\nBACKEND_REGISTRY_IMAGE=%s\n' "$BACKEND_REGISTRY_IMAGE" >> .env
+  fi
+fi
 
 # Esperar a que el Backend esté healthy (máx 60s)
 echo "Esperando a que el Backend esté healthy..."
