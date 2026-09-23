@@ -17,6 +17,7 @@ from src.audit import audit_log
 from src.database import get_db
 from src.models.audit_model import AuditAction
 from src.models.expediente_model import ExpedienteAdministrativo
+from src.routes.upload_routes import servir_adjunto_de_area
 from src.schemas.expediente_schemas import (
     ExpedienteCreate,
     ExpedienteListOut,
@@ -245,6 +246,36 @@ async def obtener_expediente(
     """Obtener un expediente administrativo por su ID interno."""
     check_permissions(db, current_user, PERM_EXPEDIENTES)
     return _get_expediente_or_404(db, expediente_id)
+
+
+@expediente_router.get(
+    "/{expediente_id}/resolucion-pdf",
+    summary="Descargar el PDF de la resolución del expediente",
+)
+async def descargar_resolucion_pdf(
+    expediente_id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """El PDF lo sube un gestor y lo abre cualquiera del area; queda auditado
+    igual que las descargas de adjuntos del padron."""
+    check_permissions(db, current_user, PERM_EXPEDIENTES)
+    expediente = _get_expediente_or_404(db, expediente_id)
+    respuesta = servir_adjunto_de_area(
+        expediente.resolucion_pdf_path, "expediente_resolucion"
+    )
+    audit_log(
+        db=db,
+        action=AuditAction.DOCUMENTO_DESCARGADO,
+        user_id=current_user["id"],
+        resource_type="ExpedienteAdministrativo",
+        resource_id=str(expediente_id),
+        details={"adjunto": "resolucion_pdf_path"},
+        request=request,
+    )
+    db.commit()
+    return respuesta
 
 
 @expediente_router.put(

@@ -299,3 +299,54 @@ class TestExpedienteResumen:
         )
         assert tipo["cantidad"] >= 1
         assert float(tipo["monto_aprobado"]) >= 1000.00
+
+
+class TestExpedienteResolucionPdf:
+    """Mismo criterio que los adjuntos del digesto: se sirve el PDF que subio
+    otro gestor, pero solo si la ruta tiene el formato de su tipo de upload."""
+
+    @pytest.fixture
+    def uploads(self, tmp_path, monkeypatch):
+        import src.routes.upload_routes as upload_routes
+
+        monkeypatch.setattr(upload_routes, "UPLOAD_BASE_DIR", str(tmp_path))
+        return tmp_path
+
+    def _archivo(self, uploads, user_id, nombre):
+        carpeta = uploads / user_id
+        carpeta.mkdir(exist_ok=True)
+        (carpeta / nombre).write_bytes(b"%PDF-1.4 prueba")
+        return f"{user_id}/{nombre}"
+
+    def test_descarga_la_resolucion(self, client, admin_headers, crear_expediente, uploads):
+        ruta = self._archivo(uploads, "otro-gestor", "expediente_resolucion_abc.pdf")
+        exp = crear_expediente(resolucion_pdf_path=ruta)
+        resp = client.get(
+            f"{_base(client)}/{exp['id']}/resolucion-pdf", headers=admin_headers
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.content.startswith(b"%PDF")
+
+    def test_no_sirve_un_archivo_de_otro_tipo(
+        self, client, admin_headers, crear_expediente, uploads
+    ):
+        ruta = self._archivo(uploads, "victima", "dni_abc.pdf")
+        exp = crear_expediente(resolucion_pdf_path=ruta)
+        resp = client.get(
+            f"{_base(client)}/{exp['id']}/resolucion-pdf", headers=admin_headers
+        )
+        assert resp.status_code == 404
+
+    def test_sin_pdf_es_404(self, client, admin_headers, crear_expediente):
+        exp = crear_expediente(resolucion_pdf_path=None)
+        resp = client.get(
+            f"{_base(client)}/{exp['id']}/resolucion-pdf", headers=admin_headers
+        )
+        assert resp.status_code == 404
+
+    def test_sin_permiso_es_403(self, client, user_headers, crear_expediente):
+        exp = crear_expediente()
+        resp = client.get(
+            f"{_base(client)}/{exp['id']}/resolucion-pdf", headers=user_headers
+        )
+        assert resp.status_code == 403

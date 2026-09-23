@@ -498,3 +498,72 @@ class TestInstrumentoBorrador:
         )
         assert resp.status_code == 200, resp.text
         assert resp.json()["titulo"] == "Paso 2"
+
+
+# ---------------------------------------------------------------------------
+# Descarga de adjuntos
+# ---------------------------------------------------------------------------
+class TestInstrumentoAdjuntos:
+    """
+    El PDF lo sube un gestor y lo abre otro: se sirve desde el directorio de
+    quien lo subio, no del que lo pide. La ruta la escribe el cliente, asi que
+    solo se sirven archivos con el formato que genera upload_document para el
+    tipo correspondiente.
+    """
+
+    @pytest.fixture
+    def uploads(self, tmp_path, monkeypatch):
+        import src.routes.upload_routes as upload_routes
+
+        monkeypatch.setattr(upload_routes, "UPLOAD_BASE_DIR", str(tmp_path))
+        return tmp_path
+
+    def _archivo(self, uploads, user_id, nombre):
+        carpeta = uploads / user_id
+        carpeta.mkdir(exist_ok=True)
+        (carpeta / nombre).write_bytes(b"%PDF-1.4 prueba")
+        return f"{user_id}/{nombre}"
+
+    def test_descarga_el_pdf_subido_por_otro_usuario(
+        self, client, juridico_headers, uploads
+    ):
+        ruta = self._archivo(uploads, "otro-gestor", "instrumento_juridico_abc.pdf")
+        creado = _crear(client, juridico_headers, archivo_pdf_path=ruta)
+        resp = client.get(f"{BASE}/{creado['id']}/pdf", headers=juridico_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.content.startswith(b"%PDF")
+
+    def test_no_sirve_un_archivo_de_otro_tipo(self, client, juridico_headers, uploads):
+        # Un DNI ajeno no se puede sacar apuntando el campo a su ruta.
+        ruta = self._archivo(uploads, "victima", "dni_abc.pdf")
+        creado = _crear(client, juridico_headers, archivo_pdf_path=ruta)
+        resp = client.get(f"{BASE}/{creado['id']}/pdf", headers=juridico_headers)
+        assert resp.status_code == 404
+
+    def test_no_sirve_rutas_que_salen_del_directorio(
+        self, client, juridico_headers, uploads
+    ):
+        creado = _crear(
+            client, juridico_headers,
+            archivo_pdf_path="../instrumento_juridico_abc.pdf",
+        )
+        resp = client.get(f"{BASE}/{creado['id']}/pdf", headers=juridico_headers)
+        assert resp.status_code in (403, 404)
+
+    def test_descarga_el_pdf_del_acta(self, client, juridico_headers, uploads):
+        ruta = self._archivo(uploads, "otro-gestor", "acta_consejo_directivo_abc.pdf")
+        creado = _crear(
+            client, juridico_headers,
+            tipo_documento="acta_consejo_directivo",
+            acta={"acta_pdf_path": ruta},
+        )
+        resp = client.get(f"{BASE}/{creado['id']}/acta-pdf", headers=juridico_headers)
+        assert resp.status_code == 200, resp.text
+
+    def test_adjunto_desconocido_es_404(self, client, juridico_headers, instrumento):
+        resp = client.get(f"{BASE}/{instrumento['id']}/otra-cosa", headers=juridico_headers)
+        assert resp.status_code == 404
+
+    def test_sin_permiso_es_403(self, client, user_headers, instrumento):
+        resp = client.get(f"{BASE}/{instrumento['id']}/pdf", headers=user_headers)
+        assert resp.status_code == 403
