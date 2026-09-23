@@ -33,9 +33,9 @@ dentro del corte:
 
 | Etapa | Hay corte? |
 | --- | --- |
-| 1. Actualizar codigo y submodulo | no |
-| 2. Bajar la imagen del backend (1m 16s en frio) | **no** |
-| 3. Construir el frontend (54s con cache) | **no** |
+| 1. Actualizar codigo | no |
+| 2. Bajar las imagenes del backend y del frontend (1m 16s en frio) | **no** |
+| 3. (Solo sin registry) construirlas | **no** |
 | 4. Verificar que la base responda | no (no se la toca) |
 | 5. `docker compose up -d` reconcilia | **si**, ~20s |
 
@@ -169,20 +169,32 @@ DEPLOY_RECREAR_TODO=1 ./deploy.sh
 Es deliberadamente explicito: que tirar la base de datos sea una decision que
 alguien toma y escribe, no el default de todos los dias.
 
-## El frontend sigue construyendose en el servidor
+## El frontend tambien sale del registry
 
-Por ahora. El obstaculo era que su bundle horneaba las variables `VITE_*` en
-build-time (`VITE_SHOW_TEST_USERS`, los datos de contacto de la landing), asi
-que una sola imagen no servia para QA y prod.
+Mismo esquema que el backend, desde su propio repositorio
+(`EduardoFuques/Repa2025-Frontend`): semantic-release crea el tag, su
+`docker-publish.yml` publica `ghcr.io/eduardofuques/repa-frontend:vX.Y.Z` y
+despliega a QA corriendo este `deploy.sh` con `FRONTEND_REGISTRY_IMAGE`, que
+queda escrita en el `.env`. Volver atras es cambiar ese tag y correr
+`./deploy.sh`.
 
-La **Etapa 2** lo resolvio: los datos de contacto se leen al arrancar el
-contenedor (`environment:` del compose, que el frontend vuelca a `/env.js`) y
-los usuarios de prueba los entrega el backend (`/users/demo-accounts`, solo
-con `SEED_DEMO_DATA` y nunca en produccion). La imagen ya es una sola.
+Lo que lo hizo posible (Etapa 2): la imagen es una sola para todos los
+entornos. Los datos de contacto de la landing se leen al arrancar el
+contenedor (`environment:` del compose, que el frontend vuelca a `/env.js`)
+y los usuarios de prueba los entrega el backend (`/users/demo-accounts`,
+solo con `SEED_DEMO_DATA` y nunca en produccion).
 
-Falta publicarla desde el repositorio del frontend (**Etapa 3**) y desplegarla
-desde el registry (**Etapa 4**). Recien ahi el servidor deja de construir
-nada.
+**El frontend ya no es un submodulo.** El puntero se bumpeaba a mano y se
+olvidaba: hasta el 23/09 QA servia el frontend del 21/08. Ahora cada repo
+despliega lo suyo, y lo que corre lo dicen `BACKEND_REGISTRY_IMAGE` y
+`FRONTEND_REGISTRY_IMAGE` en el `.env` del servidor. Para desarrollo local,
+el frontend se clona suelto en `./frontend` (ignorado por git); sin
+`FRONTEND_REGISTRY_IMAGE`, `deploy.sh` y los compose lo construyen de ahi.
+
+**Consecuencia: los deploys son independientes.** Si un cambio del frontend
+necesita un endpoint nuevo del backend, el backend se despliega primero.
+`deploy.sh` toma un `flock` para que dos deploys que coincidan (uno de cada
+repo) no se pisen.
 
 ## En QA, el codigo sale del bind mount, no de la imagen
 
@@ -197,19 +209,3 @@ alguien toca archivos a mano en el servidor, en QA eso se ve y en produccion
 no (`docker-compose.prod.yml` no tiene el bind mount). Conviene tenerlo
 presente al diagnosticar una diferencia entre entornos.
 
-## Para la Etapa 2 hace falta un token que llegue al repo del frontend
-
-El frontend vive en `EduardoFuques/Repa2025-Frontend`, que es privado y
-entra aca como submodulo. Hoy eso no molesta, porque se construye en el
-servidor con el submodulo ya clonado.
-
-**Pero es lo primero que hay que resolver para la Etapa 2**: para que
-Actions construya el frontend tiene que poder hacer checkout del submodulo,
-y el `GITHUB_TOKEN` por defecto **no da acceso a otro repositorio**, por
-privado o publico que sea. Hace falta un deploy key o un PAT con acceso a
-ese repo, pasado a `actions/checkout` con `submodules: recursive` y `token:`.
-
-(Durante el 22/09 esto aparecia ademas como *"Repository not found"* al
-operar a mano, porque la cuenta que se estaba usando no era colaboradora del
-repo del frontend. Eso ya se resolvio; la limitacion del `GITHUB_TOKEN`
-dentro de Actions es aparte y sigue en pie.)

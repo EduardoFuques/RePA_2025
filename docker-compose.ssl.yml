@@ -17,7 +17,7 @@ services:
     volumes:
       - /etc/letsencrypt/live/${SSL_DOMAIN}/fullchain.pem:/certs/fullchain.pem:ro
       - /etc/letsencrypt/live/${SSL_DOMAIN}/privkey.pem:/certs/privkey.pem:ro
-    # Ya no se monta nginx-ssl.conf desde el submodulo: viene dentro de la
-    # imagen del frontend y se activa sola al arrancar si encuentra estos
-    # certificados en /certs (frontend/docker/35-nginx-ssl.sh). Asi el
-    # servidor no necesita el codigo fuente del frontend para servir HTTPS.
+    # nginx-ssl.conf viene dentro de la imagen del frontend y se activa sola
+    # al arrancar si encuentra estos certificados en /certs
+    # (docker/35-nginx-ssl.sh del repositorio del frontend). El servidor no
+    # necesita el codigo fuente del frontend para servir HTTPS.

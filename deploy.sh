@@ -8,6 +8,17 @@ set -e
 echo "=== Deploy RePA ==="
 echo ""
 
+# Un deploy a la vez. Desde que el frontend se publica y despliega desde su
+# propio repositorio, a este servidor le llegan deploys de DOS workflows
+# (backend y frontend) que pueden coincidir: dos `docker compose up` en
+# paralelo se pisan. La `concurrency` de GitHub Actions no cruza entre
+# repositorios, asi que el cerrojo va aca. El segundo espera al primero.
+exec 9>"${DEPLOY_LOCK:-/tmp/repa-deploy.lock}"
+if ! flock -w 900 9; then
+  echo "❌ Hay otro deploy corriendo hace mas de 15 minutos; no se sigue."
+  exit 1
+fi
+
 # Cargar .env para leer SSL_DOMAIN (docker compose ya lo hace solo al
 # correr, pero acá lo necesitamos ANTES, para decidir qué -f pasarle).
 #
@@ -16,7 +27,10 @@ echo ""
 # que pasa docker-publish.yml en el deploy — el servidor se quedaria
 # desplegando eternamente la version anterior. Lo que viene del entorno
 # manda; el .env es el valor por defecto.
+# Lo mismo con FRONTEND_REGISTRY_IMAGE, que pasa el docker-publish.yml del
+# repositorio del frontend.
 BACKEND_REGISTRY_IMAGE_ENTORNO="$BACKEND_REGISTRY_IMAGE"
+FRONTEND_REGISTRY_IMAGE_ENTORNO="$FRONTEND_REGISTRY_IMAGE"
 if [ -f .env ]; then
   set -a
   source .env
@@ -24,6 +38,9 @@ if [ -f .env ]; then
 fi
 if [ -n "$BACKEND_REGISTRY_IMAGE_ENTORNO" ]; then
   BACKEND_REGISTRY_IMAGE="$BACKEND_REGISTRY_IMAGE_ENTORNO"
+fi
+if [ -n "$FRONTEND_REGISTRY_IMAGE_ENTORNO" ]; then
+  FRONTEND_REGISTRY_IMAGE="$FRONTEND_REGISTRY_IMAGE_ENTORNO"
 fi
 
 # HTTPS es opt-in: si configuraste SSL_DOMAIN en .env, se agrega el
@@ -59,25 +76,6 @@ else
 fi
 echo ""
 
-# Cargar versiones desde .version
-#
-# El `export` no es decorativo. `source .version` a secas deja las variables
-# como variables de shell, y docker compose —que es otro proceso— no las ve:
-# `image: repa-frontend:${FRONTEND_VERSION:-latest}` caia siempre al default
-# y CADA deploy pisaba `repa-frontend:latest`, sin forma de saber despues que
-# version de frontend estaba corriendo. Se veia en el log del deploy de
-# v1.10.0: `naming to docker.io/library/repa-frontend:latest` mientras el
-# resumen de este mismo script anunciaba 1.14.2.
-if [ -f .version ]; then
-  source .version
-  export FRONTEND_VERSION
-  echo "Frontend: $FRONTEND_VERSION"
-else
-  echo "⚠ Archivo .version no encontrado, usando 'latest' para el frontend"
-  export FRONTEND_VERSION=latest
-fi
-echo ""
-
 # De donde sale la imagen del backend.
 #
 # Si BACKEND_REGISTRY_IMAGE esta definida (la setea docker-publish.yml en
@@ -102,6 +100,29 @@ else
   USAR_REGISTRY=0
   echo "ℹ BACKEND_REGISTRY_IMAGE no definida — el backend se construye acá"
 fi
+
+# De donde sale la imagen del frontend. Mismo esquema que el backend: la
+# publica el repositorio del frontend en GHCR (una imagen para todos los
+# entornos, la config se lee al arrancar) y su docker-publish.yml despliega
+# pasando FRONTEND_REGISTRY_IMAGE, que queda escrita en el .env.
+#
+# Sin ella se construye desde ./frontend, que ya NO es un submodulo: es un
+# clon suelto del repositorio del frontend, ignorado por git. Sirve para
+# desarrollo local y como salida de emergencia si el registry no responde.
+if [ -n "$FRONTEND_REGISTRY_IMAGE" ]; then
+  export FRONTEND_IMAGE="$FRONTEND_REGISTRY_IMAGE"
+  FRONTEND_DESDE_REGISTRY=1
+  echo "✓ Frontend desde el registry: $FRONTEND_IMAGE"
+elif [ -f frontend/Dockerfile ]; then
+  export FRONTEND_IMAGE="repa-frontend:local"
+  FRONTEND_DESDE_REGISTRY=0
+  echo "ℹ FRONTEND_REGISTRY_IMAGE no definida — el frontend se construye desde ./frontend ($(git -C frontend rev-parse --short HEAD 2>/dev/null || echo 'sin git'))"
+else
+  echo "❌ No hay de donde sacar el frontend: FRONTEND_REGISTRY_IMAGE no esta"
+  echo "   definida y ./frontend no tiene un checkout del repositorio."
+  echo "   Definila en el .env (ver .env.example) o cloná Repa2025-Frontend en ./frontend."
+  exit 1
+fi
 echo ""
 
 # =============================================================================
@@ -121,7 +142,7 @@ echo ""
 #      esperando una descarga que se podria haber hecho con todo funcionando.
 #
 # Ahora: primero se trae todo lo necesario con el sistema en pie (codigo,
-# imagen del backend, build del frontend), y recien al final se reconcilia.
+# imagenes del backend y del frontend), y recien al final se reconcilia.
 #
 # LA CLAVE ES QUE `docker compose up -d` YA HACE LO QUE QUEREMOS. Es
 # declarativo: compara cada contenedor corriendo contra lo que declara el
@@ -149,35 +170,12 @@ else
   echo "  HEAD detached en $(git rev-parse --short HEAD) — no se hace pull"
 fi
 
-# Actualizar el frontend al commit pineado en el submodulo.
-#
-# Antes esto clonaba el repo a mano y hacia `git pull origin main`, con lo cual
-# el puntero del submodulo se ignoraba y se desplegaba siempre el HEAD de main:
-# backend y frontend nunca salian de forma atomica, y `git status` reportaba el
-# submodulo como modificado de forma permanente.
-#
-# Ahora manda el puntero. Consecuencia practica del cambio: mergear algo en el
-# frontend YA NO ALCANZA para que llegue al servidor — hay que bumpear el
-# puntero en este repo (git add frontend && commit), que es justamente lo que
-# vuelve reproducible un despliegue.
-echo "Actualizando frontend (submodulo)..."
-git submodule sync --recursive
-if ! git submodule update --init --recursive; then
-  # Primera corrida despues de declarar el submodulo: frontend/ todavia es el
-  # clon suelto que dejaba el deploy anterior y git no lo reconoce como
-  # submodulo registrado. Se rehace desde cero — no hay nada local que perder,
-  # es un checkout de un repo remoto (el flujo viejo tambien hacia rm -rf aca).
-  echo "  frontend/ no era un submodulo valido; rehaciendo el checkout"
-  rm -rf frontend
-  git submodule update --init --recursive
-fi
-echo "  frontend en: $(git -C frontend rev-parse --short HEAD)"
 echo ""
 
 # --- 2. Imagenes. Sigue sin haber corte: el sistema viejo atiende igual. ---
 #
-# Todo lo lento va aca, a proposito: la descarga de la imagen y el build del
-# frontend pasan con la version anterior en pie y sirviendo.
+# Todo lo lento va aca, a proposito: las descargas (o los builds, si no hay
+# registry) pasan con la version anterior en pie y sirviendo.
 if [ "$USAR_REGISTRY" = "1" ]; then
   echo "Bajando la imagen del backend..."
   if ! docker compose "${COMPOSE_FILES[@]}" pull backend; then
@@ -194,11 +192,21 @@ else
   docker compose "${COMPOSE_FILES[@]}" build backend
 fi
 
-# El frontend se construye acá siempre: su bundle hornea las variables VITE_*
-# en build-time, asi que una sola imagen no sirve para QA y prod (Etapa 2,
-# anotada en BACKLOG.md).
-echo "Construyendo el frontend..."
-docker compose "${COMPOSE_FILES[@]}" build frontend
+if [ "$FRONTEND_DESDE_REGISTRY" = "1" ]; then
+  echo "Bajando la imagen del frontend..."
+  if ! docker compose "${COMPOSE_FILES[@]}" pull frontend; then
+    echo ""
+    echo "❌ No se pudo bajar $FRONTEND_IMAGE"
+    echo "   Si es un 401/denied: el token de GHCR del servidor no puede leer"
+    echo "   el paquete repa-frontend. Ver docs/deploy-registry.md."
+    echo ""
+    echo "   No se toco nada: el sistema sigue corriendo la version anterior."
+    exit 1
+  fi
+else
+  echo "Construyendo el frontend..."
+  docker compose "${COMPOSE_FILES[@]}" build frontend
+fi
 echo ""
 
 # --- 3. Escotilla de emergencia: forzar un reinicio completo. --------------
@@ -254,12 +262,22 @@ docker compose "${COMPOSE_FILES[@]}" up -d --remove-orphans
 
 # Queda escrito en el servidor que version corre. Es lo que se edita para
 # volver atras: cambiar el tag acá y correr deploy.sh de nuevo.
-if [ "$USAR_REGISTRY" = "1" ] && [ -f .env ]; then
-  if grep -q '^BACKEND_REGISTRY_IMAGE=' .env; then
-    sed -i "s|^BACKEND_REGISTRY_IMAGE=.*|BACKEND_REGISTRY_IMAGE=${BACKEND_REGISTRY_IMAGE}|" .env
+# Vale para las dos imagenes: un deploy del frontend no toca la linea del
+# backend y viceversa, asi que cada una queda con la ultima que se desplego.
+guardar_en_env() {
+  local clave=$1 valor=$2
+  [ -f .env ] || return 0
+  if grep -q "^${clave}=" .env; then
+    sed -i "s|^${clave}=.*|${clave}=${valor}|" .env
   else
-    printf '\nBACKEND_REGISTRY_IMAGE=%s\n' "$BACKEND_REGISTRY_IMAGE" >> .env
+    printf '\n%s=%s\n' "$clave" "$valor" >> .env
   fi
+}
+if [ "$USAR_REGISTRY" = "1" ]; then
+  guardar_en_env BACKEND_REGISTRY_IMAGE "$BACKEND_REGISTRY_IMAGE"
+fi
+if [ "$FRONTEND_DESDE_REGISTRY" = "1" ]; then
+  guardar_en_env FRONTEND_REGISTRY_IMAGE "$FRONTEND_REGISTRY_IMAGE"
 fi
 
 # Esperar a que el Backend esté healthy (máx 60s)
@@ -324,7 +342,11 @@ docker compose "${COMPOSE_FILES[@]}" logs backend --tail 10
 echo ""
 echo "=== Deploy completado ==="
 echo "Backend:  $BACKEND_IMAGE"
-echo "Frontend: repa-frontend:${FRONTEND_VERSION:-latest} (construido acá)"
+if [ "$FRONTEND_DESDE_REGISTRY" = "1" ]; then
+  echo "Frontend: $FRONTEND_IMAGE"
+else
+  echo "Frontend: $FRONTEND_IMAGE (construido acá desde ./frontend)"
+fi
 echo "Frontend: http://localhost (puerto 80)"
 echo "API: http://localhost/api (proxy al backend)"
 echo ""

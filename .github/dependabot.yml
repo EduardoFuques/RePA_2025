@@ -31,14 +31,14 @@
 # datos entre si; aca ese problema no existe.
 #
 # POR QUE NO ESTA npm: el frontend vive en otro repositorio
-# (Repa2025-Frontend, incluido aca como submodulo). Dependabot solo mira el
-# repo donde esta este archivo — no entra a los submodulos. Las dependencias
+# (Repa2025-Frontend). Dependabot solo mira el repo donde esta este
+# archivo. Las dependencias
 # de npm del frontend hay que cubrirlas con un dependabot.yml en ESE repo.
 version: 2
 updates:
   - package-ecosystem: docker
     # Los Dockerfile no estan en la raiz: backend/ tiene el suyo y el
-    # frontend es un submodulo. `directories` (plural) permite listar varios.
+    # frontend es otro repositorio. `directories` (plural) permite listar varios.
     directories:
       - "/backend"
     schedule:

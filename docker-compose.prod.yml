@@ -97,7 +97,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: repa-frontend:${FRONTEND_VERSION:-latest}
+    # La define deploy.sh: la imagen publicada del frontend
+    # (FRONTEND_REGISTRY_IMAGE) o, sin ella, la que construye desde ./frontend
+    # — un clon suelto de Repa2025-Frontend, ya no un submodulo.
+    image: ${FRONTEND_IMAGE:-repa-frontend:local}
     restart: unless-stopped
     ports:
       - "80:80"

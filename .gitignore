@@ -214,3 +214,9 @@ desktop.ini
 *.bak
 BACKLOG.md
 graphify-out/*
+
+# El frontend es otro repositorio (Repa2025-Frontend). Ya no es un
+# submodulo: el servidor baja su imagen de GHCR. Para desarrollo local se
+# clona suelto en ./frontend (deploy.sh y los compose lo construyen de ahi
+# si no hay FRONTEND_REGISTRY_IMAGE).
+/frontend/
