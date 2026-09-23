@@ -9,8 +9,6 @@ entornos.
 
 from datetime import date, datetime, timedelta, timezone
 
-from passlib.context import CryptContext
-
 from src.config import IS_TESTING, SEED_DEMO_DATA
 from src.database import SessionLocal
 from src.document_generator import generate_fomento_documents, generate_test_documents
@@ -34,8 +32,7 @@ from src.models.persona_juridica_model import PersonaJuridica
 from src.models.user_models import Permission, Role, User, UserRole
 from src.rbac import PERMISSIONS, SYSTEM_ROLES
 from src.services.repa_code_service import generar_codigo_repa
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from src.utils import get_password_hash
 
 # === USUARIOS DE PRUEBA: 2 por cada rol del sistema ===
 # admin1/admin2 usan Admin1234; el resto Test1234. estudiante* se crea aparte
@@ -517,7 +514,7 @@ def _crear_usuario(db, email, password, role=None):
         return existing
     user = User(
         email=email,
-        hashed_password=pwd_context.hash(password),
+        hashed_password=get_password_hash(password),
         is_active=True,
     )
     db.add(user)

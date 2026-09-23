@@ -77,40 +77,6 @@ updates:
       prefix: "chore"
     labels:
       - dependencias
-    ignore:
-      # bcrypt 5.x no se puede usar mientras dependamos de passlib.
-      #
-      # passlib 1.7.4 es de octubre de 2020 y esta sin mantenimiento. Rompe
-      # con bcrypt 5.x por dos motivos independientes, los dos verificados en
-      # el CI del PR #38 (260 errores, 40 tests pasando):
-      #
-      #   1. AttributeError: module 'bcrypt' has no attribute '__about__'
-      #      passlib lee bcrypt.__about__.__version__ para detectar la version
-      #      del backend. bcrypt lo saco en la 4.1; en la 5.x ya no existe.
-      #
-      #   2. ValueError: password cannot be longer than 72 bytes
-      #      passlib prueba a proposito con una clave de mas de 72 bytes para
-      #      detectar un bug viejo de bcrypt. La 4.x truncaba en silencio, la
-      #      5.x tira excepcion — asi que la rutina de deteccion de passlib se
-      #      mata sola.
-      #
-      # ESTO NO SE ARREGLA ACTUALIZANDO BCRYPT, se arregla sacando passlib.
-      # La superficie es chica: src/utils.py, src/seed.py y
-      # src/routes/user_routes.py, siempre el mismo CryptContext con hash() y
-      # verify(), reemplazable por bcrypt.hashpw/checkpw directo. Las claves
-      # ya guardadas siguen validando: es el mismo algoritmo y el mismo
-      # formato `$2b$`, no hay que rehashear a nadie.
-      #
-      # El ignore es para que Dependabot deje de proponer lo mismo en cada
-      # release de bcrypt. Cerrarlo a mano no alcanza: vuelve a abrirlo y en
-      # tres meses nadie se acuerda de por que se habia descartado. Cuando se
-      # saque passlib, HAY QUE BORRAR ESTAS LINEAS — si no, bcrypt se queda
-      # congelado en la 4.x para siempre, sin que nadie se entere.
-      #
-      # Mientras tanto la 4.x sigue recibiendo parches por Dependabot: lo
-      # unico ignorado son los saltos de version MAYOR.
-      - dependency-name: "bcrypt"
-        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker-compose
     directory: "/"

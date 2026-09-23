@@ -8,7 +8,6 @@ from uuid import uuid4
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from src.audit import audit_log
@@ -43,17 +42,17 @@ from src.utils import (
     token_revocado,
     update_last_login,
     validar_password,
+    verify_password,
 )
 
 user_router = APIRouter()
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Hash de una contrasena que nadie usa. Sirve para gastar el mismo tiempo de
 # bcrypt cuando el email no existe (ver login), de modo que la duracion de la
 # respuesta no revele si la cuenta esta registrada. Se calcula una sola vez al
 # importar el modulo.
-_HASH_DESCARTABLE = pwd_context.hash("no-such-user-placeholder")
+_HASH_DESCARTABLE = get_password_hash("no-such-user-placeholder")
 
 
 # Crear un usuario nuevo
@@ -324,14 +323,14 @@ def login(
         # mismo que con un email real. Sin esto, bcrypt solo corria cuando el
         # usuario existia y la diferencia de tiempo —decenas de ms, medibles de
         # forma remota— permitia enumerar que direcciones estan registradas.
-        pwd_context.verify(form_data.password, _HASH_DESCARTABLE)
+        verify_password(form_data.password, _HASH_DESCARTABLE)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Correo electrónico o contraseña incorrectos",
         )
 
     # Verificar la contraseña
-    if not pwd_context.verify(form_data.password, user.hashed_password):
+    if not verify_password(form_data.password, user.hashed_password):
         # Los intentos fallidos son justamente lo que se quiere poder revisar
         # después: se registran contra el usuario cuya cuenta se intentó usar.
         audit_log(
@@ -749,7 +748,7 @@ async def change_own_password(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Usuario no encontrado"
         )
 
-    if not pwd_context.verify(data.current_password, user.hashed_password):
+    if not verify_password(data.current_password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La contraseña actual es incorrecta",
@@ -799,7 +798,7 @@ async def delete_user(
         )
 
     # Verificar contraseña actual antes de desactivar
-    if not pwd_context.verify(confirm.password, user.hashed_password):
+    if not verify_password(confirm.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Contraseña incorrecta",
