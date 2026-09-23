@@ -193,6 +193,21 @@ REPA_GATING_ENABLED = os.getenv("REPA_GATING_ENABLED", "false").lower() == "true
 # En producción con nginx: "/api", en desarrollo local: ""
 API_ROOT_PATH = os.getenv("API_ROOT_PATH", "")
 
+# Version de la aplicacion, la que se muestra en /docs.
+#
+# Sale del tag de git, que es la unica fuente de verdad desde que
+# semantic-release genera las versiones: docker-publish.yml se la pasa a la
+# imagen como build-arg al construirla, el Dockerfile la deja como variable
+# de entorno, y acá se lee.
+#
+# Antes estaba hardcodeada en main.py y quedo diciendo "1.9.0" mientras
+# produccion corria v1.10.x. Un numero que nadie se acuerda de actualizar y
+# que igual se publica en /docs es peor que no tenerlo.
+#
+# "dev" es el default honesto: es lo que corresponde en un build local o en
+# el job de verificacion del CI, donde no hay ningun tag detras.
+APP_VERSION = os.getenv("APP_VERSION", "dev")
+
 # =============================================================================
 # Pool de conexiones de base de datos
 # =============================================================================

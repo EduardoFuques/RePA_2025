@@ -81,6 +81,12 @@ jobs:
         with:
           context: ./backend
           push: true
+          # La version que la app reporta en /docs sale de aca: del tag de
+          # git, que es la unica fuente de verdad desde que semantic-release
+          # genera las versiones. Antes estaba hardcodeada en main.py y
+          # quedo diciendo 1.9.0 mientras produccion corria v1.10.x.
+          build-args: |
+            APP_VERSION=${{ github.ref_name }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # El cache de Actions es lo que hace que la capa del apt-get
