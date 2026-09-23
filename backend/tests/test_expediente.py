@@ -30,11 +30,15 @@ import pytest
 
 
 def _base(client):
-    """Prefix real del router, leído de la app (ver nota del docstring)."""
-    for route in client.app.routes:
-        if getattr(route, "name", None) == "listar_expedientes":
-            return route.path.rstrip("/")
-    pytest.skip("El router de expedientes no está montado en main.py")
+    """Prefix real del router, leído de la app (ver nota del docstring).
+
+    Por nombre de endpoint y no recorriendo `app.routes`: desde FastAPI 0.141
+    los routers incluidos quedan anidados (`_IncludedRouter`) y ya no aparecen
+    aplanados ahí. Antes esto recorría la lista, no encontraba nada y hacía
+    `pytest.skip` — la suite entera se salteaba en silencio. Si el router no
+    está montado, que falle: un skip escondería exactamente ese error.
+    """
+    return client.app.url_path_for("listar_expedientes").rstrip("/")
 
 
 def _nuevo_expediente(**overrides):
