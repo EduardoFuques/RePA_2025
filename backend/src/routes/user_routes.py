@@ -575,6 +575,32 @@ async def recovery_passwd(
     return user
 
 
+# Cuentas de demostracion para el acceso rapido del login (QA / desarrollo)
+@user_router.get(
+    "/demo-accounts",
+    summary="Usuarios de prueba para el acceso rápido del login",
+    responses={404: {"description": "No hay datos de demostración en este entorno"}},
+)
+@limiter.limit("30/minute")
+async def demo_accounts(request: Request):
+    """
+    Emails y contraseñas de los usuarios que siembra seed.py.
+
+    Existe para que la imagen del frontend sea UNA para todos los entornos:
+    antes estas credenciales iban compiladas en el bundle de QA. Responde 404
+    donde esos usuarios no existen — sin SEED_DEMO_DATA — y en produccion
+    SIEMPRE, aunque alguien active SEED_DEMO_DATA ahi: publicar contraseñas
+    en un endpoint sin autenticacion no puede depender de una sola variable.
+    Sin autenticacion a proposito: se usa en la pantalla de login.
+    """
+    from src.config import IS_PRODUCTION, SEED_DEMO_DATA
+    from src.demo_users import cuentas_demo
+
+    if IS_PRODUCTION or not SEED_DEMO_DATA:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+    return cuentas_demo()
+
+
 # Obtener los datos del usuario actual
 @user_router.get(
     "/me", response_model=UserOut, description="Obtener datos del usuario actual"
