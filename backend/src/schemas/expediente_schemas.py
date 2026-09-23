@@ -121,7 +121,6 @@ class ExpedienteOut(BaseModel):
 
 class ExpedienteListOut(BaseModel):
     """Pagina del listado de backoffice."""
-    borrador: bool = False
 
     items: list[ExpedienteOut]
     total: int
