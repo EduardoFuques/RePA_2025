@@ -8,7 +8,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.config import API_ROOT_PATH, CORS_ORIGINS, DOCS_ENABLED, IS_TESTING
+from src.config import (
+    API_ROOT_PATH,
+    APP_VERSION,
+    CORS_ORIGINS,
+    DOCS_ENABLED,
+    IS_TESTING,
+)
 from src.database import create_all_tables, get_db, run_migrations
 from src.logger import logger
 from src.middlewarelogg import log_requests
@@ -89,7 +95,7 @@ Los endpoints sensibles tienen límites de solicitudes:
 - **IAAviM** - Instituto de Artes Audiovisuales de Misiones
 - **Email**: sistemas@iaavim.gob.ar
     """,
-    version="1.9.0",
+    version=APP_VERSION,
     contact={
         "name": "IAAviM - Sistemas",
         "url": "https://iaavim.gob.ar",
