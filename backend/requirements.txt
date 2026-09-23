@@ -31,5 +31,5 @@ slowapi>=0.1.10,<1.0.0
 # src/seed.py importa src/document_generator.py, que las usa para armar los
 # adjuntos de ejemplo — y el seed corre dentro del contenedor cuando
 # SEED_DEMO_DATA=true, que es como esta QA.
-reportlab>=4.0.0,<5.0.0
+reportlab>=5.0.1,<6.0.0
 python-docx>=1.2.0,<2.0.0
