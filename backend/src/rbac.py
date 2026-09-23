@@ -25,6 +25,8 @@ PERMISSIONS: dict[str, str] = {
     "registros:read_all": "Ver el padrón completo (PF, PJ, AS, ESA, AGAM) de todos los usuarios",
     "registros:revisar": "Aprobar, observar o rechazar registros del Padrón RePA",
     "rodajes:manage": "Gestionar rodajes (ver, actualizar y eliminar cualquier registro, ver estadísticas)",
+    "expedientes:manage": "Gestionar expedientes administrativos y ejecución presupuestaria",
+    "instrumentos:manage": "Gestionar el digesto jurídico (resoluciones, convenios, actas del Consejo)",
 }
 
 # Permiso especial que representa "todos los permisos" (solo rol admin)
@@ -52,6 +54,20 @@ SYSTEM_ROLES: dict[str, dict] = {
     "revisor_padron": {
         "descripcion": "Revisa y aprueba registros del Padrón RePA (PF, PJ, AS, ESA, AGAM)",
         "permissions": {"registros:read_all", "registros:revisar"},
+    },
+    # Los dos módulos de área son de uso interno y exclusivo del personal de
+    # esa gerencia: no hay "mis expedientes" ni "mis instrumentos" como en los
+    # formularios del Padrón, donde cada usuario gestiona lo propio. Por eso
+    # cada uno tiene su rol, igual que gestor_fomento — sin esto, el único que
+    # podría cargar un expediente sería un admin, que es justo lo que no
+    # queremos (el área tiene que poder trabajar sin pedirle acceso a nadie).
+    "gestor_administracion": {
+        "descripcion": "Administración General: carga y seguimiento de expedientes y ejecución presupuestaria",
+        "permissions": {"expedientes:manage", "reportes:read"},
+    },
+    "gestor_juridico": {
+        "descripcion": "Asuntos Jurídicos: carga y consulta del digesto jurídico institucional",
+        "permissions": {"instrumentos:manage", "reportes:read"},
     },
     "lectura": {
         "descripcion": "Acceso de solo lectura a usuarios, auditoría y reportes",

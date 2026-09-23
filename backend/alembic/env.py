@@ -2,9 +2,8 @@ import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, create_engine
-from sqlalchemy import pool
 from dotenv import load_dotenv
+from sqlalchemy import create_engine, pool
 
 from alembic import context
 
@@ -75,7 +74,7 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, 
+            connection=connection,
             target_metadata=target_metadata,
             compare_type=True,  # Detectar cambios en tipos de columnas
             compare_server_default=True,  # Detectar cambios en defaults

@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -13,6 +12,16 @@ from src.logger import logger
 from src.models.persona_fisica_model import PersonaFisica
 from src.models.registro_lifecycle import EstadoRegistro
 from src.models.user_models import Role, User
+
+# Reexportados por comodidad: muchisimo codigo ya hacia
+# `from src.utils import get_password_hash`. La implementacion vive en
+# src/password.py para no crear un ciclo con los schemas.
+from src.password import (  # noqa: F401
+    PASSWORD_MAX_BYTES,
+    get_password_hash,
+    password_excede_limite,
+    verify_password,
+)
 from src.rbac import ALL_PERMISSIONS
 from src.schemas.user_schemas import UserUpdate
 from src.token_utils import decode_access_token
@@ -20,13 +29,6 @@ from src.token_utils import decode_access_token
 # Objeto necesario para la función de 'get_current_user' que valida los datos del usuario
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/token")
 
-# Configuración de passlib
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-# Hashear la contraseña
-def get_password_hash(password: str):
-    return pwd_context.hash(password)
 
 
 # Actualizar último acceso... Esto se debe integrar a la ruta de logín del usuario.

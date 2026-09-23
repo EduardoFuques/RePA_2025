@@ -273,6 +273,27 @@ ALLOWED_DOC_TYPES = {
         "extensions": {".pdf", ".jpg", ".jpeg", ".png"},
         "max_size": 10 * 1024 * 1024,
     },
+    # Administración General - resolución asociada al expediente.
+    "expediente_resolucion": {
+        "extensions": {".pdf"},
+        "max_size": 10 * 1024 * 1024,
+    },
+    # Asuntos Jurídicos - el instrumento legal en si (resolucion, convenio,
+    # contrato, dictamen) y, aparte, el acta del Consejo Directivo.
+    #
+    # Solo PDF a proposito, y no .doc/.docx como en otros tipos: el doc del
+    # area pide que el archivo definitivo del digesto sea PDF, porque es el
+    # que lleva las firmas y los sellos y el que se va a publicar. Aceptar
+    # formatos editables invitaria a cargar borradores como si fueran el
+    # instrumento firmado.
+    "instrumento_juridico": {
+        "extensions": {".pdf"},
+        "max_size": 20 * 1024 * 1024,
+    },
+    "acta_consejo_directivo": {
+        "extensions": {".pdf"},
+        "max_size": 20 * 1024 * 1024,
+    },
 }
 
 MIME_MAP = {

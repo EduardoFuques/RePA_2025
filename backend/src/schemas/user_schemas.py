@@ -1,6 +1,30 @@
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr
+
+from src.password import PASSWORD_MAX_BYTES, password_excede_limite
+
+
+def _validar_largo_password(valor: str) -> str:
+    """
+    bcrypt no admite mas de 72 BYTES. El limite es en bytes y no en
+    caracteres, por eso no alcanza con `max_length`: 72 caracteres con
+    acentos son 144 bytes en UTF-8 y pasarian la validacion igual.
+
+    Sin esto, una contraseña larga no da un error de validacion sino un 500,
+    porque bcrypt 5.x lanza ValueError al hashear (y al verificar).
+    """
+    if password_excede_limite(valor):
+        raise ValueError(
+            f"La contraseña no puede superar los {PASSWORD_MAX_BYTES} bytes "
+            "(las letras con acento y los emojis ocupan mas de un byte)."
+        )
+    return valor
+
+
+# Tipo reutilizable para toda contraseña que vaya a hashearse.
+Password = Annotated[str, AfterValidator(_validar_largo_password)]
 
 
 # Esquema para Permisos
@@ -55,7 +79,7 @@ class UserBase(BaseModel):
 
 # Esquema para creación de usuario
 class UserCreate(UserBase):
-    password: str  # Contraseña en texto plano (se hasheará en el backend)
+    password: Password  # Contraseña en texto plano (se hasheará en el backend)
     roles: list[int] | None = [2]  # Lista de IDs de roles asignados
 
 
@@ -73,7 +97,7 @@ class UserOut(UserBase):
 # Esquema para actualización de usuario
 class UserUpdate(BaseModel):
     email: EmailStr | None = None
-    password: str | None = None  # Nueva contraseña (se hasheará)
+    password: Password | None = None  # Nueva contraseña (se hasheará)
 
 
 # Esquema para confirmar acción con contraseña
@@ -86,7 +110,7 @@ class PasswordConfirm(BaseModel):
 # confirmación — mismo criterio que ya usa DELETE /me con PasswordConfirm.
 class PasswordChange(BaseModel):
     current_password: str
-    new_password: str
+    new_password: Password
 
 
 # Esquema para actualizar roles de usuario
