@@ -11,6 +11,7 @@ IMPORTANTE: las rutas estáticas (`/users`, `/roles`, `/permissions`,
 anidados (`/users/{id}`, `/roles/{id}`) para evitar colisiones de routing.
 """
 
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -18,20 +19,25 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from src.audit import audit_log
+from src.config import FRONTEND_URL, SMTP_HOST
 from src.database import get_db
 from src.models.audit_model import AuditAction, AuditLog
-from src.models.user_models import Permission, Role, User
+from src.models.user_models import Permission, Role, TokenRecovery, User
 from src.rbac import SYSTEM_ROLE_NAMES, es_rol_de_equipo
 from src.schemas.user_schemas import (
+    ActivacionOut,
     PermissionOut,
     RoleCreate,
     RoleDetailOut,
     RoleUpdate,
+    TeamUserCreate,
     UserOut,
     UserRolePatch,
     UserUpdate,
 )
 from src.search import filtro_texto
+from src.services.email_service import send_activation_email
+from src.token_utils import create_access_token
 from src.utils import (
     get_password_hash,
     get_user_permissions,
@@ -362,6 +368,36 @@ def _validar_roles_para(tipo_cuenta: str, roles: list) -> None:
         )
 
 
+# Link de activacion de una cuenta del equipo: 72 h, un solo uso.
+ACTIVACION_MINUTOS = 72 * 60
+
+
+def _emitir_activacion(db: Session, user: User) -> tuple[str, datetime, bool]:
+    """Invalida los links activos del usuario y emite uno nuevo.
+
+    El token queda en token_recovery (mismo mecanismo que la recuperacion de
+    contrasena) con su vencimiento; el JWT es de tipo "activacion", asi que un
+    link de recuperacion no sirve para activar ni al reves.
+    """
+    db.query(TokenRecovery).filter(
+        TokenRecovery.user_id == user.id, TokenRecovery.is_active.is_(True)
+    ).update({"is_active": False})
+    token = create_access_token(
+        data={"sub": user.id}, expires_delta=ACTIVACION_MINUTOS, type="activacion"
+    )
+    expira = datetime.now(timezone.utc) + timedelta(minutes=ACTIVACION_MINUTOS)
+    db.add(TokenRecovery(user_id=user.id, token_payload=token, expires_at=expira))
+    url = f"{FRONTEND_URL.rstrip('/')}/activar-cuenta/{token}"
+    enviado = False
+    if SMTP_HOST:
+        try:
+            send_activation_email(user.email, url)
+            enviado = True
+        except Exception:  # el link igual se devuelve: el admin lo manda a mano
+            enviado = False
+    return url, expira, enviado
+
+
 def _get_user_or_404(db: Session, user_id: str) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -369,6 +405,99 @@ def _get_user_or_404(db: Session, user_id: str) -> User:
             status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
         )
     return user
+
+
+@admin_router.post(
+    "/users",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ActivacionOut,
+    summary="Alta de una cuenta del equipo",
+)
+async def crear_usuario_equipo(
+    data: TeamUserCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_permissions("roles:manage")),
+):
+    """Crea una cuenta del EQUIPO (nunca de ciudadano) y devuelve su link de
+    activacion. Nadie conoce la contrasena inicial: la persona la define con
+    el link. Con SMTP configurado, el link ademas sale por mail."""
+    if db.query(User).filter(func.lower(User.email) == data.email.lower()).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cuenta con ese email.",
+        )
+    roles = db.query(Role).filter(Role.id.in_(data.role_ids)).all()
+    if len(roles) != len(set(data.role_ids)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Uno o más roles no existen"
+        )
+    _validar_roles_para("equipo", roles)
+    # Misma regla que al editar roles: roles:manage no alcanza para crear admins.
+    if any(r.rol.lower() == "admin" for r in roles):
+        actuales = {r["rol"].lower() for r in (current_user.get("roles") or [])}
+        if "admin" not in actuales:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo un administrador puede otorgar el rol admin",
+            )
+    user = User(
+        email=data.email,
+        is_active=True,
+        tipo_cuenta="equipo",
+        password_definida_at=None,
+        hashed_password=get_password_hash(secrets.token_urlsafe(32)),
+    )
+    user.roles = roles
+    db.add(user)
+    db.flush()
+    url, expira, enviado = _emitir_activacion(db, user)
+    audit_log(
+        db=db,
+        action=AuditAction.CREATE,
+        user_id=current_user["id"],
+        resource_type="User",
+        resource_id=user.id,
+        details={"tipo_cuenta": "equipo", "roles": [r.rol for r in roles]},
+        request=request,
+    )
+    db.commit()
+    db.refresh(user)
+    return {"user": user, "activation_url": url, "expires_at": expira, "email_enviado": enviado}
+
+
+@admin_router.post(
+    "/users/{user_id}/activation-link",
+    response_model=ActivacionOut,
+    summary="Nuevo link de activación de una cuenta del equipo",
+)
+async def regenerar_activacion(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_permissions("roles:manage")),
+):
+    """Invalida el link anterior y emite otro (vencido, perdido...). Solo para
+    cuentas del equipo que todavia no se activaron."""
+    user = _get_user_or_404(db, user_id)
+    if not user.pendiente_activacion:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La cuenta no está pendiente de activación.",
+        )
+    url, expira, enviado = _emitir_activacion(db, user)
+    audit_log(
+        db=db,
+        action=AuditAction.UPDATE,
+        user_id=current_user["id"],
+        resource_type="User",
+        resource_id=user.id,
+        details={"accion": "nuevo_link_activacion"},
+        request=request,
+    )
+    db.commit()
+    db.refresh(user)
+    return {"user": user, "activation_url": url, "expires_at": expira, "email_enviado": enviado}
 
 
 @admin_router.get(

@@ -64,6 +64,11 @@ def decode_verify_token(token: str) -> dict:
     return _decode(token, expected_type="verify")
 
 
+def decode_activation_token(token: str) -> dict:
+    """Decodifica un link de activacion de cuenta del equipo (tipo "activacion")."""
+    return _decode(token, expected_type="activacion")
+
+
 def decode_recovery_token(token: str) -> dict:
     """Decodifica un token de recuperación de contraseña (tipo "recover")."""
     return _decode(token, expected_type="recover")

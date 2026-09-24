@@ -17,6 +17,7 @@ from src.models.audit_model import AuditAction
 from src.models.user_models import Role, TokenRecovery, User
 from src.rate_limiter import limiter
 from src.schemas.user_schemas import (
+    ActivacionIn,
     PasswordChange,
     PasswordConfirm,
     RefreshTokenRequest,
@@ -30,6 +31,7 @@ from src.services.email_service import send_recovery_email, send_verification_em
 from src.token_utils import (
     create_access_token,
     create_refresh_token,
+    decode_activation_token,
     decode_recovery_token,
     decode_refresh_token,
     decode_verify_token,
@@ -578,6 +580,62 @@ async def recovery_passwd(
     db.commit()
     db.refresh(user)
 
+    return user
+
+
+# Activacion de una cuenta del equipo (link que genera el admin al darla de alta)
+@user_router.post(
+    "/activar/{token}",
+    response_model=UserOut,
+    summary="Activar una cuenta del equipo",
+)
+@limiter.limit("5/minute")
+async def activar_cuenta(
+    request: Request, token: str, data: ActivacionIn, db: Session = Depends(get_db)
+):
+    """La persona define su contrasena con el link que le paso el admin.
+
+    El JWT vence a las 72 h (401 si ya vencio o si es de otro tipo, como uno
+    de recuperacion); ademas el registro en token_recovery tiene que seguir
+    activo (un solo uso; regenerar el link invalida el anterior) y vigente.
+    """
+    payload = decode_activation_token(token)
+    registro = (
+        db.query(TokenRecovery).filter(TokenRecovery.token_payload == token).first()
+    )
+    if not registro or not registro.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este link ya se usó o fue reemplazado por uno nuevo. "
+            "Pedile otro al administrador.",
+        )
+    vence = registro.expires_at
+    if vence is not None and vence.tzinfo is None:
+        vence = vence.replace(tzinfo=timezone.utc)
+    if vence is not None and vence < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este link venció. Pedile uno nuevo al administrador.",
+        )
+    user = db.query(User).filter(User.id == payload.get("sub")).first()
+    if not user or user.tipo_cuenta != "equipo":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Link inválido.")
+    validar_password(data.password)
+    user.hashed_password = get_password_hash(data.password)
+    user.password_definida_at = datetime.now(timezone.utc)
+    revocar_sesiones(user)
+    registro.is_active = False
+    audit_log(
+        db=db,
+        action="PASSWORD_RESET",
+        user_id=user.id,
+        resource_type="User",
+        resource_id=user.id,
+        details={"origen": "activacion"},
+        request=request,
+    )
+    db.commit()
+    db.refresh(user)
     return user
 
 

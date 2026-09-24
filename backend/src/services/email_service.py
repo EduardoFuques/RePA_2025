@@ -101,3 +101,19 @@ def send_recovery_email(to_email: str, recovery_url: str) -> None:
         "Si no solicitaste este cambio, podés ignorar este correo.</p>"
     )
     _send_email(to_email, subject, html)
+
+
+def send_activation_email(to_email: str, activation_url: str) -> None:
+    subject = "Activá tu cuenta del equipo - RePA IAAviM"
+    html = _wrapper(
+        "Registro Provincial del Audiovisual",
+        "<p>Te dieron de alta una cuenta del equipo del IAAviM. Para empezar, "
+        "definí tu contraseña:</p>",
+        activation_url,
+        "Activar mi cuenta",
+    )
+    html += (
+        '<p style="color:#999;font-size:0.8rem;">Este enlace vence en 72 horas '
+        "y sirve una sola vez.</p>"
+    )
+    _send_email(to_email, subject, html)
