@@ -11,7 +11,12 @@ from datetime import date, datetime, timedelta, timezone
 
 from src.config import IS_TESTING, SEED_DEMO_DATA
 from src.database import SessionLocal
-from src.demo_users import TEST_ESA_USERS, TEST_ROLE_USERS
+from src.demo_users import (
+    CIUDADANOS_EVALUADORES,
+    CIUDADANOS_PADRON,
+    TEST_ESA_USERS,
+    TEST_ROLE_USERS,
+)
 from src.document_generator import generate_fomento_documents, generate_test_documents
 from src.logger import logger
 from src.models.asociacion_model import Asociacion
@@ -31,7 +36,7 @@ from src.models.fomento_model import (
 from src.models.persona_fisica_model import PersonaFisica
 from src.models.persona_juridica_model import PersonaJuridica
 from src.models.user_models import Permission, Role, User, UserRole
-from src.rbac import PERMISSIONS, SYSTEM_ROLES
+from src.rbac import PERMISSIONS, SYSTEM_ROLES, es_rol_de_equipo
 from src.seed_area import seed_area_data
 from src.services.repa_code_service import generar_codigo_repa
 from src.utils import get_password_hash
@@ -55,14 +60,11 @@ def _pf(
     estado,
     **overrides,
 ):
-    """Defaults válidos de Persona Física para usuarios de prueba que no
-    necesitan un perfil elaborado (staff: admin/gestor/evaluador/revisor/
-    lectura). Todos quedan en estado 'vigente'/'aprobado' para que
-    seed_padron_data() les emita código RePA — sin esto, cualquier rol que
-    no sea admin/estudiante y no tenga NINGÚN registro cae en el
-    OnboardingChooser al loguearse (ver AppLayout.jsx: el gate solo se
-    saltea con isAdmin()/isStudent() o si getFormsMetadata() devuelve algún
-    'has_*' en true)."""
+    """Defaults válidos de Persona Física para los titulares del padrón demo
+    (ciudadano.padronNN@). Quedan en 'vigente'/'aprobado' para que
+    seed_padron_data() les emita código RePA. Las cuentas del equipo no tienen
+    Persona Física: no tienen registro RePA propio (ver
+    docs/superpowers/specs/2026-09-24-cuentas-de-equipo-design.md)."""
     data = {
         "nombre": nombre,
         "apellido": apellido,
@@ -104,123 +106,123 @@ def _pf(
 
 
 TEST_PERSONA_FISICA = {
-    "admin1@repa.gob.ar": _pf(
+    "ciudadano.padron01@repa.gob.ar": _pf(
         "Sofía",
         "Benítez",
         "59000001",
         "27-59000001-4",
-        "admin1@repa.gob.ar",
+        "ciudadano.padron01@repa.gob.ar",
         "Posadas",
         "sur",
         ["productor"],
         "vigente",
     ),
-    "admin2@repa.gob.ar": _pf(
+    "ciudadano.padron02@repa.gob.ar": _pf(
         "Martín",
         "Duarte",
         "59000002",
         "20-59000002-1",
-        "admin2@repa.gob.ar",
+        "ciudadano.padron02@repa.gob.ar",
         "Posadas",
         "sur",
         ["director"],
         "aprobado",
     ),
-    "gestor1@repa.gob.ar": _pf(
+    "ciudadano.padron03@repa.gob.ar": _pf(
         "Valentina",
         "Ríos",
         "59000003",
         "27-59000003-8",
-        "gestor1@repa.gob.ar",
+        "ciudadano.padron03@repa.gob.ar",
         "Oberá",
         "norte",
         ["productor", "director"],
         "vigente",
     ),
-    "gestor2@repa.gob.ar": _pf(
+    "ciudadano.padron04@repa.gob.ar": _pf(
         "Emiliano",
         "Cabrera",
         "59000004",
         "20-59000004-5",
-        "gestor2@repa.gob.ar",
+        "ciudadano.padron04@repa.gob.ar",
         "Eldorado",
         "norte",
         ["guionista"],
         "aprobado",
     ),
-    "evaluador1@repa.gob.ar": _pf(
+    "ciudadano.padron05@repa.gob.ar": _pf(
         "Rocío",
         "Aguirre",
         "59000005",
         "27-59000005-2",
-        "evaluador1@repa.gob.ar",
+        "ciudadano.padron05@repa.gob.ar",
         "Posadas",
         "sur",
         ["investigador"],
         "vigente",
     ),
-    "evaluador2@repa.gob.ar": _pf(
+    "ciudadano.padron06@repa.gob.ar": _pf(
         "Federico",
         "Villalba",
         "59000006",
         "20-59000006-9",
-        "evaluador2@repa.gob.ar",
+        "ciudadano.padron06@repa.gob.ar",
         "Apóstoles",
         "sur",
         ["documentalista"],
         "aprobado",
     ),
-    "revisor1@repa.gob.ar": _pf(
+    "ciudadano.padron07@repa.gob.ar": _pf(
         "Camila",
         "Sosa",
         "59000007",
         "27-59000007-6",
-        "revisor1@repa.gob.ar",
+        "ciudadano.padron07@repa.gob.ar",
         "Puerto Iguazú",
         "norte",
         ["realizadorIntegral"],
         "vigente",
     ),
-    "revisor2@repa.gob.ar": _pf(
+    "ciudadano.padron08@repa.gob.ar": _pf(
         "Lucas",
         "Ortigoza",
         "59000008",
         "20-59000008-3",
-        "revisor2@repa.gob.ar",
+        "ciudadano.padron08@repa.gob.ar",
         "Leandro N. Alem",
         "norte",
         ["tecnicoArtistico"],
         "aprobado",
     ),
-    "lectura1@repa.gob.ar": _pf(
+    "ciudadano.padron09@repa.gob.ar": _pf(
         "Antonella",
         "Kurtz",
         "59000009",
         "27-59000009-0",
-        "lectura1@repa.gob.ar",
+        "ciudadano.padron09@repa.gob.ar",
         "Posadas",
         "sur",
         ["capacitador"],
         "vigente",
     ),
-    "lectura2@repa.gob.ar": _pf(
+    "ciudadano.padron10@repa.gob.ar": _pf(
         "Bruno",
         "Insaurralde",
         "59000010",
         "20-59000010-7",
-        "lectura2@repa.gob.ar",
+        "ciudadano.padron10@repa.gob.ar",
         "Montecarlo",
         "norte",
         ["investigador"],
         "aprobado",
     ),
-    "usuario1@repa.gob.ar": {
+    "ciudadano.usuario1@repa.gob.ar": {
         "nombre": "Juan Carlos",
         "apellido": "Rodríguez",
         "dni": "35678901",
         "cuil": "20-35678901-5",
         "fecha_nacimiento": date(1990, 7, 22),
-        "email": "usuario1@repa.gob.ar",
+        "email": "ciudadano.usuario1@repa.gob.ar",
         "telefono": "+54 376 4567890",
         "domicilio": "Calle Bolívar 567",
         "municipio": "Oberá",
@@ -252,13 +254,13 @@ TEST_PERSONA_FISICA = {
         "declaracion_inicial": True,
         "estado": "vigente",
     },
-    "usuario2@repa.gob.ar": {
+    "ciudadano.usuario2@repa.gob.ar": {
         "nombre": "Luciana",
         "apellido": "Fernández",
         "dni": "40234567",
         "cuil": "27-40234567-3",
         "fecha_nacimiento": date(1995, 11, 8),
-        "email": "usuario2@repa.gob.ar",
+        "email": "ciudadano.usuario2@repa.gob.ar",
         "telefono": "+54 376 4789012",
         "domicilio": "Av. Libertador 890",
         "municipio": "Eldorado",
@@ -295,7 +297,7 @@ TEST_PERSONA_FISICA = {
 }
 
 TEST_PERSONA_JURIDICA = {
-    "usuario1@repa.gob.ar": {
+    "ciudadano.usuario1@repa.gob.ar": {
         "nombre_pj": "Cooperativa de Trabajo Audiovisual Oberá Ltda.",
         "cuit": "30-71567890-2",
         "figura_legal": "cooperativa",
@@ -324,7 +326,7 @@ TEST_PERSONA_JURIDICA = {
 }
 
 TEST_ASOCIACION = {
-    "usuario2@repa.gob.ar": {
+    "ciudadano.usuario2@repa.gob.ar": {
         "nombre_asociacion": "Colectivo Audiovisual Misiones",
         "anio_creacion": 2019,
         "personeria_juridica": "en_tramite",
@@ -358,7 +360,7 @@ TEST_ASOCIACION = {
 }
 
 TEST_ESA = {
-    "estudiante1@esa.repa.gob.ar": {
+    "ciudadano.estudiante1@repa.gob.ar": {
         "nombre_completo": "Martina López",
         "dni": "45123456",
         "cuil": "27-45123456-1",
@@ -383,7 +385,7 @@ TEST_ESA = {
         "activo": True,
         "estado": "vigente",
     },
-    "estudiante2@esa.repa.gob.ar": {
+    "ciudadano.estudiante2@repa.gob.ar": {
         "nombre_completo": "Tomás Acuña",
         "dni": "44567890",
         "cuil": "20-44567890-3",
@@ -487,6 +489,8 @@ def _crear_usuario(db, email, password, role=None):
         email=email,
         hashed_password=get_password_hash(password),
         is_active=True,
+        tipo_cuenta="equipo" if role and es_rol_de_equipo(role.rol) else "ciudadano",
+        password_definida_at=datetime.now(timezone.utc),
     )
     db.add(user)
     db.commit()
@@ -499,7 +503,8 @@ def _crear_usuario(db, email, password, role=None):
 
 
 def seed_test_users(db):
-    """Crea 2 usuarios de prueba por cada rol del sistema (18 en total)."""
+    """Crea 2 cuentas de prueba por cada rol del sistema (18 con los
+    estudiantes) y los 10 titulares del padron demo."""
     roles_by_name = {r.rol: r for r in db.query(Role).all()}
 
     for rol, usuarios in TEST_ROLE_USERS.items():
@@ -513,6 +518,10 @@ def seed_test_users(db):
     # que corre en producción.
     for email, password in TEST_ESA_USERS:
         _crear_usuario(db, email, password, role=None)
+
+    # Titulares del padron demo: ciudadanos, una Persona Fisica cada uno.
+    for email in CIUDADANOS_PADRON:
+        _crear_usuario(db, email, "Test1234", role=roles_by_name.get("user"))
 
 
 # === PADRÓN ===
@@ -544,7 +553,8 @@ def _asegurar_codigo(db, registro, tipo_codigo, revisor, ahora, data=None):
 
 
 def seed_padron_data(db):
-    revisor = db.query(User).filter(User.email == "revisor1@repa.gob.ar").first()
+    revisor_email = TEST_ROLE_USERS["revisor_padron"][0][0]
+    revisor = db.query(User).filter(User.email == revisor_email).first()
     ahora = datetime.now(timezone.utc)
 
     for email, pf_data in TEST_PERSONA_FISICA.items():
@@ -737,9 +747,11 @@ def seed_fomento_data(db):
             )
             lineas[nombre] = linea
 
-    # --- Evaluadores (uno por usuario del rol evaluador) ---
+    # --- Postulaciones de evaluador ---
+    # Las hace un ciudadano (la cuenta con rol evaluador es del equipo y no
+    # tiene postulacion propia).
     evaluadores = []
-    for i, (email, _password) in enumerate(TEST_ROLE_USERS["evaluador"], start=1):
+    for i, email in enumerate(CIUDADANOS_EVALUADORES, start=1):
         user = db.query(User).filter(User.email == email).first()
         if not user:
             continue
@@ -994,7 +1006,8 @@ def seed_data():
     Sincroniza RBAC (permisos + roles del sistema) y aplica el backfill del
     rol 'estudiante' — corre siempre, incluso en producción.
 
-    En desarrollo/QA, además crea 18 usuarios de prueba (2 por rol), datos
+    En desarrollo/QA, además crea 18 cuentas de prueba (2 por rol) y 10
+    titulares del padrón, datos
     de Padrón (Persona Física/Jurídica/Asociación/ESA), datos de Fomento
     (convocatorias, líneas, trámites, comités, semillero) y genera los
     documentos adjuntos de prueba. Todo es idempotente: correr esto en cada
@@ -1005,7 +1018,7 @@ def seed_data():
     nuevo (= un lifespan nuevo) por cada test — este seed pesado corriendo
     cientos de veces multiplicaba el tiempo de la suite y, peor, algunos
     tests mutan datos que este seed asume estables (p. ej.
-    test_update_user_as_admin le cambia el email a admin1@repa.gob.ar),
+    test_update_user_as_admin le cambia el email a una cuenta de prueba),
     dejando registros huérfanos que chocan por DNI/CUIL únicos en el
     siguiente arranque. Los tests arman sus propios usuarios via fixtures
     (create_user, admin_headers, etc.) — no necesitan este seed.

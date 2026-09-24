@@ -53,7 +53,7 @@ def sembrado(db_session, uploads_seed, monkeypatch):
     # El seed solo necesita que existan (guarda los PDF en su directorio).
     # Se crean aca y no con _crear_usuario de conftest: importar conftest
     # como modulo podria volver a ejecutarlo y levantar otro contenedor.
-    for email in ("admin1@repa.gob.ar", "administracion1@repa.gob.ar", "juridico1@repa.gob.ar"):
+    for email in ("equipo.admin1@repa.gob.ar", "equipo.administracion1@repa.gob.ar", "equipo.juridico1@repa.gob.ar"):
         if not db_session.query(User).filter(User.email == email).first():
             db_session.add(User(email=email, hashed_password=get_password_hash("Test1234"), is_active=True))
     db_session.commit()

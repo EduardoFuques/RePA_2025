@@ -1,5 +1,7 @@
 """
-Usuarios de demostracion (QA y desarrollo): 2 por cada rol del sistema.
+Usuarios de demostracion (QA y desarrollo): 2 por cada rol del sistema, mas
+los titulares del padron demo. El email dice si la cuenta es del equipo
+(equipo.<area>N) o de ciudadano (ciudadano.<perfil>N).
 
 Una sola lista para los dos lugares que la necesitan:
 - seed.py los crea en la base cuando SEED_DEMO_DATA esta activo.
@@ -12,50 +14,37 @@ credenciales no pueden viajar en el bundle: las entrega el backend, y solo
 donde existen.
 """
 
-# admin1/admin2 usan Admin1234; el resto Test1234. estudiante* se crea aparte
-# (via EstudianteESA + backfill_estudiante_role, no se les asigna el rol aca).
+def email_de(prefijo: str, n: int) -> str:
+    return f"{prefijo}{n}@repa.gob.ar"
+
+
+# El email dice que es cada cuenta: equipo.<area>N o ciudadano.<perfil>N.
+# admin usa Admin1234; el resto Test1234.
 TEST_ROLE_USERS = {
-    "admin": [
-        ("admin1@repa.gob.ar", "Admin1234"),
-        ("admin2@repa.gob.ar", "Admin1234"),
-    ],
-    "gestor_fomento": [
-        ("gestor1@repa.gob.ar", "Test1234"),
-        ("gestor2@repa.gob.ar", "Test1234"),
-    ],
-    "evaluador": [
-        ("evaluador1@repa.gob.ar", "Test1234"),
-        ("evaluador2@repa.gob.ar", "Test1234"),
-    ],
-    "revisor_padron": [
-        ("revisor1@repa.gob.ar", "Test1234"),
-        ("revisor2@repa.gob.ar", "Test1234"),
-    ],
-    "lectura": [
-        ("lectura1@repa.gob.ar", "Test1234"),
-        ("lectura2@repa.gob.ar", "Test1234"),
-    ],
-    "user": [
-        ("usuario1@repa.gob.ar", "Test1234"),
-        ("usuario2@repa.gob.ar", "Test1234"),
-    ],
-    # Modulos de area: cada gerencia ve solo el suyo (expedientes:manage /
-    # instrumentos:manage). Sirven para probar justamente eso: que un gestor
-    # juridico no ve Expedientes y viceversa.
+    "admin": [(email_de("equipo.admin", n), "Admin1234") for n in (1, 2)],
+    "gestor_fomento": [(email_de("equipo.fomento", n), "Test1234") for n in (1, 2)],
+    "evaluador": [(email_de("equipo.evaluador", n), "Test1234") for n in (1, 2)],
+    "revisor_padron": [(email_de("equipo.padron", n), "Test1234") for n in (1, 2)],
+    "lectura": [(email_de("equipo.auditoria", n), "Test1234") for n in (1, 2)],
+    # Modulos de area: cada gerencia ve solo el suyo.
     "gestor_administracion": [
-        ("administracion1@repa.gob.ar", "Test1234"),
-        ("administracion2@repa.gob.ar", "Test1234"),
+        (email_de("equipo.administracion", n), "Test1234") for n in (1, 2)
     ],
-    "gestor_juridico": [
-        ("juridico1@repa.gob.ar", "Test1234"),
-        ("juridico2@repa.gob.ar", "Test1234"),
-    ],
+    "gestor_juridico": [(email_de("equipo.juridico", n), "Test1234") for n in (1, 2)],
+    "user": [(email_de("ciudadano.usuario", n), "Test1234") for n in (1, 2)],
 }
 
-TEST_ESA_USERS = [
-    ("estudiante1@esa.repa.gob.ar", "Test1234"),
-    ("estudiante2@esa.repa.gob.ar", "Test1234"),
-]
+# estudiante* se crea sin rol: backfill_estudiante_role se lo da cuando
+# existe su EstudianteESA (el mismo camino que en produccion).
+TEST_ESA_USERS = [(email_de("ciudadano.estudiante", n), "Test1234") for n in (1, 2)]
+
+# Titulares del padron demo (una Persona Fisica cada uno). Son datos, no
+# personas de prueba: no van al acceso rapido del login.
+CIUDADANOS_PADRON = [f"ciudadano.padron{n:02d}@repa.gob.ar" for n in range(1, 11)]
+
+# Las postulaciones de evaluador del seed son de ciudadanos: la postulacion
+# la hace un ciudadano; el rol evaluador es otra cuenta, del equipo.
+CIUDADANOS_EVALUADORES = CIUDADANOS_PADRON[4:6]
 
 
 def cuentas_demo() -> list[dict]:
