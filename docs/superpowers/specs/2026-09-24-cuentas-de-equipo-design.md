@@ -125,16 +125,17 @@ Los endpoints de gestión (con permiso) no cambian. Los de adjuntos de área
 
 ### 1.6 Seed
 
-- Usuarios de prueba de equipo con `tipo_cuenta='equipo'` y sólo su rol.
-- Las Persona Física de demo que hoy cuelgan de cuentas de equipo
-  (`TEST_PERSONA_FISICA`: admin1/2, gestor1/2, evaluador1/2, revisor1/2,
-  lectura1/2) pasan a cuentas ciudadanas de demo nuevas
-  (`ciudadano01..10@repa.gob.ar`, `Test1234`), así el padrón demo conserva
-  el volumen. usuario1/2 no cambian.
-- Las postulaciones de evaluador del seed pasan a esas cuentas ciudadanas.
-  Comités y dictámenes siguen referenciando `evaluadores.id` (no cambia).
-- El acceso rápido del login (`/users/demo-accounts`) no suma las cuentas
-  `ciudadanoNN` (son datos del padrón, no personas de prueba).
+La base de QA se wipea con este cambio (no hay datos que preservar), así que
+el seed se reescribe de cero y los emails de prueba dicen qué es cada cuenta:
+
+- Equipo: `equipo.<area>N@repa.gob.ar` (`admin`, `fomento`, `evaluador`,
+  `padron`, `auditoria`, `administracion`, `juridico`; N = 1, 2), con
+  `tipo_cuenta='equipo'`, sólo su rol y **sin** Persona Física.
+- Ciudadanos de prueba: `ciudadano.usuario1/2@` (PF, PJ, Asociación) y
+  `ciudadano.estudiante1/2@` (ESA).
+- Titulares del padrón demo: `ciudadano.padron01..10@` (las 10 PF que antes
+  colgaban de cuentas del equipo). No van al acceso rápido del login.
+- Las postulaciones de evaluador del seed son de `ciudadano.padron05/06`.
 
 ## Parte 2 — Frontend: lo que ve el equipo (Repa2025-Frontend)
 

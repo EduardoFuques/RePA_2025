@@ -1547,25 +1547,58 @@ git add src tests/test_alta_equipo.py
 git commit -m "feat(be): alta de cuentas del equipo con link de activacion (72 h, un solo uso)"
 ```
 
-### Task 11: Seed — equipo sin Persona Física
+### Task 11: Seed reescrito — emails que dicen qué son, equipo sin Persona Física
+
+> Reescrita el 24/09 por decisión del usuario: la base de QA se **wipea** (no hay que preservar ni mover datos) y los emails de prueba pasan a decir si la cuenta es del equipo o de ciudadano y qué rol tiene.
 
 **Files:**
-- Modify: `src/seed.py`, `src/demo_users.py`
+- Modify: `src/demo_users.py`, `src/seed.py`, `src/seed_area.py`
+- Modify: `tests/test_demo_accounts.py`, `tests/test_seed_area.py`
 - Test: `tests/test_seed_cuentas.py`
 
 **Interfaces:**
-- Consumes: `User.tipo_cuenta`, `es_rol_de_equipo`.
-- Produces: `demo_users.CIUDADANOS_PADRON: dict[str, str]` (email de equipo viejo → email ciudadano nuevo); `seed._crear_usuario(db, email, password, role=None)` setea `tipo_cuenta` según el rol.
+- Consumes: `User.tipo_cuenta` (Task 7), `es_rol_de_equipo` (Task 7).
+- Produces: `demo_users.TEST_ROLE_USERS` (nuevos emails), `demo_users.TEST_ESA_USERS`, `demo_users.CIUDADANOS_PADRON: list[str]`, `demo_users.CIUDADANOS_EVALUADORES: list[str]`, `demo_users.email_de(rol, n) -> str`; `seed._crear_usuario(db, email, password, role=None)` con `tipo_cuenta` según el rol.
+
+Emails (contraseña `Test1234` para todos, `Admin1234` para admins):
+
+| Cuenta | Emails |
+|---|---|
+| admin | `equipo.admin1@repa.gob.ar`, `equipo.admin2@…` |
+| gestor_fomento | `equipo.fomento1@…`, `equipo.fomento2@…` |
+| evaluador | `equipo.evaluador1@…`, `equipo.evaluador2@…` |
+| revisor_padron | `equipo.padron1@…`, `equipo.padron2@…` |
+| lectura | `equipo.auditoria1@…`, `equipo.auditoria2@…` |
+| gestor_administracion | `equipo.administracion1@…`, `equipo.administracion2@…` |
+| gestor_juridico | `equipo.juridico1@…`, `equipo.juridico2@…` |
+| user (con PF, PJ, Asociación) | `ciudadano.usuario1@…`, `ciudadano.usuario2@…` |
+| estudiante (ESA) | `ciudadano.estudiante1@…`, `ciudadano.estudiante2@…` |
+| titulares del padrón demo (10 PF) | `ciudadano.padron01@…` … `ciudadano.padron10@…` |
+
+- El acceso rápido del login (`/users/demo-accounts`) muestra equipo + `ciudadano.usuarioN` + `ciudadano.estudianteN` (18 cuentas). Los 10 `ciudadano.padronNN` no: son datos del padrón.
+- Las 2 postulaciones de evaluador del seed son de `ciudadano.padron05` y `ciudadano.padron06`. Las cuentas `equipo.evaluadorN` no tienen postulación.
+- El revisor que firma las revisiones del padrón demo es `equipo.padron1`.
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_seed_cuentas.py
-"""El seed deja al equipo sin Persona Fisica y el padron demo en cuentas ciudadanas."""
+"""Seed: el equipo sin registro RePA, los ciudadanos con el padron demo, y
+los emails diciendo que es cada cuenta."""
 
 
-def test_el_seed_mueve_las_pf_y_postulaciones_a_ciudadanos(db_session):
-    from src.demo_users import CIUDADANOS_PADRON
+def test_emails_dicen_que_son():
+    from src.demo_users import CIUDADANOS_PADRON, TEST_ESA_USERS, TEST_ROLE_USERS
+
+    for rol, usuarios in TEST_ROLE_USERS.items():
+        prefijo = "ciudadano." if rol == "user" else "equipo."
+        assert all(email.startswith(prefijo) for email, _ in usuarios), rol
+    assert all(e.startswith("ciudadano.estudiante") for e, _ in TEST_ESA_USERS)
+    assert len(CIUDADANOS_PADRON) == 10 and all(e.startswith("ciudadano.padron") for e in CIUDADANOS_PADRON)
+
+
+def test_el_seed_deja_al_equipo_sin_registros_y_al_padron_en_ciudadanos(db_session):
+    from src.demo_users import CIUDADANOS_EVALUADORES, CIUDADANOS_PADRON, TEST_ROLE_USERS
     from src.models.fomento_model import Evaluador
     from src.models.persona_fisica_model import PersonaFisica
     from src.models.user_models import User
@@ -1576,65 +1609,87 @@ def test_el_seed_mueve_las_pf_y_postulaciones_a_ciudadanos(db_session):
     seed_padron_data(db_session)
     seed_fomento_data(db_session)
 
-    for viejo, ciudadano in CIUDADANOS_PADRON.items():
-        equipo = db_session.query(User).filter(User.email == viejo).first()
-        persona = db_session.query(User).filter(User.email == ciudadano).first()
-        assert equipo.tipo_cuenta == "equipo"
-        assert persona.tipo_cuenta == "ciudadano"
-        assert db_session.query(PersonaFisica).filter(PersonaFisica.user_id == equipo.id).first() is None
-        assert db_session.query(PersonaFisica).filter(PersonaFisica.user_id == persona.id).first() is not None
-    evaluador1 = db_session.query(User).filter(User.email == "evaluador1@repa.gob.ar").first()
-    assert db_session.query(Evaluador).filter(Evaluador.user_id == evaluador1.id).first() is None
+    for rol, usuarios in TEST_ROLE_USERS.items():
+        for email, _ in usuarios:
+            u = db_session.query(User).filter(User.email == email).first()
+            assert u.tipo_cuenta == ("ciudadano" if rol == "user" else "equipo"), email
+            if rol != "user":
+                assert db_session.query(PersonaFisica).filter(PersonaFisica.user_id == u.id).first() is None, email
+                assert db_session.query(Evaluador).filter(Evaluador.user_id == u.id).first() is None, email
+    for email in CIUDADANOS_PADRON:
+        u = db_session.query(User).filter(User.email == email).first()
+        assert u.tipo_cuenta == "ciudadano"
+        assert db_session.query(PersonaFisica).filter(PersonaFisica.user_id == u.id).first() is not None, email
+    for email in CIUDADANOS_EVALUADORES:
+        u = db_session.query(User).filter(User.email == email).first()
+        assert db_session.query(Evaluador).filter(Evaluador.user_id == u.id).first() is not None, email
 
 
-def test_seed_idempotente_y_simulando_datos_previos(db_session):
-    """En QA las PF ya existen colgadas de admin1, gestor1... (mismo DNI): el
-    seed las MUEVE, no intenta crearlas de nuevo (chocaria por DNI unico)."""
-    from src.seed import seed_padron_data
+def test_seed_idempotente(db_session):
+    from src.models.user_models import User
+    from src.seed import seed_padron_data, seed_test_users
 
-    seed_padron_data(db_session)  # segunda corrida: no falla, no duplica
+    antes = db_session.query(User).count()
+    seed_test_users(db_session)
+    seed_padron_data(db_session)
+    assert db_session.query(User).count() == antes
 ```
 
-- [ ] **Step 2: Lint** — `ruff check tests/test_seed_cuentas.py` → PASS.
+- [ ] **Step 2: Lint** — `ruff check tests/test_seed_cuentas.py` → PASS (falla en CI hasta el Step 3: no existe `CIUDADANOS_PADRON` y los emails son los viejos).
 
 - [ ] **Step 3: Implement**
 
-`src/demo_users.py` — add:
+`src/demo_users.py` — reemplazar las listas por:
 
 ```python
-# Las PF de demo que antes colgaban de cuentas del equipo (para esquivar el
-# selector de primer ingreso) pasan a cuentas de ciudadano. El padron demo
-# conserva su volumen y el equipo queda sin registro propio. No van al
-# acceso rapido del login: son datos del padron, no personas de prueba.
-CIUDADANOS_PADRON = {
-    "admin1@repa.gob.ar": "ciudadano01@repa.gob.ar",
-    "admin2@repa.gob.ar": "ciudadano02@repa.gob.ar",
-    "gestor1@repa.gob.ar": "ciudadano03@repa.gob.ar",
-    "gestor2@repa.gob.ar": "ciudadano04@repa.gob.ar",
-    "evaluador1@repa.gob.ar": "ciudadano05@repa.gob.ar",
-    "evaluador2@repa.gob.ar": "ciudadano06@repa.gob.ar",
-    "revisor1@repa.gob.ar": "ciudadano07@repa.gob.ar",
-    "revisor2@repa.gob.ar": "ciudadano08@repa.gob.ar",
-    "lectura1@repa.gob.ar": "ciudadano09@repa.gob.ar",
-    "lectura2@repa.gob.ar": "ciudadano10@repa.gob.ar",
+def email_de(prefijo: str, n: int) -> str:
+    return f"{prefijo}{n}@repa.gob.ar"
+
+
+# El email dice que es cada cuenta: equipo.<area>N o ciudadano.<perfil>N.
+TEST_ROLE_USERS = {
+    "admin": [(email_de("equipo.admin", n), "Admin1234") for n in (1, 2)],
+    "gestor_fomento": [(email_de("equipo.fomento", n), "Test1234") for n in (1, 2)],
+    "evaluador": [(email_de("equipo.evaluador", n), "Test1234") for n in (1, 2)],
+    "revisor_padron": [(email_de("equipo.padron", n), "Test1234") for n in (1, 2)],
+    "lectura": [(email_de("equipo.auditoria", n), "Test1234") for n in (1, 2)],
+    "gestor_administracion": [(email_de("equipo.administracion", n), "Test1234") for n in (1, 2)],
+    "gestor_juridico": [(email_de("equipo.juridico", n), "Test1234") for n in (1, 2)],
+    "user": [(email_de("ciudadano.usuario", n), "Test1234") for n in (1, 2)],
 }
+
+TEST_ESA_USERS = [(email_de("ciudadano.estudiante", n), "Test1234") for n in (1, 2)]
+
+# Titulares del padron demo (una PF cada uno). Son datos, no personas de
+# prueba: no van al acceso rapido del login.
+CIUDADANOS_PADRON = [f"ciudadano.padron{n:02d}@repa.gob.ar" for n in range(1, 11)]
+
+# Las postulaciones de evaluador del seed son de ciudadanos: la postulacion
+# la hace un ciudadano; el rol evaluador es una cuenta del equipo aparte.
+CIUDADANOS_EVALUADORES = CIUDADANOS_PADRON[4:6]
 ```
 
+(`cuentas_demo()` no cambia: sigue armándose con `TEST_ROLE_USERS` + `TEST_ESA_USERS`.)
+
 `src/seed.py`:
+1. `_crear_usuario`: al crear, `tipo_cuenta="equipo" if role and es_rol_de_equipo(role.rol) else "ciudadano"` y `password_definida_at=datetime.now(timezone.utc)`.
+2. `seed_test_users`: al final, `for email in CIUDADANOS_PADRON: _crear_usuario(db, email, "Test1234", role=roles_by_name.get("user"))`.
+3. `TEST_PERSONA_FISICA`: las 10 PF que eran de admin1…lectura2 pasan a `CIUDADANOS_PADRON[0..9]` (clave del dict y argumento `email` de `_pf`, en el mismo orden); las de `usuario1/2` pasan a `ciudadano.usuario1/2`. `TEST_PERSONA_JURIDICA` y `TEST_ASOCIACION` re-key a `ciudadano.usuario1/2`; `TEST_ESA` a `ciudadano.estudiante1/2` (claves y campos `email` internos). Actualizar el docstring de `_pf`: son titulares ciudadanos del padrón demo; el equipo no tiene PF.
+4. `seed_padron_data`: el revisor es `TEST_ROLE_USERS["revisor_padron"][0][0]` (no un email literal).
+5. `seed_fomento_data`: los evaluadores se crean para `CIUDADANOS_EVALUADORES` (no `TEST_ROLE_USERS["evaluador"]`), con `nombre_completo` tomado de la PF de ese ciudadano si existe. Donde se usa `TEST_ROLE_USERS["user"]` sigue igual (los ciudadanos usuario).
+6. `seed_data` docstring: la cuenta de usuarios pasa a "18 cuentas de prueba + 10 titulares del padrón".
 
-1. `_crear_usuario`: `user = User(email=..., hashed_password=..., is_active=True, tipo_cuenta="equipo" if role and es_rol_de_equipo(role.rol) else "ciudadano", password_definida_at=datetime.now(timezone.utc))`; for an existing user whose role is of team and `tipo_cuenta != "equipo"`, set it and drop citizen roles (QA already converted by the migration; this keeps a fresh dev DB consistent).
-2. `seed_test_users`: after the loops, create each `CIUDADANOS_PADRON` value with `_crear_usuario(db, email, "Test1234", role=roles_by_name.get("user"))`.
-3. `TEST_PERSONA_FISICA`: re-key each entry with `CIUDADANOS_PADRON[email]` and pass the citizen email as the `_pf(..., email, ...)` argument. Update the `_pf` docstring: the PFs belong to demo citizens; team accounts have no PF.
-4. `seed_padron_data`, in the PF loop, before creating: if a PF with the same `dni` exists, move it: `if existente_por_dni and existente_por_dni.user_id != user.id: existente_por_dni.user_id = user.id; existente_por_dni.email = email; db.commit(); continue`.
-5. `seed_fomento_data`, "Evaluadores": iterate `CIUDADANOS_PADRON["evaluador1@repa.gob.ar"]` and `["evaluador2@…"]` (the citizens) instead of `TEST_ROLE_USERS["evaluador"]`. Before `_get_or_create`, move any `Evaluador` row whose `email` equals the old team email to the citizen user (`user_id`, `email`).
+`src/seed_area.py`: los emails literales pasan a `TEST_ROLE_USERS["admin"][0][0]`, `TEST_ROLE_USERS["gestor_administracion"][0][0]`, `TEST_ROLE_USERS["gestor_juridico"][0][0]`.
 
-- [ ] **Step 4: Verify** — `ruff check src tests` → PASS; local object check (venv, sin base): `python -c "from src.seed import TEST_PERSONA_FISICA; from src.demo_users import CIUDADANOS_PADRON; assert set(TEST_PERSONA_FISICA) == set(CIUDADANOS_PADRON.values())"`. CI: `tests/test_seed_cuentas.py` and `tests/test_seed_area.py` PASS.
+`tests/test_seed_area.py`: los emails que crea el fixture `sembrado` pasan a `equipo.admin1@`, `equipo.administracion1@`, `equipo.juridico1@`. `tests/test_demo_accounts.py` no cambia de cantidad (18) ni de roles.
+
+- [ ] **Step 4: Verify** — `ruff check src tests` → PASS; validación local sin base (venv): `python -c "from src.seed import TEST_PERSONA_FISICA, TEST_ESA; from src.demo_users import CIUDADANOS_PADRON; assert set(CIUDADANOS_PADRON) <= set(TEST_PERSONA_FISICA)"`. `grep -rn "repa.gob.ar" src | grep -v "equipo\.\|ciudadano\."` → sin resultados en seed/demo. CI: `test_seed_cuentas.py`, `test_seed_area.py`, `test_demo_accounts.py` PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/seed.py src/demo_users.py tests/test_seed_cuentas.py
-git commit -m "feat(be): el seed deja al equipo sin Persona Fisica; el padron demo pasa a cuentas ciudadanas"
+git add src/seed.py src/demo_users.py src/seed_area.py tests/test_seed_cuentas.py tests/test_seed_area.py
+git commit -m "feat(be): seed reescrito — emails que dicen que es cada cuenta, y el equipo sin Persona Fisica"
 ```
 
 ### Task 12: Verificación y PR 2
@@ -1642,7 +1697,7 @@ git commit -m "feat(be): el seed deja al equipo sin Persona Fisica; el padron de
 - [ ] **Step 1:** `ruff check src/ --ignore E501` → PASS.
 - [ ] **Step 2:** Push y PR `feat(be): cuentas de equipo — tipo de cuenta, require_ciudadano, alta y activación`. Esperar CI: `Tests Backend`, `Validar migraciones Alembic` y `Verificar build de la imagen` PASS; revisar en el log que los tests nuevos corrieron (no SKIPPED).
 - [ ] **Step 3:** Mergear SOLO después de que el PR 1 esté desplegado en QA.
-- [ ] **Step 4:** Tras el deploy: en QA entrar con `administracion1@repa.gob.ar`, `gestor1@…`, `evaluador1@…` y `admin1@…` → menú del equipo, sin selector; con `usuario1@…` → sin cambios. `curl` autenticado de `gestor1` a `/api/persona-fisica/me` → 403.
+- [ ] **Step 4:** Tras el deploy, **wipe de QA** (ver instrucciones en el PR): se borra `./pgdata` y el volumen de uploads, y al arrancar el backend la migración crea el esquema y el seed siembra todo con los emails nuevos. Después: entrar con `equipo.administracion1@repa.gob.ar`, `equipo.fomento1@…`, `equipo.evaluador1@…` y `equipo.admin1@…` → menú del equipo, sin selector; con `ciudadano.usuario1@…` → sin cambios. `curl` autenticado de `equipo.fomento1` a `/api/persona-fisica/me` → 403.
 
 ---
 
