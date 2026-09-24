@@ -330,9 +330,25 @@ async def eliminar_expediente(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Eliminar un expediente administrativo."""
+    """Eliminar un expediente administrativo — SOLO si es un borrador.
+
+    El formulario del area no preve borrar (hace "trazable la ejecucion
+    presupuestaria" y los indicadores se calculan sobre la historia). Lo
+    unico que se puede eliminar es una carga a medio hacer: el autoguardado
+    crea el borrador con el primer campo, y uno abandonado no tiene por que
+    quedar para siempre en el listado. Uno ya cargado sigue su ciclo por
+    estado_expediente (hasta "observado_rechazado"), no se borra: 409.
+    """
     check_permissions(db, current_user, PERM_EXPEDIENTES)
     expediente = _get_expediente_or_404(db, expediente_id)
+    if not expediente.borrador:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Un expediente ya cargado no se elimina: queda en el historial "
+                "de ejecución presupuestaria. Solo se pueden eliminar borradores."
+            ),
+        )
 
     # La auditoria se emite ANTES del delete: despues del db.delete() los
     # atributos del objeto ya no son legibles para armar el detalle.
