@@ -61,12 +61,26 @@ def _convertir_cuentas_de_equipo(conexion) -> list[str]:
     return ids
 
 
+def _marcar_contrasenas_existentes(bind) -> None:
+    """Las cuentas existentes ya tienen una contrasena elegida por su titular.
+
+    COALESCE: `created_at` es nullable; una cuenta vieja sin fecha quedaba con
+    password_definida_at NULL, o sea "pendiente de activacion", y no podia
+    entrar. Se separa en una funcion para poder testearla.
+    """
+    bind.execute(
+        sa.text(
+            "UPDATE users SET password_definida_at = COALESCE(created_at, now()) "
+            "WHERE password_definida_at IS NULL"
+        )
+    )
+
+
 def upgrade() -> None:
     op.add_column(
         "users", sa.Column("password_definida_at", sa.DateTime(), nullable=True)
     )
-    # Las cuentas existentes ya tienen una contrasena elegida por su titular.
-    op.execute("UPDATE users SET password_definida_at = created_at")
+    _marcar_contrasenas_existentes(op.get_bind())
     op.add_column(
         "users",
         sa.Column(

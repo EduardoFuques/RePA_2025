@@ -21,10 +21,11 @@ def get_request_id() -> str | None:
     return request_id_actual.get()
 
 
-# Rutas que llevan un JWT en el path: /users/confirm/{token} y
-# /users/recovery/{token}. Un token de recuperación logueado en claro
-# permite tomar la cuenta, así que se redacta antes de escribir el log.
-_TOKEN_PATH_RE = re.compile(r"(/users/(?:confirm|recovery)/)[^/?#]+")
+# Rutas que llevan un JWT en el path: /users/confirm/{token},
+# /users/recovery/{token} y /users/activar/{token}. Un token de recuperación
+# o de activación logueado en claro permite tomar la cuenta, así que se
+# redacta antes de escribir el log.
+_TOKEN_PATH_RE = re.compile(r"(/users/(?:confirm|recovery|activar)/)[^/?#]+")
 
 _PARAMS_SENSIBLES = {"token", "password", "secret", "key", "authorization"}
 
@@ -115,10 +116,11 @@ async def log_requests(request: Request, call_next):
         raise
     finally:
         duracion_ms = round((time.perf_counter() - inicio) * 1000, 2)
+        path = redactar_url(request.url.path)
         evento = {
             "request_id": request_id,
             "method": request.method,
-            "path": redactar_url(request.url.path),
+            "path": path,
             "query_params": filtrar_query_params(dict(request.query_params)),
             "status": status_code,
             "duration_ms": duracion_ms,
@@ -131,7 +133,9 @@ async def log_requests(request: Request, call_next):
 
         nivel = logger.error if (error or status_code >= 500) else logger.info
         nivel(
-            f"{request.method} {request.url.path} {status_code} {duracion_ms}ms",
+            # El path redactado también en el texto: antes el mensaje usaba
+            # request.url.path crudo y el token quedaba en claro igual.
+            f"{request.method} {path} {status_code} {duracion_ms}ms",
             extra=evento,
         )
         request_id_actual.reset(token_ctx)

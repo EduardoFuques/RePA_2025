@@ -176,3 +176,99 @@ def test_un_jwt_vencido_dice_que_el_link_vencio(client, create_user):
     resp = client.post(f"/users/activar/{vencido}", json={"password": "Nueva1234"})
     assert resp.status_code == 400, resp.text
     assert "venció" in resp.json()["detail"]
+
+
+def test_dos_activaciones_simultaneas_solo_una_gana(alta, client, monkeypatch, SessionLocal):
+    """Dos pedidos con el mismo link: el que llega segundo encontró el link
+    vigente al leerlo, pero el primero lo consumió antes de que éste guarde.
+    Se simula "el otro pedido ya confirmó" marcando el link como usado desde
+    otra sesión en el medio del pedido (durante la validación de la clave)."""
+    from src.models.user_models import TokenRecovery
+    from src.routes import user_routes
+
+    body = alta().json()
+    token = _token(body["activation_url"])
+    validar_original = user_routes.validar_password
+
+    def el_otro_pedido_gano(password):
+        validar_original(password)
+        otra = SessionLocal()
+        otra.query(TokenRecovery).filter(TokenRecovery.token_payload == token).update(
+            {"is_active": False}
+        )
+        otra.commit()
+        otra.close()
+
+    monkeypatch.setattr(user_routes, "validar_password", el_otro_pedido_gano)
+    resp = client.post(f"/users/activar/{token}", json={"password": "Perdedora1"})
+    assert resp.status_code == 400, resp.text
+    assert "ya se usó" in resp.json()["detail"]
+    login = client.post("/users/token", data={"username": body["user"]["email"], "password": "Perdedora1"})
+    assert login.status_code in (400, 401)
+
+
+def test_una_clave_invalida_no_consume_el_link(alta, client):
+    token = _token(alta().json()["activation_url"])
+    assert client.post(f"/users/activar/{token}", json={"password": "corta"}).status_code in (400, 422)
+    assert client.post(f"/users/activar/{token}", json={"password": "Nueva1234"}).status_code == 200
+
+
+@pytest.mark.parametrize("regenerar", [False, True])
+def test_el_mail_de_activacion_sale_despues_del_commit(
+    alta, client, admin_headers, monkeypatch, SessionLocal, regenerar
+):
+    """Si el mail salía antes del commit y el commit fallaba, la persona
+    recibía un link que no existía en la base."""
+    from src.models.user_models import TokenRecovery
+    from src.routes import admin_routes
+
+    vistos = []
+
+    def enviar(email, url):
+        otra = SessionLocal()
+        vistos.append(
+            otra.query(TokenRecovery).filter(TokenRecovery.token_payload == _token(url)).first()
+            is not None
+        )
+        otra.close()
+
+    monkeypatch.setattr(admin_routes, "SMTP_HOST", "smtp.test")
+    monkeypatch.setattr(admin_routes, "send_activation_email", enviar)
+    body = alta().json()
+    if regenerar:
+        body = client.post(
+            f"/admin_user/users/{body['user']['id']}/activation-link", headers=admin_headers
+        ).json()
+    assert body["email_enviado"] is True
+    assert vistos and vistos[-1] is True
+
+
+def test_si_el_mail_falla_el_link_igual_se_devuelve(alta, monkeypatch):
+    from src.routes import admin_routes
+
+    def falla(email, url):
+        raise ConnectionError("SMTP caído")
+
+    monkeypatch.setattr(admin_routes, "SMTP_HOST", "smtp.test")
+    monkeypatch.setattr(admin_routes, "send_activation_email", falla)
+    resp = alta()
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["email_enviado"] is False
+    assert "/activar-cuenta/" in resp.json()["activation_url"]
+
+
+def test_listado_filtra_pendientes_de_activacion(alta, client, admin_headers):
+    pendiente = alta().json()["user"]["email"]
+    activa = alta().json()
+    client.post(f"/users/activar/{_token(activa['activation_url'])}", json={"password": "Nueva1234"})
+
+    def emails(valor):
+        resp = client.get(
+            f"/admin_user/users?tipo_cuenta=equipo&pendiente_activacion={valor}&limit=200",
+            headers=admin_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        return {u["email"] for u in resp.json()["items"]}
+
+    assert pendiente in emails("true") and activa["user"]["email"] not in emails("true")
+    assert activa["user"]["email"] in emails("false") and pendiente not in emails("false")

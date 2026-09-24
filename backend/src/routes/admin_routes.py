@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from src.audit import audit_log
 from src.config import FRONTEND_URL, SMTP_HOST
@@ -294,6 +294,9 @@ async def get_users(
     tipo_cuenta: str | None = Query(
         None, pattern="^(ciudadano|equipo)$", description="ciudadano o equipo"
     ),
+    pendiente_activacion: bool | None = Query(
+        None, description="Cuentas del equipo que todavía no usaron su link"
+    ),
     limit: int = Query(25, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -315,28 +318,20 @@ async def get_users(
         query = query.filter(User.is_active.is_(is_active))
     if tipo_cuenta:
         query = query.filter(User.tipo_cuenta == tipo_cuenta)
+    # Misma definicion que User.pendiente_activacion, en SQL.
+    pendiente = (User.tipo_cuenta == "equipo") & User.password_definida_at.is_(None)
+    if pendiente_activacion is True:
+        query = query.filter(pendiente)
+    elif pendiente_activacion is False:
+        query = query.filter(~pendiente)
     if role:
         query = query.filter(User.roles.any(Role.rol == role))
 
     total = query.count()
-    usuarios = (
-        query.options(selectinload(User.persona_fisica))
-        .order_by(User.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
-
-    # `tiene_persona_fisica`: ya no se exige Persona Fisica para ser admin
-    # (cuentas de equipo); el campo queda por compatibilidad.
-    items = []
-    for u in usuarios:
-        item = UserOut.model_validate(u).model_dump()
-        item["tiene_persona_fisica"] = u.persona_fisica is not None
-        items.append(item)
+    usuarios = query.order_by(User.created_at.desc()).offset(offset).limit(limit).all()
 
     return {
-        "items": items,
+        "items": [UserOut.model_validate(u).model_dump() for u in usuarios],
         "total": total,
         "offset": offset,
         "limit": limit,
@@ -372,12 +367,14 @@ def _validar_roles_para(tipo_cuenta: str, roles: list) -> None:
 ACTIVACION_MINUTOS = 72 * 60
 
 
-def _emitir_activacion(db: Session, user: User) -> tuple[str, datetime, bool]:
+def _emitir_activacion(db: Session, user: User) -> tuple[str, datetime]:
     """Invalida los links activos del usuario y emite uno nuevo.
 
     El token queda en token_recovery (mismo mecanismo que la recuperacion de
     contrasena) con su vencimiento; el JWT es de tipo "activacion", asi que un
     link de recuperacion no sirve para activar ni al reves.
+
+    No manda el mail: eso va despues del commit (ver _enviar_activacion).
     """
     db.query(TokenRecovery).filter(
         TokenRecovery.user_id == user.id, TokenRecovery.is_active.is_(True)
@@ -387,15 +384,21 @@ def _emitir_activacion(db: Session, user: User) -> tuple[str, datetime, bool]:
     )
     expira = datetime.now(timezone.utc) + timedelta(minutes=ACTIVACION_MINUTOS)
     db.add(TokenRecovery(user_id=user.id, token_payload=token, expires_at=expira))
-    url = f"{FRONTEND_URL.rstrip('/')}/activar-cuenta/{token}"
-    enviado = False
-    if SMTP_HOST:
-        try:
-            send_activation_email(user.email, url)
-            enviado = True
-        except Exception:  # el link igual se devuelve: el admin lo manda a mano
-            enviado = False
-    return url, expira, enviado
+    return f"{FRONTEND_URL.rstrip('/')}/activar-cuenta/{token}", expira
+
+
+def _enviar_activacion(email: str, url: str) -> bool:
+    """Manda el link por mail si hay SMTP. Se llama DESPUES del commit: antes,
+    si el commit fallaba, la persona recibia un link que no existia en la
+    base. Si el envio falla el link igual se devuelve y el admin lo manda a
+    mano."""
+    if not SMTP_HOST:
+        return False
+    try:
+        send_activation_email(email, url)
+        return True
+    except Exception:
+        return False
 
 
 def _get_user_or_404(db: Session, user_id: str) -> User:
@@ -451,7 +454,7 @@ async def crear_usuario_equipo(
     user.roles = roles
     db.add(user)
     db.flush()
-    url, expira, enviado = _emitir_activacion(db, user)
+    url, expira = _emitir_activacion(db, user)
     audit_log(
         db=db,
         action=AuditAction.CREATE,
@@ -463,6 +466,7 @@ async def crear_usuario_equipo(
     )
     db.commit()
     db.refresh(user)
+    enviado = _enviar_activacion(user.email, url)
     return {"user": user, "activation_url": url, "expires_at": expira, "email_enviado": enviado}
 
 
@@ -485,7 +489,7 @@ async def regenerar_activacion(
             status_code=status.HTTP_409_CONFLICT,
             detail="La cuenta no está pendiente de activación.",
         )
-    url, expira, enviado = _emitir_activacion(db, user)
+    url, expira = _emitir_activacion(db, user)
     audit_log(
         db=db,
         action=AuditAction.UPDATE,
@@ -497,6 +501,7 @@ async def regenerar_activacion(
     )
     db.commit()
     db.refresh(user)
+    enviado = _enviar_activacion(user.email, url)
     return {"user": user, "activation_url": url, "expires_at": expira, "email_enviado": enviado}
 
 
