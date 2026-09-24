@@ -13,9 +13,33 @@ Postgres al importarse y los imports tienen que ocurrir despues.
 import pytest
 
 
+# La base es compartida por toda la suite: otros tests tambien crean
+# expedientes, instrumentos y actas. Todo lo que se consulta aca se acota a
+# las filas del seed, por sus propias claves.
+def _numeros_demo():
+    from datetime import date
+
+    from src.seed_area import _expedientes, _instrumentos
+
+    hoy = date.today()
+    exps = [c["numero_expediente_provincial"] for c, _ in _expedientes(hoy, None)
+            if "numero_expediente_provincial" in c]
+    insts = [c["numero_instrumento"] for c, _ in _instrumentos(hoy, None)
+             if "numero_instrumento" in c]
+    return exps, insts
+
+
+@pytest.fixture(scope="session")
+def uploads_seed(tmp_path_factory):
+    """Un solo directorio de uploads para toda la sesion, no uno por test:
+    el seed es idempotente, asi que los PDF se escriben en la PRIMERA
+    corrida y los tests siguientes los tienen que encontrar ahi."""
+    return tmp_path_factory.mktemp("uploads-seed-area")
+
+
 @pytest.fixture
-def sembrado(db_session, tmp_path, monkeypatch):
-    """Corre el seed con los usuarios que usa y los uploads en tmp_path."""
+def sembrado(db_session, uploads_seed, monkeypatch):
+    """Corre el seed con los usuarios que usa y los uploads en uploads_seed."""
     import src.document_generator as generador
     import src.routes.upload_routes as upload_routes
     from src.models.user_models import User
@@ -23,8 +47,8 @@ def sembrado(db_session, tmp_path, monkeypatch):
     from src.seed_area import seed_area_data
 
     # Mismo directorio para quien escribe los PDF y quien los sirve.
-    monkeypatch.setattr(generador, "UPLOAD_BASE_DIR", str(tmp_path))
-    monkeypatch.setattr(upload_routes, "UPLOAD_BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(generador, "UPLOAD_BASE_DIR", str(uploads_seed))
+    monkeypatch.setattr(upload_routes, "UPLOAD_BASE_DIR", str(uploads_seed))
 
     # El seed solo necesita que existan (guarda los PDF en su directorio).
     # Se crean aca y no con _crear_usuario de conftest: importar conftest
@@ -40,9 +64,11 @@ def sembrado(db_session, tmp_path, monkeypatch):
 def test_expedientes_en_todos_los_estados_y_borradores(sembrado):
     from src.models.expediente_model import ExpedienteAdministrativo
 
+    exps, _ = _numeros_demo()
     demo = sembrado.query(ExpedienteAdministrativo).filter(
-        ExpedienteAdministrativo.numero_expediente_provincial.like("DEMO-EXP-%")
+        ExpedienteAdministrativo.numero_expediente_provincial.in_(exps)
     ).all()
+    assert len(demo) == len(exps)
     assert {e.estado_expediente for e in demo} == {
         "iniciado", "en_proceso_administrativo", "en_tesoreria",
         "aprobado_para_pago", "pagado", "observado_rechazado",
@@ -56,29 +82,37 @@ def test_expedientes_en_todos_los_estados_y_borradores(sembrado):
 def test_instrumentos_en_todos_los_estados_y_con_acta(sembrado):
     from src.models.instrumento_juridico_model import InstrumentoJuridico
 
-    todos = sembrado.query(InstrumentoJuridico).filter(
-        InstrumentoJuridico.titulo.isnot(None)
+    _, insts = _numeros_demo()
+    cargados = sembrado.query(InstrumentoJuridico).filter(
+        InstrumentoJuridico.numero_instrumento.in_(insts)
     ).all()
-    cargados = [i for i in todos if not i.borrador and i.numero_instrumento]
+    assert len(cargados) == len(insts)
+    assert not any(i.borrador for i in cargados)
     assert {i.estado_revision for i in cargados} >= {"en_revision", "validado", "archivado"}
     # Un cargado cumple lo que exige el envio: tipo, titulo, resumen y PDF.
     for i in cargados:
         assert i.tipo_documento and i.titulo and i.resumen and i.archivo_pdf_path, i.titulo
     acta = next(i for i in cargados if i.tipo_documento == "acta_consejo_directivo")
     assert acta.acta is not None and len(acta.acta.asistentes) == 3
-    assert any(i.borrador for i in todos)
+    assert acta.acta.acta_pdf_path
+    borradores = sembrado.query(InstrumentoJuridico).filter(
+        InstrumentoJuridico.titulo.like("[Borrador demo]%")
+    ).all()
+    assert len(borradores) == 2 and all(b.borrador for b in borradores)
 
 
 def test_los_pdf_se_descargan_por_el_endpoint_del_modulo(sembrado, client, admin_headers):
     from src.models.expediente_model import ExpedienteAdministrativo
     from src.models.instrumento_juridico_model import InstrumentoJuridico
 
+    exps, insts = _numeros_demo()
     exp = sembrado.query(ExpedienteAdministrativo).filter(
-        ExpedienteAdministrativo.resolucion_pdf_path.like("%/expediente_resolucion_%")
+        ExpedienteAdministrativo.numero_expediente_provincial.in_(exps),
+        ExpedienteAdministrativo.resolucion_pdf_path.isnot(None),
     ).first()
     inst = sembrado.query(InstrumentoJuridico).filter(
+        InstrumentoJuridico.numero_instrumento.in_(insts),
         InstrumentoJuridico.tipo_documento == "acta_consejo_directivo",
-        InstrumentoJuridico.borrador.is_(False),
     ).first()
     assert exp is not None and inst is not None
 
@@ -110,7 +144,9 @@ def test_los_borradores_del_seed_se_pueden_eliminar_y_los_cargados_no(
 ):
     from src.models.expediente_model import ExpedienteAdministrativo
 
+    exps, _ = _numeros_demo()
     cargado = sembrado.query(ExpedienteAdministrativo).filter(
-        ExpedienteAdministrativo.estado_expediente == "pagado"
+        ExpedienteAdministrativo.numero_expediente_provincial.in_(exps),
+        ExpedienteAdministrativo.estado_expediente == "pagado",
     ).first()
     assert client.delete(f"/expedientes/{cargado.id}", headers=admin_headers).status_code == 409
