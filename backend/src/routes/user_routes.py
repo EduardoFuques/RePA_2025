@@ -632,10 +632,26 @@ async def activar_cuenta(
             "usá «Olvidé mi contraseña».",
         )
     validar_password(data.password)
+    # Un solo uso, de forma atomica: dos pedidos con el mismo link pueden
+    # haber pasado los dos el chequeo de arriba. El UPDATE condicional toma
+    # el lock de la fila; el segundo espera, ve is_active=false y no toca
+    # nada. Va despues de validar la clave para que una clave invalida no
+    # queme el link.
+    reclamado = (
+        db.query(TokenRecovery)
+        .filter(TokenRecovery.id == registro.id, TokenRecovery.is_active.is_(True))
+        .update({"is_active": False}, synchronize_session=False)
+    )
+    if not reclamado:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este link ya se usó o fue reemplazado por uno nuevo. "
+            "Pedile otro al administrador.",
+        )
     user.hashed_password = get_password_hash(data.password)
     user.password_definida_at = datetime.now(timezone.utc)
     revocar_sesiones(user)
-    registro.is_active = False
     audit_log(
         db=db,
         action="PASSWORD_RESET",

@@ -187,3 +187,20 @@ def test_el_registro_crea_cuentas_de_ciudadano(client, db_session):
     client.post("/users/register", json={"email": email, "password": "Passw0rd1"})
     user = db_session.query(User).filter(User.email == email).first()
     assert user.tipo_cuenta == "ciudadano" and user.password_definida_at is not None
+
+
+def test_la_migracion_no_deja_pendientes_a_las_cuentas_sin_created_at(db_session, create_user):
+    """Una cuenta vieja sin created_at quedaba con password_definida_at NULL:
+    "pendiente de activacion", sin poder entrar."""
+    from src.models.user_models import User
+
+    user, _ = create_user(f"vieja-{uuid.uuid4().hex[:6]}@x.com", roles=["user"])
+    db_session.rollback()
+    db_session.query(User).filter(User.id == user.id).update(
+        {"created_at": None, "password_definida_at": None}
+    )
+    _migracion()._marcar_contrasenas_existentes(db_session.connection())
+    vieja = db_session.query(User).filter(User.id == user.id).first()
+    db_session.refresh(vieja)
+    assert vieja.password_definida_at is not None
+    db_session.rollback()

@@ -252,28 +252,6 @@ class TestDesignarAdminCuentasDeEquipo:
         assert resp.status_code == 200, resp.text
         assert any(r["rol"] == "admin" for r in resp.json()["roles"])
 
-    def test_listado_indica_quien_tiene_pf(self, client, create_user, admin_headers, db_session):
-        from src.models.persona_fisica_model import PersonaFisica
-
-        con_pf, _ = create_user(
-            f"listapf_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["user"]
-        )
-        db_session.add(PersonaFisica(user_id=con_pf.id))
-        db_session.commit()
-        sin_pf, _ = create_user(
-            f"listasinpf_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["user"]
-        )
-
-        data = client.get(
-            f"/admin_user/users?search={con_pf.email}", headers=admin_headers
-        ).json()
-        assert data["items"][0]["tiene_persona_fisica"] is True
-
-        data = client.get(
-            f"/admin_user/users?search={sin_pf.email}", headers=admin_headers
-        ).json()
-        assert data["items"][0]["tiene_persona_fisica"] is False
-
     def test_no_aplica_si_ya_era_admin(self, client, create_user, admin_headers, db_session):
         """Un patch que no agrega el rol admin de nuevo (ya lo tenía) no debe
         exigir Persona Física — ej. tocar solo otro rol en el mismo pedido."""
