@@ -142,3 +142,37 @@ def test_solo_un_admin_da_de_alta_admins(alta, create_user, db_session):
     _, headers = create_user(f"rrhh-{uuid.uuid4().hex[:6]}@x.com", roles=[rol.rol])
     assert alta(roles=("admin",), headers=headers).status_code == 403
     assert alta(roles=("lectura",), headers=headers).status_code == 201
+
+
+# --- Revision final ---------------------------------------------------------
+def test_un_link_viejo_no_sirve_si_la_cuenta_ya_se_activo(alta, client, admin_headers):
+    """Si la cuenta ya tiene contrasena (recuperacion o cambio del admin), el
+    link de alta que quedo dando vueltas no puede pisarla."""
+    body = alta().json()
+    token = _token(body["activation_url"])
+    resp = client.put(f"/admin_user/users/{body['user']['id']}", headers=admin_headers,
+                      json={"password": "Propia1234"})
+    assert resp.status_code == 200, resp.text
+    viejo = client.post(f"/users/activar/{token}", json={"password": "Ajena12345"})
+    assert viejo.status_code == 400
+    assert "ya está activa" in viejo.json()["detail"]
+    login = client.post("/users/token", data={"username": body["user"]["email"], "password": "Propia1234"})
+    assert login.status_code == 200
+
+
+def test_una_contrasena_demasiado_larga_es_422_y_no_500(alta, client):
+    token = _token(alta().json()["activation_url"])
+    resp = client.post(f"/users/activar/{token}", json={"password": "Aa1" + "x" * 80})
+    assert resp.status_code == 422, resp.text
+
+
+def test_un_jwt_vencido_dice_que_el_link_vencio(client, create_user):
+    """El JWT y el registro vencen juntos: el mensaje tiene que ser el claro, y
+    no un 401 (que el frontend tomaria como sesion vencida)."""
+    from src.token_utils import create_access_token
+
+    user, _ = create_user(f"v-{uuid.uuid4().hex[:6]}@x.com", roles=["lectura"])
+    vencido = create_access_token(data={"sub": user.id}, expires_delta=-1, type="activacion")
+    resp = client.post(f"/users/activar/{vencido}", json={"password": "Nueva1234"})
+    assert resp.status_code == 400, resp.text
+    assert "venció" in resp.json()["detail"]

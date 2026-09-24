@@ -29,6 +29,7 @@ from src.schemas.user_schemas import (
 )
 from src.services.email_service import send_recovery_email, send_verification_email
 from src.token_utils import (
+    MSG_LINK_VENCIDO,
     create_access_token,
     create_refresh_token,
     decode_activation_token,
@@ -615,11 +616,21 @@ async def activar_cuenta(
     if vence is not None and vence < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Este link venció. Pedile uno nuevo al administrador.",
+            detail=MSG_LINK_VENCIDO,
         )
     user = db.query(User).filter(User.id == payload.get("sub")).first()
     if not user or user.tipo_cuenta != "equipo":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Link inválido.")
+    if not user.pendiente_activacion:
+        # Ya definio su contrasena por otra via (recuperacion, cambio del
+        # admin): el link que quedo dando vueltas no puede pisarla.
+        registro.is_active = False
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Esta cuenta ya está activa. Si no recordás la contraseña, "
+            "usá «Olvidé mi contraseña».",
+        )
     validar_password(data.password)
     user.hashed_password = get_password_hash(data.password)
     user.password_definida_at = datetime.now(timezone.utc)

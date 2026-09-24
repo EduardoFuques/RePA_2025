@@ -166,7 +166,7 @@ class TeamUserCreate(BaseModel):
 
 
 class ActivacionIn(BaseModel):
-    password: str
+    password: Password
 
 
 class ActivacionOut(BaseModel):
