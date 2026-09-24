@@ -94,8 +94,12 @@ class TestRevocacionInmediata:
         # aunque su token siga vigente.
         from src.models.user_models import Role
 
+        # Con otro rol del equipo ademas de admin: una cuenta del equipo tiene
+        # que conservar al menos uno (sin eso, quitarle admin es 409). El
+        # revisor no tiene users:read, asi que el 403 de abajo sigue probando
+        # que se perdio el acceso admin.
         _admin2, headers2 = create_user(
-            f"admin2_{uuid.uuid4().hex[:8]}@example.com", roles=["admin"]
+            f"admin2_{uuid.uuid4().hex[:8]}@example.com", roles=["admin", "revisor_padron"]
         )
         # Con rol admin puede listar usuarios
         assert (

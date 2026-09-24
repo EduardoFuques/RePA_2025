@@ -21,7 +21,7 @@ from src.audit import audit_log
 from src.database import get_db
 from src.models.audit_model import AuditAction, AuditLog
 from src.models.user_models import Permission, Role, User
-from src.rbac import SYSTEM_ROLE_NAMES
+from src.rbac import SYSTEM_ROLE_NAMES, es_rol_de_equipo
 from src.schemas.user_schemas import (
     PermissionOut,
     RoleCreate,
@@ -285,6 +285,9 @@ async def get_users(
     search: str | None = Query(None, description="Búsqueda por email (ignora acentos)"),
     role: str | None = Query(None, description="Filtrar por nombre de rol"),
     is_active: bool | None = Query(None, description="Filtrar por estado de la cuenta"),
+    tipo_cuenta: str | None = Query(
+        None, pattern="^(ciudadano|equipo)$", description="ciudadano o equipo"
+    ),
     limit: int = Query(25, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -304,6 +307,8 @@ async def get_users(
         query = query.filter(filtro_texto(db, [User.email], search.strip()))
     if is_active is not None:
         query = query.filter(User.is_active.is_(is_active))
+    if tipo_cuenta:
+        query = query.filter(User.tipo_cuenta == tipo_cuenta)
     if role:
         query = query.filter(User.roles.any(Role.rol == role))
 
@@ -316,9 +321,8 @@ async def get_users(
         .all()
     )
 
-    # `tiene_persona_fisica`: para designar admin hace falta ya tener un
-    # registro de Persona Física (ver update_user_roles) — se muestra acá
-    # para que Administradores.jsx pueda avisarlo antes de intentarlo.
+    # `tiene_persona_fisica`: ya no se exige Persona Fisica para ser admin
+    # (cuentas de equipo); el campo queda por compatibilidad.
     items = []
     for u in usuarios:
         item = UserOut.model_validate(u).model_dump()
@@ -331,6 +335,31 @@ async def get_users(
         "offset": offset,
         "limit": limit,
     }
+
+
+def _validar_roles_para(tipo_cuenta: str, roles: list) -> None:
+    """Una cuenta es de ciudadano o del equipo: los roles no se mezclan."""
+    de_equipo = [r.rol for r in roles if es_rol_de_equipo(r.rol)]
+    de_ciudadano = [r.rol for r in roles if not es_rol_de_equipo(r.rol)]
+    if tipo_cuenta == "equipo":
+        if de_ciudadano:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Una cuenta del equipo no puede tener roles de ciudadano "
+                f"({', '.join(de_ciudadano)}).",
+            )
+        if not de_equipo:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Una cuenta del equipo tiene que conservar al menos un rol "
+                "del equipo. Para darla de baja, desactivala.",
+            )
+    elif de_equipo:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Una cuenta de ciudadano no puede recibir roles del equipo "
+            f"({', '.join(de_equipo)}). Creá una cuenta del equipo aparte.",
+        )
 
 
 def _get_user_or_404(db: Session, user_id: str) -> User:
@@ -385,6 +414,7 @@ async def update_user(
     if user_in.password:
         validar_password(user_in.password)
         user.hashed_password = get_password_hash(user_in.password)
+        user.password_definida_at = datetime.now(timezone.utc)
         cambios.append("password")
 
     if not cambios:
@@ -462,23 +492,6 @@ async def update_user_roles(
                 detail="Solo un administrador puede otorgar o quitar el rol admin",
             )
 
-    # Para ser designado administrador hay que ya estar en la plataforma:
-    # tener un registro de Persona Física en el Padrón. No aplica si el
-    # usuario ya era admin (ej. patch que solo toca otros roles). Va
-    # DESPUÉS del chequeo de permisos de arriba: quién puede intentarlo
-    # importa antes que si el objetivo califica.
-    if (
-        admin_role
-        and admin_role.id in add_ids
-        and admin_role.id not in original_role_ids
-        and user.persona_fisica is None
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El usuario no tiene un registro de Persona Física en el Padrón. "
-            "Para ser administrador primero tiene que completar su registro RePA.",
-        )
-
     # Auto-protección: el admin no puede quitarse su propio rol admin
     if (
         admin_role
@@ -512,7 +525,11 @@ async def update_user_roles(
                 detail="No se puede quitar el rol admin al último administrador activo",
             )
 
-    user.roles = db.query(Role).filter(Role.id.in_(current_role_ids)).all()
+    roles_resultantes = db.query(Role).filter(Role.id.in_(current_role_ids)).all()
+    # Se valida el conjunto RESULTANTE: un mismo patch puede sacar un rol y
+    # agregar otro. Una cuenta es de ciudadano o del equipo, nunca las dos.
+    _validar_roles_para(user.tipo_cuenta, roles_resultantes)
+    user.roles = roles_resultantes
     db.commit()
     db.refresh(user)
     audit_log(

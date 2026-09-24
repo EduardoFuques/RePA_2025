@@ -90,6 +90,10 @@ class UserOut(UserBase):
     created_at: datetime
     last_login: datetime | None = None
     roles: list[RoleOut] = []
+    # ciudadano | equipo (ver docs/superpowers/specs/2026-09-24-cuentas-de-equipo-design.md)
+    tipo_cuenta: str = "ciudadano"
+    # Cuenta del equipo que todavia no definio su contrasena (link de activacion).
+    pendiente_activacion: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

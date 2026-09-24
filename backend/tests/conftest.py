@@ -168,12 +168,17 @@ def _crear_usuario(db, email, password, roles=None):
     # de que se importe cualquier cosa de src.
     from src.password import get_password_hash
 
+    from src.rbac import es_rol_de_equipo
+
     user = db.query(User).filter(User.email == email).first()
     if not user:
+        # Una cuenta con algun rol del equipo es del equipo (ver
+        # users.tipo_cuenta): los fixtures respetan la misma regla que la app.
         user = User(
             email=email,
             hashed_password=get_password_hash(password),
             is_active=True,
+            tipo_cuenta="equipo" if any(es_rol_de_equipo(r) for r in roles or []) else "ciudadano",
         )
         db.add(user)
         db.commit()

@@ -193,38 +193,28 @@ class TestAdmin:
         assert response.status_code == 200
         assert response.json()["is_active"] == nuevo_estado
 
-    def test_update_user_roles(self, client: TestClient, admin_headers: dict, db_session):
-        """Test actualizar roles de usuario."""
-        if not admin_headers:
-            pytest.skip("No se pudo obtener token de admin")
+    def test_update_user_roles(self, client: TestClient, admin_headers: dict, create_user, db_session):
+        """Actualizar roles: a una cuenta del equipo se le suma otro rol del equipo."""
+        from src.models.user_models import Role
 
-        from src.models.user_models import Role, User
-
-        # Obtener usuario y rol. Excluye el rol "admin" a propósito: designar
-        # admin exige que el usuario ya tenga una Persona Física en el Padrón
-        # (ver admin_routes.py update_user_roles) — esa regla ya tiene su
-        # propia cobertura en TestDesignarAdminRequierePersonaFisica más
-        # abajo. Este test solo verifica el camino feliz genérico de
-        # actualizar roles, así que agarrar "admin" acá era un choque con
-        # esa regla, no con lo que el test dice probar.
-        user = db_session.query(User).filter(User.email != "admin_test@example.com").first()
-        role = db_session.query(Role).filter(Role.rol != "admin").first()
-
-        if not user or not role:
-            pytest.skip("No hay usuarios o roles para actualizar")
+        user, _ = create_user(
+            f"roles_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["lectura"]
+        )
+        db_session.rollback()
+        role = db_session.query(Role).filter(Role.rol == "revisor_padron").first()
 
         response = client.put(
             f"/admin_user/users/{user.id}/roles",
             json={"add": [role.id], "remove": []},
             headers=admin_headers
         )
+        assert response.status_code == 200, response.text
+        assert {r["rol"] for r in response.json()["roles"]} == {"lectura", "revisor_padron"}
 
-        assert response.status_code == 200
 
-
-class TestDesignarAdminRequierePersonaFisica:
-    """Para ser designado administrador, el usuario ya tiene que estar en la
-    plataforma: tener un registro de Persona Física en el Padrón."""
+class TestDesignarAdminCuentasDeEquipo:
+    """Admin es un rol del equipo: se da a cuentas del equipo, sin exigir
+    Persona Fisica (antes se exigia), y nunca a una cuenta de ciudadano."""
 
     def _admin_role_id(self, db_session):
         from src.models.user_models import Role
@@ -232,9 +222,9 @@ class TestDesignarAdminRequierePersonaFisica:
         db_session.rollback()
         return db_session.query(Role).filter(Role.rol == "admin").first().id
 
-    def test_sin_persona_fisica_es_400(self, client, create_user, admin_headers, db_session):
+    def test_a_un_ciudadano_no_se_le_da_admin(self, client, create_user, admin_headers, db_session):
         candidato, _ = create_user(
-            f"sinpf_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["user"]
+            f"ciu_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["user"]
         )
         admin_role_id = self._admin_role_id(db_session)
 
@@ -243,17 +233,15 @@ class TestDesignarAdminRequierePersonaFisica:
             headers=admin_headers,
             json={"add": [admin_role_id], "remove": []},
         )
-        assert resp.status_code == 400
-        assert "Persona Física" in resp.json()["detail"]
+        assert resp.status_code == 409
+        assert "cuenta de ciudadano" in resp.json()["detail"]
 
-    def test_con_persona_fisica_permite_otorgar(self, client, create_user, admin_headers, db_session):
-        from src.models.persona_fisica_model import PersonaFisica
-
+    def test_a_una_cuenta_del_equipo_sin_persona_fisica_si(
+        self, client, create_user, admin_headers, db_session
+    ):
         candidato, _ = create_user(
-            f"conpf_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["user"]
+            f"eq_{__import__('uuid').uuid4().hex[:8]}@example.com", roles=["lectura"]
         )
-        db_session.add(PersonaFisica(user_id=candidato.id))
-        db_session.commit()
         admin_role_id = self._admin_role_id(db_session)
 
         resp = client.put(
@@ -261,7 +249,7 @@ class TestDesignarAdminRequierePersonaFisica:
             headers=admin_headers,
             json={"add": [admin_role_id], "remove": []},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.text
         assert any(r["rol"] == "admin" for r in resp.json()["roles"])
 
     def test_listado_indica_quien_tiene_pf(self, client, create_user, admin_headers, db_session):

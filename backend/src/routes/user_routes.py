@@ -111,6 +111,10 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
         is_active=False,
         hashed_password=hashed_password,
         created_at=datetime.now(timezone.utc),
+        # El autoregistro siempre crea cuentas de ciudadano; las del equipo
+        # las da de alta un admin (POST /admin_user/users).
+        tipo_cuenta="ciudadano",
+        password_definida_at=datetime.now(timezone.utc),
     )
 
     # Asignar el rol "user" por defecto
@@ -555,6 +559,7 @@ async def recovery_passwd(
         )
     validar_password(user_in.password)
     user.hashed_password = get_password_hash(user_in.password)
+    user.password_definida_at = datetime.now(timezone.utc)
     # Cortar las sesiones abiertas: si alguien se metió con la cuenta, este es
     # justamente el momento en que hay que echarlo (AUT-03).
     revocar_sesiones(user)
@@ -783,6 +788,7 @@ async def change_own_password(
 
     validar_password(data.new_password)
     user.hashed_password = get_password_hash(data.new_password)
+    user.password_definida_at = datetime.now(timezone.utc)
     # Las demás sesiones de esta cuenta dejan de valer. La que está haciendo el
     # cambio también, así que el frontend tiene que pedir login de nuevo: es el
     # precio de que un token robado no sobreviva a un cambio de contraseña.
