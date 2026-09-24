@@ -100,37 +100,3 @@ def audit_log(
     except Exception as e:
         logger.error(f"Error registrando audit log: {e}")
         raise
-
-
-def get_audit_logs(
-    db: Session,
-    user_id: str | None = None,
-    action: str | None = None,
-    resource_type: str | None = None,
-    limit: int = 100,
-    offset: int = 0,
-) -> list[AuditLog]:
-    """
-    Obtiene registros de auditoría con filtros opcionales.
-
-    Args:
-        db: Sesión de base de datos.
-        user_id: Filtrar por usuario.
-        action: Filtrar por tipo de acción.
-        resource_type: Filtrar por tipo de recurso.
-        limit: Cantidad máxima de registros.
-        offset: Desplazamiento para paginación.
-
-    Returns:
-        list[AuditLog]: Lista de registros de auditoría.
-    """
-    query = db.query(AuditLog)
-
-    if user_id:
-        query = query.filter(AuditLog.user_id == user_id)
-    if action:
-        query = query.filter(AuditLog.action == action)
-    if resource_type:
-        query = query.filter(AuditLog.resource_type == resource_type)
-
-    return query.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit).all()
