@@ -5,7 +5,7 @@ Reduce código duplicado en los routers de formularios (PF, PJ, Asociación, etc
 """
 
 from contextlib import contextmanager
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel
@@ -69,15 +69,6 @@ def get_user_record(
     return record
 
 
-def get_user_record_or_none(
-    db: Session, model: type[ModelType], user_id: str
-) -> ModelType | None:
-    """
-    Obtiene el registro de un modelo filtrado por user_id, o None si no existe.
-    """
-    return db.query(model).filter(model.user_id == user_id).first()
-
-
 def check_duplicate_record(
     db: Session,
     model: type[ModelType],
@@ -95,33 +86,6 @@ def check_duplicate_record(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=error_message
         )
-
-
-def create_record(
-    db: Session,
-    model: type[ModelType],
-    data: CreateSchemaType,
-    user_id: str,
-    **extra_fields,
-) -> ModelType:
-    """
-    Crea un nuevo registro en la base de datos.
-
-    Args:
-        db: Sesión de base de datos
-        model: Clase del modelo SQLAlchemy
-        data: Schema Pydantic con los datos
-        user_id: ID del usuario actual
-        **extra_fields: Campos adicionales a agregar
-
-    Returns:
-        Instancia del modelo creado
-    """
-    db_record = model(**data.model_dump(), user_id=user_id, **extra_fields)
-    db.add(db_record)
-    _commit_or_conflict(db)
-    db.refresh(db_record)
-    return db_record
 
 
 @contextmanager
@@ -151,7 +115,7 @@ def apply_update_fields(record: ModelType, data: UpdateSchemaType) -> dict:
     ``borrador`` a enviado y disparar `lifecycle_service.procesar_actualizacion`)
     y decidir side-effects adicionales antes de `commit_or_conflict`.
 
-    Es lo que hace `update_record` por dentro; se expone aparte para los
+    Se expone aparte (y no como un update completo) para los
     modelos registrables (PF/PJ/AS/ESA/AGAM) que necesitan ese hook.
     """
     update_data = data.model_dump(exclude_unset=True)
@@ -175,14 +139,14 @@ def create_registrable_record(
     **extra_fields,
 ) -> ModelType:
     """
-    Como `create_record`, pero hace `flush` antes de commitear y, si se pasa
+    Crea el registro del usuario: hace `flush` antes de commitear y, si se pasa
     `on_flush(record, data_dict)`, le da la chance de reaccionar — pensado
     para `lifecycle_service.procesar_actualizacion`, por si un
     registro se crea directamente con `borrador: false` (sin pasar antes por
     un PUT de borrador), caso poco común pero posible (clientes que no usan
     el flujo multi-paso del frontend, o el propio create con default False).
 
-    Sin `on_flush`, se comporta igual que `create_record`.
+    Sin `on_flush`, es un alta común (add + commit, 409 si choca un único).
     """
     db_record = model(**data.model_dump(), user_id=user_id, **extra_fields)
     db.add(db_record)
@@ -193,24 +157,6 @@ def create_registrable_record(
     _commit_or_conflict(db)
     db.refresh(db_record)
     return db_record
-
-
-def update_record(db: Session, record: ModelType, data: UpdateSchemaType) -> ModelType:
-    """
-    Actualiza un registro existente con los datos proporcionados.
-
-    Args:
-        db: Sesión de base de datos
-        record: Instancia del modelo a actualizar
-        data: Schema Pydantic con los datos a actualizar
-
-    Returns:
-        Instancia del modelo actualizado
-    """
-    apply_update_fields(record, data)
-    _commit_or_conflict(db)
-    db.refresh(record)
-    return record
 
 
 def delete_record(db: Session, record: ModelType) -> None:
@@ -256,47 +202,3 @@ def get_record_by_id(
             status_code=status.HTTP_404_NOT_FOUND, detail=not_found_message
         )
     return record
-
-
-def add_child_record(
-    db: Session,
-    parent_model: type[ModelType],
-    child_model: type[Any],
-    parent_id_field: str,
-    data: CreateSchemaType,
-    user_id: str,
-    parent_not_found_message: str = "Registro padre no encontrado",
-) -> Any:
-    """
-    Agrega un registro hijo a un registro padre.
-
-    Ejemplo: Agregar integrante a Persona Jurídica
-
-    Args:
-        db: Sesión de base de datos
-        parent_model: Modelo del registro padre
-        child_model: Modelo del registro hijo
-        parent_id_field: Nombre del campo FK en el hijo (ej: "persona_juridica_id")
-        data: Schema con los datos del hijo
-        user_id: ID del usuario actual
-        parent_not_found_message: Mensaje si no se encuentra el padre
-
-    Returns:
-        Instancia del modelo hijo creado
-    """
-    # Obtener el registro padre
-    parent = db.query(parent_model).filter(parent_model.user_id == user_id).first()
-    if not parent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=parent_not_found_message
-        )
-
-    # Crear el registro hijo
-    child_data = data.model_dump()
-    child_data[parent_id_field] = parent.id
-
-    child_record = child_model(**child_data)
-    db.add(child_record)
-    _commit_or_conflict(db)
-    db.refresh(child_record)
-    return child_record
