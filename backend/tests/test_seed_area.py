@@ -55,7 +55,7 @@ def sembrado(db_session, uploads_seed, monkeypatch):
     # como modulo podria volver a ejecutarlo y levantar otro contenedor.
     for email in ("equipo.admin1@repa.gob.ar", "equipo.administracion1@repa.gob.ar", "equipo.juridico1@repa.gob.ar"):
         if not db_session.query(User).filter(User.email == email).first():
-            db_session.add(User(email=email, hashed_password=get_password_hash("Test1234"), is_active=True))
+            db_session.add(User(email=email, hashed_password=get_password_hash("Test1234"), is_active=True, tipo_cuenta="equipo"))
     db_session.commit()
     seed_area_data(db_session)
     return db_session
