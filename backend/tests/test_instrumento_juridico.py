@@ -188,6 +188,7 @@ class TestActaConsejoDirectivo:
             juridico_headers,
             tipo_documento="acta_consejo_directivo",
             acta={"ordenes_del_dia": "Temario"},
+            borrador=True,
         )
         assert client.delete(
             f"{BASE}/{creado['id']}", headers=juridico_headers
@@ -244,9 +245,22 @@ class TestInstrumentoCRUD:
         )
         assert resp.status_code == 403
 
-    def test_delete_happy_path(self, client, juridico_headers, instrumento):
-        resp = client.delete(f"{BASE}/{instrumento['id']}", headers=juridico_headers)
+    def test_delete_de_un_borrador(self, client, juridico_headers):
+        borrador = _crear(client, juridico_headers, borrador=True)
+        resp = client.delete(f"{BASE}/{borrador['id']}", headers=juridico_headers)
         assert resp.status_code == 204
+
+    def test_no_se_elimina_un_instrumento_cargado(
+        self, client, juridico_headers, instrumento
+    ):
+        # El digesto es un archivo: un instrumento cargado se retira
+        # archivandolo, no borrandolo.
+        resp = client.delete(f"{BASE}/{instrumento['id']}", headers=juridico_headers)
+        assert resp.status_code == 409
+        assert "Archivado" in resp.json()["detail"]
+        assert client.get(
+            f"{BASE}/{instrumento['id']}", headers=juridico_headers
+        ).status_code == 200
 
     def test_delete_not_found(self, client, juridico_headers):
         resp = client.delete(f"{BASE}/99999999", headers=juridico_headers)

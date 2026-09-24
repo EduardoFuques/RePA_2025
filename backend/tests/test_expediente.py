@@ -121,8 +121,8 @@ class TestExpedienteCRUD:
         assert float(data["monto_ejecutado"]) == 800000.00
         assert data["nombre_proyecto"] == creado["nombre_proyecto"]
 
-    def test_eliminar_expediente(self, client, admin_headers, crear_expediente):
-        creado = crear_expediente()
+    def test_eliminar_un_borrador(self, client, admin_headers, crear_expediente):
+        creado = crear_expediente(borrador=True)
         resp = client.delete(f"{_base(client)}/{creado['id']}", headers=admin_headers)
         assert resp.status_code == 204
         assert (
@@ -151,6 +151,19 @@ class TestExpedienteNotFound:
             headers=admin_headers,
         )
         assert resp.status_code == 404
+
+    def test_no_se_elimina_un_expediente_cargado(
+        self, client, admin_headers, crear_expediente
+    ):
+        # Queda en el historial de ejecucion presupuestaria: solo los
+        # borradores (cargas a medio hacer) se pueden eliminar.
+        creado = crear_expediente()
+        resp = client.delete(f"{_base(client)}/{creado['id']}", headers=admin_headers)
+        assert resp.status_code == 409
+        assert "borradores" in resp.json()["detail"]
+        assert client.get(
+            f"{_base(client)}/{creado['id']}", headers=admin_headers
+        ).status_code == 200
 
     def test_delete_inexistente(self, client, admin_headers):
         resp = client.delete(

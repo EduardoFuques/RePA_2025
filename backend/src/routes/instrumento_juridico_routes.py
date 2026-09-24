@@ -497,7 +497,14 @@ async def delete_instrumento(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Eliminar un instrumento. El acta asociada se borra en cascada."""
+    """Eliminar un instrumento — SOLO si es un borrador.
+
+    El digesto es un archivo institucional (el formulario habla de
+    trazabilidad, rendicion publica y versiones historicas): un instrumento
+    cargado no se borra, se retira pasandolo a estado_revision "archivado".
+    Lo que si se puede eliminar es una carga a medio hacer que dejo el
+    autoguardado. El acta asociada se borra en cascada.
+    """
     check_permissions(db, current_user, "instrumentos:manage")
 
     instrumento = (
@@ -507,6 +514,15 @@ async def delete_instrumento(
     )
     if not instrumento:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=MSG_NOT_FOUND)
+    if not instrumento.borrador:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Un instrumento ya cargado no se elimina del digesto: para "
+                "retirarlo, pasalo a estado de revisión Archivado. Solo se "
+                "pueden eliminar borradores."
+            ),
+        )
 
     tipo, numero = instrumento.tipo_documento, instrumento.numero_instrumento
     db.delete(instrumento)

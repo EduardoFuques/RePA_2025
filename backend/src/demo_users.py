@@ -39,6 +39,17 @@ TEST_ROLE_USERS = {
         ("usuario1@repa.gob.ar", "Test1234"),
         ("usuario2@repa.gob.ar", "Test1234"),
     ],
+    # Modulos de area: cada gerencia ve solo el suyo (expedientes:manage /
+    # instrumentos:manage). Sirven para probar justamente eso: que un gestor
+    # juridico no ve Expedientes y viceversa.
+    "gestor_administracion": [
+        ("administracion1@repa.gob.ar", "Test1234"),
+        ("administracion2@repa.gob.ar", "Test1234"),
+    ],
+    "gestor_juridico": [
+        ("juridico1@repa.gob.ar", "Test1234"),
+        ("juridico2@repa.gob.ar", "Test1234"),
+    ],
 }
 
 TEST_ESA_USERS = [

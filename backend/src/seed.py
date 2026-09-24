@@ -32,6 +32,7 @@ from src.models.persona_fisica_model import PersonaFisica
 from src.models.persona_juridica_model import PersonaJuridica
 from src.models.user_models import Permission, Role, User, UserRole
 from src.rbac import PERMISSIONS, SYSTEM_ROLES
+from src.seed_area import seed_area_data
 from src.services.repa_code_service import generar_codigo_repa
 from src.utils import get_password_hash
 
@@ -498,7 +499,7 @@ def _crear_usuario(db, email, password, role=None):
 
 
 def seed_test_users(db):
-    """Crea 2 usuarios de prueba por cada rol del sistema (14 en total)."""
+    """Crea 2 usuarios de prueba por cada rol del sistema (18 en total)."""
     roles_by_name = {r.rol: r for r in db.query(Role).all()}
 
     for rol, usuarios in TEST_ROLE_USERS.items():
@@ -993,7 +994,7 @@ def seed_data():
     Sincroniza RBAC (permisos + roles del sistema) y aplica el backfill del
     rol 'estudiante' — corre siempre, incluso en producción.
 
-    En desarrollo/QA, además crea 14 usuarios de prueba (2 por rol), datos
+    En desarrollo/QA, además crea 18 usuarios de prueba (2 por rol), datos
     de Padrón (Persona Física/Jurídica/Asociación/ESA), datos de Fomento
     (convocatorias, líneas, trámites, comités, semillero) y genera los
     documentos adjuntos de prueba. Todo es idempotente: correr esto en cada
@@ -1028,6 +1029,8 @@ def seed_data():
         # creó los EstudianteESA de los usuarios estudiante* de este seed.
         backfill_estudiante_role(db)
         seed_fomento_data(db)
+        # Expedientes e Instrumentos Juridicos, con sus PDF (ver seed_area.py).
+        seed_area_data(db)
 
         try:
             generate_test_documents(db)

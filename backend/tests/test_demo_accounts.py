@@ -32,11 +32,12 @@ def test_con_datos_demo_devuelve_las_cuentas_sin_autenticacion(client, entorno):
     resp = client.get(URL)
     assert resp.status_code == 200, resp.text
     cuentas = resp.json()
-    # 2 por cada uno de los 6 roles + 2 estudiantes.
-    assert len(cuentas) == 14
+    # 2 por cada uno de los 8 roles + 2 estudiantes.
+    assert len(cuentas) == 18
     assert {c["rol"] for c in cuentas} == {
         "admin", "gestor_fomento", "evaluador", "revisor_padron",
-        "lectura", "user", "estudiante",
+        "lectura", "user", "gestor_administracion", "gestor_juridico",
+        "estudiante",
     }
     assert {"rol", "email", "password"} <= set(cuentas[0])
 
