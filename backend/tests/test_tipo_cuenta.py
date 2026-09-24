@@ -53,3 +53,76 @@ def test_la_migracion_convierte_las_cuentas_mixtas(db_session):
     assert {r.rol for r in mixta.roles} == {"gestor_fomento"}
     assert ciudadana.tipo_cuenta == "ciudadano"
     assert {r.rol for r in ciudadana.roles} == {"user"}
+
+
+# --- require_ciudadano -----------------------------------------------------
+import pytest  # noqa: E402
+
+RUTAS_CIUDADANO = [
+    ("get", "/persona-fisica/me"),
+    ("get", "/persona-juridica/me"),
+    ("get", "/asociacion/me"),
+    ("get", "/esa/me"),
+    ("get", "/obras/me"),
+    ("get", "/exhibiciones/salas/me"),
+    ("get", "/rodajes/me"),
+    ("get", "/fomento/tramites/me"),
+    ("get", "/fomento/evaluadores/me"),
+    ("post", "/users/me/become-estudiante"),
+    ("get", "/upload/my-dni"),
+]
+
+
+def _como_equipo(db_session, user):
+    from src.models.user_models import User
+
+    db_session.query(User).filter(User.id == user.id).update({"tipo_cuenta": "equipo"})
+    db_session.commit()
+
+
+@pytest.fixture
+def equipo_headers(create_user, db_session):
+    user, headers = create_user(f"equipo-{uuid.uuid4().hex[:6]}@x.com", roles=["gestor_fomento"])
+    _como_equipo(db_session, user)
+    return headers
+
+
+@pytest.fixture
+def ciudadano_headers(create_user):
+    # Cuenta propia por test: become-estudiante le cambia los roles.
+    _, headers = create_user(f"ciu-{uuid.uuid4().hex[:6]}@x.com", roles=["user"])
+    return headers
+
+
+@pytest.mark.parametrize("metodo,ruta", RUTAS_CIUDADANO)
+def test_el_equipo_no_usa_endpoints_de_ciudadano(client, equipo_headers, metodo, ruta):
+    resp = getattr(client, metodo)(ruta, headers=equipo_headers)
+    assert resp.status_code == 403, (ruta, resp.text)
+    assert "cuentas del equipo" in resp.json()["detail"]
+
+
+@pytest.mark.parametrize("metodo,ruta", RUTAS_CIUDADANO)
+def test_el_ciudadano_si(client, ciudadano_headers, metodo, ruta):
+    resp = getattr(client, metodo)(ruta, headers=ciudadano_headers)
+    assert resp.status_code != 403, (ruta, resp.text)
+
+
+def test_token_emitido_antes_de_la_conversion(client, create_user, db_session):
+    """Review Focus 1: la dependencia lee la base, no el token."""
+    user, headers = create_user(f"conv-{uuid.uuid4().hex[:6]}@x.com", roles=["user"])
+    assert client.get("/persona-fisica/me", headers=headers).status_code != 403
+    _como_equipo(db_session, user)
+    assert client.get("/persona-fisica/me", headers=headers).status_code == 403
+
+
+def test_el_equipo_sube_adjuntos_de_area_pero_no_de_ciudadano(
+    client, equipo_headers, tmp_path, monkeypatch
+):
+    import src.routes.upload_routes as upload_routes
+
+    monkeypatch.setattr(upload_routes, "UPLOAD_BASE_DIR", str(tmp_path))
+    pdf = {"file": ("a.pdf", b"%PDF-1.4 x", "application/pdf")}
+    area = client.post("/upload/document/instrumento_juridico", headers=equipo_headers, files=pdf)
+    assert area.status_code == 200, area.text
+    ciudadano = client.post("/upload/document/estatuto", headers=equipo_headers, files=pdf)
+    assert ciudadano.status_code == 403

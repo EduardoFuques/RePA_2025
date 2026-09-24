@@ -38,6 +38,7 @@ from src.utils import (
     get_current_user,
     get_password_hash,
     get_user_permissions,
+    require_ciudadano,
     revocar_sesiones,
     token_revocado,
     update_last_login,
@@ -689,7 +690,7 @@ async def get_user_forms_metadata(
 )
 async def become_estudiante(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """

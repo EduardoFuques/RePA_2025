@@ -87,10 +87,32 @@ async def get_current_user(
         "email": db_user.email,
         "roles": [{"id": r.id, "rol": r.rol} for r in db_user.roles],
         "type": payload.get("type"),
+        # Leido de la base en cada request: una cuenta convertida a equipo
+        # pierde lo de ciudadano aunque tenga un token anterior.
+        "tipo_cuenta": db_user.tipo_cuenta,
     }
     # No registrar el payload completo para evitar fuga de PII en logs
     logger.debug(f"get_current_user - user_id: {user_data['id']}")
     return user_data
+
+
+MSG_SOLO_CIUDADANO = (
+    "Las cuentas del equipo no pueden usar funciones de ciudadano. "
+    "Usá una cuenta personal."
+)
+
+
+async def require_ciudadano(current_user: dict = Depends(get_current_user)) -> dict:
+    """Endpoints de ciudadano (registros RePA, tramite propio, postulacion...).
+
+    Una cuenta del equipo es de trabajo: no tiene registros propios. Ver
+    docs/superpowers/specs/2026-09-24-cuentas-de-equipo-design.md.
+    """
+    if current_user.get("tipo_cuenta") == "equipo":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=MSG_SOLO_CIUDADANO
+        )
+    return current_user
 
 
 def token_revocado(db_user: User, payload: dict) -> bool:
