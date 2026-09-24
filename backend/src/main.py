@@ -17,7 +17,7 @@ from src.config import (
 )
 from src.database import create_all_tables, get_db, run_migrations
 from src.logger import logger
-from src.middlewarelogg import log_requests
+from src.middlewarelogg import log_requests, redactar_url
 from src.rate_limiter import limiter, rate_limit_exceeded_handler
 from src.routes.admin_registros_routes import admin_registros_router
 from src.routes.admin_routes import admin_router
@@ -190,7 +190,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     # resolviéndose por sus propios handlers de FastAPI (match exacto de
     # clase antes de llegar acá vía MRO), así que esto solo captura fallas
     # realmente no anticipadas.
-    logger.exception("Excepción no manejada en %s %s", request.method, request.url.path)
+    logger.exception(
+        "Excepción no manejada en %s %s", request.method, redactar_url(request.url.path)
+    )
     return JSONResponse(
         status_code=500,
         content={"detail": "Error interno del servidor"},
