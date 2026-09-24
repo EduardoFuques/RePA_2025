@@ -28,6 +28,7 @@ import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 
+from src.demo_users import TEST_ROLE_USERS
 from src.models.expediente_model import ExpedienteAdministrativo
 from src.models.instrumento_juridico_model import (
     ActaConsejoDirectivo,
@@ -419,9 +420,9 @@ def seed_area_data(db):
 
     # Los PDF se guardan en el directorio de quien "los subio": un gestor de
     # cada area. Si el usuario no esta (seed parcial), se usa el admin.
-    admin = _usuario(db, "admin1@repa.gob.ar")
-    gestor_adm = _usuario(db, "administracion1@repa.gob.ar") or admin
-    gestor_jur = _usuario(db, "juridico1@repa.gob.ar") or admin
+    admin = _usuario(db, TEST_ROLE_USERS["admin"][0][0])
+    gestor_adm = _usuario(db, TEST_ROLE_USERS["gestor_administracion"][0][0]) or admin
+    gestor_jur = _usuario(db, TEST_ROLE_USERS["gestor_juridico"][0][0]) or admin
     if not (gestor_adm and gestor_jur):
         print("⚠️  Sin usuarios de prueba: no se siembran los modulos de area")
         return

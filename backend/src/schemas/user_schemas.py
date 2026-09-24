@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
 
 from src.password import PASSWORD_MAX_BYTES, password_excede_limite
 
@@ -90,6 +90,10 @@ class UserOut(UserBase):
     created_at: datetime
     last_login: datetime | None = None
     roles: list[RoleOut] = []
+    # ciudadano | equipo (ver docs/superpowers/specs/2026-09-24-cuentas-de-equipo-design.md)
+    tipo_cuenta: str = "ciudadano"
+    # Cuenta del equipo que todavia no definio su contrasena (link de activacion).
+    pendiente_activacion: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -151,3 +155,22 @@ class UserFormsMetadata(BaseModel):
     has_sala: bool = False
     has_exhibicion: bool = False
     has_festival: bool = False
+
+
+# === Alta de cuentas del equipo y activacion ===
+class TeamUserCreate(BaseModel):
+    """Alta de una cuenta del EQUIPO (nunca de ciudadano) por un admin."""
+
+    email: EmailStr
+    role_ids: list[int] = Field(min_length=1)
+
+
+class ActivacionIn(BaseModel):
+    password: Password
+
+
+class ActivacionOut(BaseModel):
+    user: UserOut
+    activation_url: str
+    expires_at: datetime
+    email_enviado: bool

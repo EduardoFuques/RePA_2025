@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from ..database import get_db
 from ..logger import logger
-from ..utils import get_current_user
+from ..utils import MSG_SOLO_CIUDADANO, get_current_user, require_ciudadano
 
 upload_router = APIRouter(prefix="/upload", tags=["upload"])
 
@@ -111,7 +111,7 @@ def ensure_user_dir(user_id: str):
 @upload_router.post("/dni")
 async def upload_dni(
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db=Depends(get_db),
 ):
     """
@@ -296,6 +296,11 @@ ALLOWED_DOC_TYPES = {
     },
 }
 
+# Adjuntos de los modulos de area: los unicos que sube una cuenta del equipo.
+# Los demas tipos son documentacion de ciudadano (estatuto, CUIT, actas de
+# asociacion...) y se rechazan para el equipo (ver require_ciudadano).
+ADJUNTOS_DE_AREA = {"expediente_resolucion", "instrumento_juridico", "acta_consejo_directivo"}
+
 MIME_MAP = {
     ".pdf": "application/pdf",
     ".jpg": "image/jpeg",
@@ -323,6 +328,9 @@ async def upload_document(
         raise HTTPException(
             status_code=400, detail=f"Tipo de documento no válido: {doc_type}"
         )
+
+    if current_user.get("tipo_cuenta") == "equipo" and doc_type not in ADJUNTOS_DE_AREA:
+        raise HTTPException(status_code=403, detail=MSG_SOLO_CIUDADANO)
 
     doc_config = ALLOWED_DOC_TYPES[doc_type]
 
@@ -410,7 +418,7 @@ async def get_document(
 
 @upload_router.delete("/dni/{filename}")
 async def delete_dni(
-    filename: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)
+    filename: str, current_user: dict = Depends(require_ciudadano), db=Depends(get_db)
 ):
     """
     Eliminar un archivo DNI del usuario
@@ -434,7 +442,7 @@ async def delete_dni(
 
 @upload_router.get("/dni/{filename:path}")
 async def get_dni(
-    filename: str, current_user: dict = Depends(get_current_user), db=Depends(get_db)
+    filename: str, current_user: dict = Depends(require_ciudadano), db=Depends(get_db)
 ):
     """
     Obtener un archivo DNI del usuario
@@ -469,7 +477,7 @@ async def get_dni(
 
 @upload_router.get("/my-dni")
 async def get_my_dni(
-    current_user: dict = Depends(get_current_user), db=Depends(get_db)
+    current_user: dict = Depends(require_ciudadano), db=Depends(get_db)
 ):
     """
     Obtener el DNI del usuario actual (si existe)

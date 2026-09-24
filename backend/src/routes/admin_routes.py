@@ -11,6 +11,7 @@ IMPORTANTE: las rutas estáticas (`/users`, `/roles`, `/permissions`,
 anidados (`/users/{id}`, `/roles/{id}`) para evitar colisiones de routing.
 """
 
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -18,20 +19,25 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from src.audit import audit_log
+from src.config import FRONTEND_URL, SMTP_HOST
 from src.database import get_db
 from src.models.audit_model import AuditAction, AuditLog
-from src.models.user_models import Permission, Role, User
-from src.rbac import SYSTEM_ROLE_NAMES
+from src.models.user_models import Permission, Role, TokenRecovery, User
+from src.rbac import SYSTEM_ROLE_NAMES, es_rol_de_equipo
 from src.schemas.user_schemas import (
+    ActivacionOut,
     PermissionOut,
     RoleCreate,
     RoleDetailOut,
     RoleUpdate,
+    TeamUserCreate,
     UserOut,
     UserRolePatch,
     UserUpdate,
 )
 from src.search import filtro_texto
+from src.services.email_service import send_activation_email
+from src.token_utils import create_access_token
 from src.utils import (
     get_password_hash,
     get_user_permissions,
@@ -285,6 +291,9 @@ async def get_users(
     search: str | None = Query(None, description="Búsqueda por email (ignora acentos)"),
     role: str | None = Query(None, description="Filtrar por nombre de rol"),
     is_active: bool | None = Query(None, description="Filtrar por estado de la cuenta"),
+    tipo_cuenta: str | None = Query(
+        None, pattern="^(ciudadano|equipo)$", description="ciudadano o equipo"
+    ),
     limit: int = Query(25, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -304,6 +313,8 @@ async def get_users(
         query = query.filter(filtro_texto(db, [User.email], search.strip()))
     if is_active is not None:
         query = query.filter(User.is_active.is_(is_active))
+    if tipo_cuenta:
+        query = query.filter(User.tipo_cuenta == tipo_cuenta)
     if role:
         query = query.filter(User.roles.any(Role.rol == role))
 
@@ -316,9 +327,8 @@ async def get_users(
         .all()
     )
 
-    # `tiene_persona_fisica`: para designar admin hace falta ya tener un
-    # registro de Persona Física (ver update_user_roles) — se muestra acá
-    # para que Administradores.jsx pueda avisarlo antes de intentarlo.
+    # `tiene_persona_fisica`: ya no se exige Persona Fisica para ser admin
+    # (cuentas de equipo); el campo queda por compatibilidad.
     items = []
     for u in usuarios:
         item = UserOut.model_validate(u).model_dump()
@@ -333,6 +343,61 @@ async def get_users(
     }
 
 
+def _validar_roles_para(tipo_cuenta: str, roles: list) -> None:
+    """Una cuenta es de ciudadano o del equipo: los roles no se mezclan."""
+    de_equipo = [r.rol for r in roles if es_rol_de_equipo(r.rol)]
+    de_ciudadano = [r.rol for r in roles if not es_rol_de_equipo(r.rol)]
+    if tipo_cuenta == "equipo":
+        if de_ciudadano:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Una cuenta del equipo no puede tener roles de ciudadano "
+                f"({', '.join(de_ciudadano)}).",
+            )
+        if not de_equipo:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Una cuenta del equipo tiene que conservar al menos un rol "
+                "del equipo. Para darla de baja, desactivala.",
+            )
+    elif de_equipo:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Una cuenta de ciudadano no puede recibir roles del equipo "
+            f"({', '.join(de_equipo)}). Creá una cuenta del equipo aparte.",
+        )
+
+
+# Link de activacion de una cuenta del equipo: 72 h, un solo uso.
+ACTIVACION_MINUTOS = 72 * 60
+
+
+def _emitir_activacion(db: Session, user: User) -> tuple[str, datetime, bool]:
+    """Invalida los links activos del usuario y emite uno nuevo.
+
+    El token queda en token_recovery (mismo mecanismo que la recuperacion de
+    contrasena) con su vencimiento; el JWT es de tipo "activacion", asi que un
+    link de recuperacion no sirve para activar ni al reves.
+    """
+    db.query(TokenRecovery).filter(
+        TokenRecovery.user_id == user.id, TokenRecovery.is_active.is_(True)
+    ).update({"is_active": False})
+    token = create_access_token(
+        data={"sub": user.id}, expires_delta=ACTIVACION_MINUTOS, type="activacion"
+    )
+    expira = datetime.now(timezone.utc) + timedelta(minutes=ACTIVACION_MINUTOS)
+    db.add(TokenRecovery(user_id=user.id, token_payload=token, expires_at=expira))
+    url = f"{FRONTEND_URL.rstrip('/')}/activar-cuenta/{token}"
+    enviado = False
+    if SMTP_HOST:
+        try:
+            send_activation_email(user.email, url)
+            enviado = True
+        except Exception:  # el link igual se devuelve: el admin lo manda a mano
+            enviado = False
+    return url, expira, enviado
+
+
 def _get_user_or_404(db: Session, user_id: str) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -340,6 +405,99 @@ def _get_user_or_404(db: Session, user_id: str) -> User:
             status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
         )
     return user
+
+
+@admin_router.post(
+    "/users",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ActivacionOut,
+    summary="Alta de una cuenta del equipo",
+)
+async def crear_usuario_equipo(
+    data: TeamUserCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_permissions("roles:manage")),
+):
+    """Crea una cuenta del EQUIPO (nunca de ciudadano) y devuelve su link de
+    activacion. Nadie conoce la contrasena inicial: la persona la define con
+    el link. Con SMTP configurado, el link ademas sale por mail."""
+    if db.query(User).filter(func.lower(User.email) == data.email.lower()).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cuenta con ese email.",
+        )
+    roles = db.query(Role).filter(Role.id.in_(data.role_ids)).all()
+    if len(roles) != len(set(data.role_ids)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Uno o más roles no existen"
+        )
+    _validar_roles_para("equipo", roles)
+    # Misma regla que al editar roles: roles:manage no alcanza para crear admins.
+    if any(r.rol.lower() == "admin" for r in roles):
+        actuales = {r["rol"].lower() for r in (current_user.get("roles") or [])}
+        if "admin" not in actuales:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo un administrador puede otorgar el rol admin",
+            )
+    user = User(
+        email=data.email,
+        is_active=True,
+        tipo_cuenta="equipo",
+        password_definida_at=None,
+        hashed_password=get_password_hash(secrets.token_urlsafe(32)),
+    )
+    user.roles = roles
+    db.add(user)
+    db.flush()
+    url, expira, enviado = _emitir_activacion(db, user)
+    audit_log(
+        db=db,
+        action=AuditAction.CREATE,
+        user_id=current_user["id"],
+        resource_type="User",
+        resource_id=user.id,
+        details={"tipo_cuenta": "equipo", "roles": [r.rol for r in roles]},
+        request=request,
+    )
+    db.commit()
+    db.refresh(user)
+    return {"user": user, "activation_url": url, "expires_at": expira, "email_enviado": enviado}
+
+
+@admin_router.post(
+    "/users/{user_id}/activation-link",
+    response_model=ActivacionOut,
+    summary="Nuevo link de activación de una cuenta del equipo",
+)
+async def regenerar_activacion(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_permissions("roles:manage")),
+):
+    """Invalida el link anterior y emite otro (vencido, perdido...). Solo para
+    cuentas del equipo que todavia no se activaron."""
+    user = _get_user_or_404(db, user_id)
+    if not user.pendiente_activacion:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La cuenta no está pendiente de activación.",
+        )
+    url, expira, enviado = _emitir_activacion(db, user)
+    audit_log(
+        db=db,
+        action=AuditAction.UPDATE,
+        user_id=current_user["id"],
+        resource_type="User",
+        resource_id=user.id,
+        details={"accion": "nuevo_link_activacion"},
+        request=request,
+    )
+    db.commit()
+    db.refresh(user)
+    return {"user": user, "activation_url": url, "expires_at": expira, "email_enviado": enviado}
 
 
 @admin_router.get(
@@ -385,6 +543,7 @@ async def update_user(
     if user_in.password:
         validar_password(user_in.password)
         user.hashed_password = get_password_hash(user_in.password)
+        user.password_definida_at = datetime.now(timezone.utc)
         cambios.append("password")
 
     if not cambios:
@@ -462,23 +621,6 @@ async def update_user_roles(
                 detail="Solo un administrador puede otorgar o quitar el rol admin",
             )
 
-    # Para ser designado administrador hay que ya estar en la plataforma:
-    # tener un registro de Persona Física en el Padrón. No aplica si el
-    # usuario ya era admin (ej. patch que solo toca otros roles). Va
-    # DESPUÉS del chequeo de permisos de arriba: quién puede intentarlo
-    # importa antes que si el objetivo califica.
-    if (
-        admin_role
-        and admin_role.id in add_ids
-        and admin_role.id not in original_role_ids
-        and user.persona_fisica is None
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El usuario no tiene un registro de Persona Física en el Padrón. "
-            "Para ser administrador primero tiene que completar su registro RePA.",
-        )
-
     # Auto-protección: el admin no puede quitarse su propio rol admin
     if (
         admin_role
@@ -512,7 +654,11 @@ async def update_user_roles(
                 detail="No se puede quitar el rol admin al último administrador activo",
             )
 
-    user.roles = db.query(Role).filter(Role.id.in_(current_role_ids)).all()
+    roles_resultantes = db.query(Role).filter(Role.id.in_(current_role_ids)).all()
+    # Se valida el conjunto RESULTANTE: un mismo patch puede sacar un rol y
+    # agregar otro. Una cuenta es de ciudadano o del equipo, nunca las dos.
+    _validar_roles_para(user.tipo_cuenta, roles_resultantes)
+    user.roles = roles_resultantes
     db.commit()
     db.refresh(user)
     audit_log(

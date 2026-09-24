@@ -64,6 +64,24 @@ def decode_verify_token(token: str) -> dict:
     return _decode(token, expected_type="verify")
 
 
+MSG_LINK_VENCIDO = "Este link venció. Pedile uno nuevo al administrador."
+
+
+def decode_activation_token(token: str) -> dict:
+    """Decodifica un link de activacion de cuenta del equipo (tipo "activacion").
+
+    Un link vencido es 400 con un mensaje claro y no el 401 generico: quien lo
+    abre no tiene sesion, y el frontend toma un 401 como sesion vencida.
+    """
+    try:
+        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=MSG_LINK_VENCIDO)
+    except jwt.InvalidTokenError:
+        pass  # _decode da el 401 de siempre
+    return _decode(token, expected_type="activacion")
+
+
 def decode_recovery_token(token: str) -> dict:
     """Decodifica un token de recuperación de contraseña (tipo "recover")."""
     return _decode(token, expected_type="recover")

@@ -58,6 +58,7 @@ from src.utils import (
     check_permissions,
     get_current_user,
     get_user_permissions,
+    require_ciudadano,
 )
 
 fomento_router = APIRouter(prefix="/fomento", tags=["fomento"])
@@ -261,7 +262,7 @@ async def delete_linea(
 async def create_tramite(
     data: TramiteFomentoCreate,
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Crear un nuevo Trámite de Fomento"""
@@ -286,7 +287,7 @@ async def create_tramite(
 
 @fomento_router.get("/tramites/me", response_model=TramiteFomentoOut)
 async def get_my_tramite(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: dict = Depends(require_ciudadano), db: Session = Depends(get_db)
 ):
     """Obtener el Trámite de Fomento del usuario actual"""
     tramite = (
@@ -306,7 +307,7 @@ async def get_my_tramite(
 async def update_my_tramite(
     data: TramiteFomentoUpdate,
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Actualizar el Trámite de Fomento del usuario actual"""
@@ -344,7 +345,7 @@ async def update_my_tramite(
 
 @fomento_router.get("/tramites", response_model=list[TramiteFomentoOut])
 async def list_tramites(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: dict = Depends(require_ciudadano), db: Session = Depends(get_db)
 ):
     """Listar todos los Trámites de Fomento del usuario"""
     tramites = (
@@ -379,7 +380,7 @@ async def list_all_tramites(
 @fomento_router.get("/tramites/{tramite_id}", response_model=TramiteFomentoOut)
 async def get_tramite(
     tramite_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Obtener un Trámite de Fomento por ID"""
@@ -403,7 +404,7 @@ async def update_tramite(
     tramite_id: int,
     data: TramiteFomentoUpdate,
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Actualizar un Trámite de Fomento"""
@@ -517,7 +518,7 @@ async def admin_update_tramite(
 async def delete_tramite(
     tramite_id: int,
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Eliminar un Trámite de Fomento"""
@@ -559,7 +560,7 @@ async def delete_tramite(
 )
 async def create_evaluador(
     data: EvaluadorCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Crear un nuevo Evaluador"""
@@ -572,7 +573,7 @@ async def create_evaluador(
 
 @fomento_router.get("/evaluadores/me", response_model=EvaluadorOut)
 async def get_my_evaluador(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: dict = Depends(require_ciudadano), db: Session = Depends(get_db)
 ):
     """Obtener el Evaluador del usuario actual"""
     evaluador = (
@@ -589,7 +590,7 @@ async def get_my_evaluador(
 @fomento_router.put("/evaluadores/me", response_model=EvaluadorOut)
 async def update_my_evaluador(
     data: EvaluadorUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Actualizar el Evaluador del usuario actual"""
@@ -612,7 +613,7 @@ async def update_my_evaluador(
 
 @fomento_router.get("/evaluadores", response_model=list[EvaluadorOut])
 async def list_evaluadores(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: dict = Depends(require_ciudadano), db: Session = Depends(get_db)
 ):
     """Listar todos los Evaluadores del usuario"""
     return db.query(Evaluador).filter(Evaluador.user_id == current_user["id"]).all()
@@ -635,7 +636,7 @@ async def list_all_evaluadores(
 @fomento_router.get("/evaluadores/{evaluador_id}", response_model=EvaluadorOut)
 async def get_evaluador(
     evaluador_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Obtener un Evaluador por ID"""
@@ -658,7 +659,7 @@ async def get_evaluador(
 async def update_evaluador(
     evaluador_id: int,
     data: EvaluadorUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Actualizar un Evaluador"""
@@ -688,7 +689,7 @@ async def update_evaluador(
 )
 async def delete_evaluador(
     evaluador_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Eliminar un Evaluador"""

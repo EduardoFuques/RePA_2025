@@ -19,7 +19,7 @@ from src.schemas.rodaje_schemas import (
     RodajeOut,
     RodajeUpdate,
 )
-from src.utils import check_permissions, get_current_user
+from src.utils import check_permissions, get_current_user, require_ciudadano
 
 rodaje_router = APIRouter()
 
@@ -42,7 +42,7 @@ MSG_NOT_FOUND = "No se encontró el registro de rodaje"
 async def create_rodaje(
     data: RodajeCreate,
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """
@@ -83,7 +83,7 @@ async def create_rodaje(
     "/me", response_model=list[RodajeListOut], summary="Listar mis rodajes"
 )
 async def get_my_rodajes(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: dict = Depends(require_ciudadano), db: Session = Depends(get_db)
 ):
     """Obtener todos los rodajes del usuario actual"""
     return (
@@ -99,7 +99,7 @@ async def get_my_rodajes(
 )
 async def get_my_rodaje(
     rodaje_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Obtener un rodaje específico del usuario actual"""
@@ -122,7 +122,7 @@ async def update_my_rodaje(
     rodaje_id: int,
     data: RodajeUpdate,
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Actualizar un rodaje del usuario actual"""
@@ -169,7 +169,7 @@ async def update_my_rodaje(
 async def delete_my_rodaje(
     rodaje_id: int,
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """Eliminar un rodaje del usuario actual (solo si es borrador)"""

@@ -38,6 +38,7 @@ from src.services.lifecycle_service import (
     EdicionNoPermitida,
     TransicionInvalida,
 )
+from src.utils import require_ciudadano
 
 
 @asynccontextmanager
@@ -211,24 +212,43 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
 # Incluir rutas a módulos
 app.include_router(user_router, prefix="/users", tags=["Users"])
 
-# Rutas de formularios RePA
+# Rutas de formularios RePA. Son enteramente de ciudadano (registro propio,
+# /me, y buscadores que solo usan esos formularios): una cuenta del equipo
+# recibe 403 en todas (require_ciudadano). Ver
+# docs/superpowers/specs/2026-09-24-cuentas-de-equipo-design.md.
+SOLO_CIUDADANO = [Depends(require_ciudadano)]
 app.include_router(
-    persona_fisica_router, prefix="/persona-fisica", tags=["Persona Física"]
+    persona_fisica_router,
+    prefix="/persona-fisica",
+    tags=["Persona Física"],
+    dependencies=SOLO_CIUDADANO,
 )
 app.include_router(
-    persona_juridica_router, prefix="/persona-juridica", tags=["Persona Jurídica"]
+    persona_juridica_router,
+    prefix="/persona-juridica",
+    tags=["Persona Jurídica"],
+    dependencies=SOLO_CIUDADANO,
 )
 app.include_router(
-    asociacion_router, prefix="/asociacion", tags=["Asociación/Colectivo"]
+    asociacion_router,
+    prefix="/asociacion",
+    tags=["Asociación/Colectivo"],
+    dependencies=SOLO_CIUDADANO,
 )
 app.include_router(
-    obra_audiovisual_router, prefix="/obras", tags=["Obras Audiovisuales (AGAM)"]
+    obra_audiovisual_router,
+    prefix="/obras",
+    tags=["Obras Audiovisuales (AGAM)"],
+    dependencies=SOLO_CIUDADANO,
 )
-app.include_router(esa_router, prefix="/esa", tags=["Estudiantes ESA"])
+app.include_router(
+    esa_router, prefix="/esa", tags=["Estudiantes ESA"], dependencies=SOLO_CIUDADANO
+)
 app.include_router(
     exhibicion_router,
     prefix="/exhibiciones",
     tags=["Exhibiciones, Salas, Festivales"],
+    dependencies=SOLO_CIUDADANO,
 )
 app.include_router(rodaje_router, prefix="/rodajes", tags=["Comisión de Filmaciones"])
 app.include_router(fomento_router, tags=["Fomento"])

@@ -85,3 +85,12 @@ SYSTEM_ROLES: dict[str, dict] = {
 
 # Roles del sistema (no eliminables / no renombrables)
 SYSTEM_ROLE_NAMES = set(SYSTEM_ROLES.keys())
+
+# Cuentas de ciudadano: user (autoregistro) y estudiante (ESA). Todo otro rol,
+# de sistema o creado despues, es de EQUIPO: una cuenta es de un tipo o del
+# otro, nunca de los dos (ver users.tipo_cuenta).
+ROLES_CIUDADANO = frozenset({"user", "estudiante"})
+
+
+def es_rol_de_equipo(nombre: str) -> bool:
+    return (nombre or "").lower() not in ROLES_CIUDADANO

@@ -17,6 +17,7 @@ from src.models.audit_model import AuditAction
 from src.models.user_models import Role, TokenRecovery, User
 from src.rate_limiter import limiter
 from src.schemas.user_schemas import (
+    ActivacionIn,
     PasswordChange,
     PasswordConfirm,
     RefreshTokenRequest,
@@ -28,8 +29,10 @@ from src.schemas.user_schemas import (
 )
 from src.services.email_service import send_recovery_email, send_verification_email
 from src.token_utils import (
+    MSG_LINK_VENCIDO,
     create_access_token,
     create_refresh_token,
+    decode_activation_token,
     decode_recovery_token,
     decode_refresh_token,
     decode_verify_token,
@@ -38,6 +41,7 @@ from src.utils import (
     get_current_user,
     get_password_hash,
     get_user_permissions,
+    require_ciudadano,
     revocar_sesiones,
     token_revocado,
     update_last_login,
@@ -110,6 +114,10 @@ def create_user(request: Request, user_in: UserCreate, db: Session = Depends(get
         is_active=False,
         hashed_password=hashed_password,
         created_at=datetime.now(timezone.utc),
+        # El autoregistro siempre crea cuentas de ciudadano; las del equipo
+        # las da de alta un admin (POST /admin_user/users).
+        tipo_cuenta="ciudadano",
+        password_definida_at=datetime.now(timezone.utc),
     )
 
     # Asignar el rol "user" por defecto
@@ -554,6 +562,7 @@ async def recovery_passwd(
         )
     validar_password(user_in.password)
     user.hashed_password = get_password_hash(user_in.password)
+    user.password_definida_at = datetime.now(timezone.utc)
     # Cortar las sesiones abiertas: si alguien se metió con la cuenta, este es
     # justamente el momento en que hay que echarlo (AUT-03).
     revocar_sesiones(user)
@@ -572,6 +581,72 @@ async def recovery_passwd(
     db.commit()
     db.refresh(user)
 
+    return user
+
+
+# Activacion de una cuenta del equipo (link que genera el admin al darla de alta)
+@user_router.post(
+    "/activar/{token}",
+    response_model=UserOut,
+    summary="Activar una cuenta del equipo",
+)
+@limiter.limit("5/minute")
+async def activar_cuenta(
+    request: Request, token: str, data: ActivacionIn, db: Session = Depends(get_db)
+):
+    """La persona define su contrasena con el link que le paso el admin.
+
+    El JWT vence a las 72 h (401 si ya vencio o si es de otro tipo, como uno
+    de recuperacion); ademas el registro en token_recovery tiene que seguir
+    activo (un solo uso; regenerar el link invalida el anterior) y vigente.
+    """
+    payload = decode_activation_token(token)
+    registro = (
+        db.query(TokenRecovery).filter(TokenRecovery.token_payload == token).first()
+    )
+    if not registro or not registro.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este link ya se usó o fue reemplazado por uno nuevo. "
+            "Pedile otro al administrador.",
+        )
+    vence = registro.expires_at
+    if vence is not None and vence.tzinfo is None:
+        vence = vence.replace(tzinfo=timezone.utc)
+    if vence is not None and vence < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=MSG_LINK_VENCIDO,
+        )
+    user = db.query(User).filter(User.id == payload.get("sub")).first()
+    if not user or user.tipo_cuenta != "equipo":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Link inválido.")
+    if not user.pendiente_activacion:
+        # Ya definio su contrasena por otra via (recuperacion, cambio del
+        # admin): el link que quedo dando vueltas no puede pisarla.
+        registro.is_active = False
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Esta cuenta ya está activa. Si no recordás la contraseña, "
+            "usá «Olvidé mi contraseña».",
+        )
+    validar_password(data.password)
+    user.hashed_password = get_password_hash(data.password)
+    user.password_definida_at = datetime.now(timezone.utc)
+    revocar_sesiones(user)
+    registro.is_active = False
+    audit_log(
+        db=db,
+        action="PASSWORD_RESET",
+        user_id=user.id,
+        resource_type="User",
+        resource_id=user.id,
+        details={"origen": "activacion"},
+        request=request,
+    )
+    db.commit()
+    db.refresh(user)
     return user
 
 
@@ -689,7 +764,7 @@ async def get_user_forms_metadata(
 )
 async def become_estudiante(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ciudadano),
     db: Session = Depends(get_db),
 ):
     """
@@ -782,6 +857,7 @@ async def change_own_password(
 
     validar_password(data.new_password)
     user.hashed_password = get_password_hash(data.new_password)
+    user.password_definida_at = datetime.now(timezone.utc)
     # Las demás sesiones de esta cuenta dejan de valer. La que está haciendo el
     # cambio también, así que el frontend tiene que pedir login de nuevo: es el
     # precio de que un token robado no sobreviva a un cambio de contraseña.

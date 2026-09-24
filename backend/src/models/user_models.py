@@ -1,7 +1,15 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+)
 from sqlalchemy.orm import relationship
 
 from src.database import Base
@@ -61,6 +69,11 @@ class Role(Base):
 # Modelo de User
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_cuenta IN ('ciudadano', 'equipo')", name="ck_users_tipo_cuenta"
+        ),
+    )
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
@@ -76,6 +89,18 @@ class User(Base):
     # distinguir el token emitido justo antes del cambio del que se emite justo
     # despues, al volver a loguearse.
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
+    # ciudadano: autoregistro (user/estudiante). equipo: roles internos, alta
+    # por un admin. Se fija al crear la cuenta; los roles se validan contra el.
+    tipo_cuenta = Column(String(20), nullable=False, default="ciudadano")
+    # Cuando la persona eligio su contrasena. NULL en una cuenta de equipo
+    # recien creada = pendiente de activacion.
+    password_definida_at = Column(DateTime, nullable=True)
+
+    @property
+    def pendiente_activacion(self) -> bool:
+        """Cuenta del equipo cuya persona todavia no eligio contrasena."""
+        return self.tipo_cuenta == "equipo" and self.password_definida_at is None
+
     # Relación con roles a través de la tabla UserRole
     roles = relationship("Role", secondary="user_roles", backref="users")
 
